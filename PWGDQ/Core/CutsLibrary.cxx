@@ -3144,7 +3144,6 @@ AnalysisCompositeCut* o2::aod::dqcuts::GetCompositeCut(const char* cutName)
     return cut;
   }
 
-
   //////////////////// Cuts for flow ////////////////////
   if (!nameStr.compare("flowTrackQualityQuarterEta1")) {
     cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
@@ -3171,6 +3170,132 @@ AnalysisCompositeCut* o2::aod::dqcuts::GetCompositeCut(const char* cutName)
     cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
     cut->AddCut(GetAnalysisCut("pTCutFlow"));
     cut->AddCut(GetAnalysisCut("quarterEta4"));
+    return cut;
+  }
+
+  if (!nameStr.compare("flowTrackQualityfineEta1")) {
+    cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("fineEta1"));
+    return cut;
+  }
+
+  if (!nameStr.compare("flowTrackQualityfineEta2")) {
+    cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("fineEta2"));
+    return cut;
+  }
+
+  if (!nameStr.compare("flowTrackQualityfineEta3")) {
+    cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("fineEta3"));
+    return cut;
+  }
+
+  if (!nameStr.compare("flowTrackQualityfineEta4")) {
+    cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("fineEta4"));
+    return cut;
+  }
+
+  if (!nameStr.compare("flowTrackQualityfineEta5")) {
+    cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("fineEta5"));
+    return cut;
+  }
+
+  if (!nameStr.compare("flowTrackQualityfineEta6")) {
+    cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("fineEta6"));
+    return cut;
+  }
+
+  if (!nameStr.compare("flowTrackQualityfineEta7")) {
+    cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("fineEta7"));
+    return cut;
+  }
+
+  if (!nameStr.compare("flowTrackQualityfineEta8")) {
+    cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("fineEta8"));
+    return cut;
+  }
+
+  if (!nameStr.compare("flowTrackQualityfineEta9")) {
+    cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("fineEta9"));
+    return cut;
+  }
+
+  if (!nameStr.compare("flowTrackQualityfineEta10")) {
+    cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("fineEta10"));
+    return cut;
+  }
+
+  if (!nameStr.compare("flowTrackQualityfineEta11")) {
+    cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("fineEta11"));
+    return cut;
+  }
+
+  if (!nameStr.compare("flowTrackQualityfineEta12")) {
+    cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("fineEta12"));
+    return cut;
+  }
+
+  if (!nameStr.compare("flowTrackQualityfineEta13")) {
+    cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("fineEta13"));
+    return cut;
+  }
+
+  if (!nameStr.compare("flowTrackQualityfineEta14")) {
+    cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("fineEta14"));
+    return cut;
+  }
+
+  if (!nameStr.compare("flowTrackQualityfineEta15")) {
+    cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("fineEta15"));
+    return cut;
+  }
+
+  if (!nameStr.compare("flowTrackQualityfineEta16")) {
+    cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("fineEta16"));
+    return cut;
+  }
+
+  if (!nameStr.compare("flowTrackQualityfineEta17")) {
+    cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("fineEta17"));
+    return cut;
+  }
+
+  if (!nameStr.compare("flowTrackQualityfineEta18")) {
+    cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("fineEta18"));
     return cut;
   }
 
@@ -5860,6 +5985,96 @@ AnalysisCut* o2::aod::dqcuts::GetAnalysisCut(const char* cutName)
 
   if (!nameStr.compare("quarterEta4")) {
     cut->AddCut(VarManager::kEta, 0.45, 0.9);
+    return cut;
+  }
+
+  if (!nameStr.compare("fineEta1")) {
+    cut->AddCut(VarManager::kEta, -0.9, -0.8);
+    return cut;
+  }
+
+  if (!nameStr.compare("fineEta2")) {
+    cut->AddCut(VarManager::kEta, -0.8, -0.7);
+    return cut;
+  }
+
+  if (!nameStr.compare("fineEta3")) {
+    cut->AddCut(VarManager::kEta, -0.7, -0.6);
+    return cut;
+  }
+
+  if (!nameStr.compare("fineEta4")) {
+    cut->AddCut(VarManager::kEta, -0.6, -0.5);
+    return cut;
+  }
+
+  if (!nameStr.compare("fineEta5")) {
+    cut->AddCut(VarManager::kEta, -0.5, -0.4);
+    return cut;
+  }
+
+  if (!nameStr.compare("fineEta6")) {
+    cut->AddCut(VarManager::kEta, -0.4, -0.3);
+    return cut;
+  }
+
+  if (!nameStr.compare("fineEta7")) {
+    cut->AddCut(VarManager::kEta, -0.3, -0.2);
+    return cut;
+  }
+
+  if (!nameStr.compare("fineEta8")) {
+    cut->AddCut(VarManager::kEta, -0.2, -0.1);
+    return cut;
+  }
+
+  if (!nameStr.compare("fineEta9")) {
+    cut->AddCut(VarManager::kEta, -0.1, 0.0);
+    return cut;
+  }
+
+  if (!nameStr.compare("fineEta10")) {
+    cut->AddCut(VarManager::kEta, 0.0, 0.1);
+    return cut;
+  }
+
+  if (!nameStr.compare("fineEta11")) {
+    cut->AddCut(VarManager::kEta, 0.1, 0.2);
+    return cut;
+  }
+
+  if (!nameStr.compare("fineEta12")) {
+    cut->AddCut(VarManager::kEta, 0.2, 0.3);
+    return cut;
+  }
+
+  if (!nameStr.compare("fineEta13")) {
+    cut->AddCut(VarManager::kEta, 0.3, 0.4);
+    return cut;
+  }
+
+  if (!nameStr.compare("fineEta14")) {
+    cut->AddCut(VarManager::kEta, 0.4, 0.5);
+    return cut;
+  }
+
+  if (!nameStr.compare("fineEta15")) {
+    cut->AddCut(VarManager::kEta, 0.5, 0.6);
+    return cut;
+  }
+
+  if (!nameStr.compare("fineEta16")) {
+    cut->AddCut(VarManager::kEta, 0.6, 0.7);
+    return cut;
+  }
+
+  if (!nameStr.compare("fineEta17")) {
+    cut->AddCut(VarManager::kEta, 0.7, 0.8);
+    return cut;
+  }
+
+  if (!nameStr.compare("fineEta18")) {
+    cut->AddCut(VarManager::kEta, 0.8, 0.9);
     return cut;
   }
 
