@@ -71,6 +71,8 @@ DECLARE_SOA_COLUMN(IsPrefilterVetoed, isPrefilterVetoed, int);
 namespace flowVec
 {
 DECLARE_SOA_COLUMN(MultFT0C, multFT0C, float);
+DECLARE_SOA_COLUMN(MultVtxContri, multVtxContri, float);
+DECLARE_SOA_COLUMN(VtxZ, vtxZ, float);
 DECLARE_SOA_COLUMN(PT, pT, std::vector<float>);
 DECLARE_SOA_COLUMN(Eta, eta, std::vector<float>);
 DECLARE_SOA_COLUMN(Phi, phi, std::vector<float>);
@@ -86,7 +88,7 @@ DECLARE_SOA_TABLE(MixingHashes, "AOD", "DQANAMIXHASH", dqanalysisflags::MixingHa
 DECLARE_SOA_TABLE(BarrelTrackCuts, "AOD", "DQANATRKCUTS", dqanalysisflags::IsBarrelSelected, dqanalysisflags::IsBarrelSelectedPrefilter);
 DECLARE_SOA_TABLE(MuonTrackCuts, "AOD", "DQANAMUONCUTS", dqanalysisflags::IsMuonSelected);
 DECLARE_SOA_TABLE(Prefilter, "AOD", "DQPREFILTER", dqanalysisflags::IsPrefilterVetoed);
-DECLARE_SOA_TABLE(FlowVecs, "AOD", "DQFLOWVECS", flowVec::MultFT0C, flowVec::PT, flowVec::Eta, flowVec::Phi, flowVec::Mass, flowVec::Sign, flowVec::QvecRe, flowVec::QvecIm, flowVec::QvecAmp);
+DECLARE_SOA_TABLE(FlowVecs, "AOD", "DQFLOWVECS", flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowVec::PT, flowVec::Eta, flowVec::Phi, flowVec::Mass, flowVec::Sign, flowVec::QvecRe, flowVec::QvecIm, flowVec::QvecAmp);
 } // namespace o2::aod
 
 // Declarations of various short names
@@ -328,7 +330,7 @@ struct AnalysisFlow {
         vecSign.push_back(dilepton.sign());
       }
 
-    qVectors(event.multFT0C(), vecPT, vecEta, vecPhi, vecMass, vecSign, qvecRe, qvecIm, qvecAmp);
+    qVectors(event.multFT0C(), event.numContrib(), event.posZ(), vecPT, vecEta, vecPhi, vecMass, vecSign, qvecRe, qvecIm, qvecAmp);
   }
 
   template <int TCandidateType, uint32_t TEventFillMap, uint32_t TTrackFillMap, typename TEvent, typename TTracks>
