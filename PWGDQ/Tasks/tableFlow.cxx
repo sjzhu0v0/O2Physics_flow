@@ -389,7 +389,7 @@ struct AnalysisFlow {
     std::vector<float> vecPhi;
     std::vector<float> vecMass;
     std::vector<float> vecSign;
-    qVectors(event.multFT0C(), vecPT, vecEta, vecPhi, vecMass, vecSign, qvecRe, qvecIm, qvecAmp);
+    qVectors(event.multFT0C(), event.numContrib(), event.posZ(), vecPT, vecEta, vecPhi, vecMass, vecSign, qvecRe, qvecIm, qvecAmp);
   }
 
   void processSkimmed(soa::Filtered<MyEventsVtxCovSelected>::iterator const& event, MyBarrelTracksSelectedWithCov const& tracks, soa::Filtered<MyDielectronCandidates> const& dileptons)
