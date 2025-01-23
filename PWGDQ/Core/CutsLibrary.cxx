@@ -3145,6 +3145,30 @@ AnalysisCompositeCut* o2::aod::dqcuts::GetCompositeCut(const char* cutName)
   }
 
   //////////////////// Cuts for flow ////////////////////
+  if (!nameStr.compare("CutQuarkaniumTrackQuality")) {
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
+    return cut;
+  }
+
+  if (!nameStr.compare("CutPrimaryTrackWithTPCandITSncls")) {
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("PrimaryTrackWithTPCandITSncls"));
+    return cut;
+  }
+
+  if (!nameStr.compare("CutPrimaryTrackWithTPCandWoITSncls")) {
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("PrimaryTrackWithTPCandWoITSncls"));
+    return cut;
+  }
+
+  if (!nameStr.compare("CutPrimaryTrackOnlyDCA")) {
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("PrimaryTrackOnlyDCA"));
+    return cut;
+  }
+
   if (!nameStr.compare("flowTrackQualityQuarterEta1")) {
     cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
     cut->AddCut(GetAnalysisCut("pTCutFlow"));
@@ -5951,6 +5975,29 @@ AnalysisCut* o2::aod::dqcuts::GetAnalysisCut(const char* cutName)
     cut->AddCut(VarManager::kTPCncls, 90., 159);
     cut->AddCut(VarManager::kITSncls, 2.5, 7.5);
     cut->AddCut(VarManager::kIsSPDany, 0.5, 1.5);
+    cut->AddCut(VarManager::kTrackDCAxy, -1, 1);
+    cut->AddCut(VarManager::kTrackDCAz, -3.0, 3.0);
+    return cut;
+  }
+
+  if (!nameStr.compare("PrimaryTrackWithTPCandITSncls")) {
+    cut->AddCut(VarManager::kTPCchi2, 0.0, 4.0);
+    cut->AddCut(VarManager::kTPCncls, 90., 159);
+    cut->AddCut(VarManager::kITSncls, 2.5, 7.5);
+    cut->AddCut(VarManager::kTrackDCAxy, -1, 1);
+    cut->AddCut(VarManager::kTrackDCAz, -3.0, 3.0);
+    return cut;
+  }
+
+  if (!nameStr.compare("PrimaryTrackWithTPCandWoITSncls")) {
+    cut->AddCut(VarManager::kTPCchi2, 0.0, 4.0);
+    cut->AddCut(VarManager::kTPCncls, 90., 159);
+    cut->AddCut(VarManager::kTrackDCAxy, -1, 1);
+    cut->AddCut(VarManager::kTrackDCAz, -3.0, 3.0);
+    return cut;
+  }
+
+  if (!nameStr.compare("PrimaryTrackOnlyDCA")) {
     cut->AddCut(VarManager::kTrackDCAxy, -1, 1);
     cut->AddCut(VarManager::kTrackDCAz, -3.0, 3.0);
     return cut;

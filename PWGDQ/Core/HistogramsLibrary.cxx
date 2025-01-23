@@ -387,6 +387,10 @@ void o2::aod::dqhistograms::DefineHistograms(HistogramManager* hm, const char* h
       if (subGroupStr.Contains("clssize")) {
         hm->AddHistogram(histClass, "ITSclssize_p", "Mean ITS cluster size vs P", false, 200, 0.0, 10.0, VarManager::kP, 150, 0.0, 15., VarManager::kITSmeanClsSize);
       }
+      if (subGroupStr.Contains("dca")) {
+        hm->AddHistogram(histClass, "ITSClusterMap_DCAxy_fine", "", false, 128, -0.5, 127.5, VarManager::kITSClusterMap, 1000, -2., 2., VarManager::kTrackDCAxy);
+        hm->AddHistogram(histClass, "ITSClusterMap_DCAz_fine", "", false, 128, -0.5, 127.5, VarManager::kITSClusterMap, 2000, -4., 4., VarManager::kTrackDCAz);
+      }
     }
     if (subGroupStr.Contains("itsvspt")) {
       hm->AddHistogram(histClass, "ITSncls_Pt", "Number of cluster in ITS vs Pt", false, 200, 0.0, 10.0, VarManager::kPt, 8, -0.5, 7.5, VarManager::kITSncls);
