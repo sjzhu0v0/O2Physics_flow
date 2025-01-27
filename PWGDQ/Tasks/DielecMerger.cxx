@@ -99,17 +99,21 @@ DECLARE_SOA_COLUMN(dileptonSign, DileptonSign, int);
 DECLARE_SOA_COLUMN(ditrackSign, DitrackSign, int);
 
 } // namespace dqanalysisflags
-} // namespace o2::aod
 
-namespace o2::aod
-{
+DECLARE_SOA_TABLE(EventCuts, "AOD", "DQANAEVCUTS", dqanalysisflags::IsEventSelected);
+DECLARE_SOA_TABLE(MixingHashes, "AOD", "DQANAMIXHASH", dqanalysisflags::MixingHash);
+DECLARE_SOA_TABLE(BarrelTrackCuts, "AOD", "DQANATRKCUTS", dqanalysisflags::IsBarrelSelected, dqanalysisflags::IsBarrelSelectedPrefilter);
+DECLARE_SOA_TABLE(MuonTrackCuts, "AOD", "DQANAMUONCUTS", dqanalysisflags::IsMuonSelected);
+DECLARE_SOA_TABLE(Prefilter, "AOD", "DQPREFILTER", dqanalysisflags::IsPrefilterVetoed);
+DECLARE_SOA_TABLE(BmesonCandidates, "AOD", "DQBMESONS", dqanalysisflags::massBcandidate, dqanalysisflags::pTBcandidate, dqanalysisflags::LxyBcandidate, dqanalysisflags::LxyzBcandidate, dqanalysisflags::LzBcandidate, dqanalysisflags::TauxyBcandidate, dqanalysisflags::TauzBcandidate, dqanalysisflags::CosPBcandidate, dqanalysisflags::Chi2Bcandidate);
+DECLARE_SOA_TABLE(XCandidates, "AOD", "DQX3872", dqanalysisflags::massXcandidate, dqanalysisflags::pTXcandidate, dqanalysisflags::rapidityXcandidate, dqanalysisflags::etaXcandidate, dqanalysisflags::massJpsicandidate, dqanalysisflags::massDipioncandidate, dqanalysisflags::pTJpsicandidate, dqanalysisflags::pTDipioncandidate, dqanalysisflags::massDiff, dqanalysisflags::angDistPion1, dqanalysisflags::angDistPion2, dqanalysisflags::cosDileptonDipion, dqanalysisflags::dcaxyPion1, dqanalysisflags::dcazPion1, dqanalysisflags::dcaxyPion2, dqanalysisflags::dcazPion2, dqanalysisflags::pTPion1, dqanalysisflags::pTPion2, dqanalysisflags::dileptonSign, dqanalysisflags::ditrackSign);
 DECLARE_SOA_TABLE(DielectronsMerged, "RTDIELECMERGED", //!
                   reducedpair::Mass, reducedpair::Pt, reducedpair::Eta, reducedpair::Phi, reducedpair::Sign,
                   reducedpair::McDecision,
                   reducedpair::Tauz,
                   reducedpair::Lz,
                   reducedpair::Lxy);
-}
+} // namespace o2::aod
 
 // Declarations of various short names
 using MyEvents = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended>;
