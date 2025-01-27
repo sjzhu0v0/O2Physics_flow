@@ -107,7 +107,7 @@ DECLARE_SOA_TABLE(MuonTrackCuts, "AOD", "DQANAMUONCUTS", dqanalysisflags::IsMuon
 DECLARE_SOA_TABLE(Prefilter, "AOD", "DQPREFILTER", dqanalysisflags::IsPrefilterVetoed);
 DECLARE_SOA_TABLE(BmesonCandidates, "AOD", "DQBMESONS", dqanalysisflags::massBcandidate, dqanalysisflags::pTBcandidate, dqanalysisflags::LxyBcandidate, dqanalysisflags::LxyzBcandidate, dqanalysisflags::LzBcandidate, dqanalysisflags::TauxyBcandidate, dqanalysisflags::TauzBcandidate, dqanalysisflags::CosPBcandidate, dqanalysisflags::Chi2Bcandidate);
 DECLARE_SOA_TABLE(XCandidates, "AOD", "DQX3872", dqanalysisflags::massXcandidate, dqanalysisflags::pTXcandidate, dqanalysisflags::rapidityXcandidate, dqanalysisflags::etaXcandidate, dqanalysisflags::massJpsicandidate, dqanalysisflags::massDipioncandidate, dqanalysisflags::pTJpsicandidate, dqanalysisflags::pTDipioncandidate, dqanalysisflags::massDiff, dqanalysisflags::angDistPion1, dqanalysisflags::angDistPion2, dqanalysisflags::cosDileptonDipion, dqanalysisflags::dcaxyPion1, dqanalysisflags::dcazPion1, dqanalysisflags::dcaxyPion2, dqanalysisflags::dcazPion2, dqanalysisflags::pTPion1, dqanalysisflags::pTPion2, dqanalysisflags::dileptonSign, dqanalysisflags::ditrackSign);
-DECLARE_SOA_TABLE(DielectronsMerged, "RTDIELECMERGED", //!
+DECLARE_SOA_TABLE(DielectronsMerged, "AOD", "RTDIELECMERGED", //!
                   reducedpair::Mass, reducedpair::Pt, reducedpair::Eta, reducedpair::Phi, reducedpair::Sign,
                   reducedpair::McDecision,
                   reducedpair::Tauz,
