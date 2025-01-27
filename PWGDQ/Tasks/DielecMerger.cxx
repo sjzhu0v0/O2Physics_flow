@@ -172,11 +172,11 @@ constexpr static int pairTypeMuMu = VarManager::kDecayToMuMu;
 constexpr static int pairTypeEMu = VarManager::kElectronMuon;
 
 struct AnalysisMergeTable {
-  Produces<aod::DielectronsMerge> tableMerged;
+  Produces<aod::DielectronsMerged> tableMerged;
 
   // Filter dileptonFilter = aod::reducedpair::mass > fConfigDileptonLowMass&& aod::reducedpair::mass < fConfigDileptonHighMass;
   // Filter filterBarrelTrackSelected = aod::dqanalysisflags::isBarrelSelected > 0;
-  void init(o2::framework::InitContext& context) {}
+  void init() {}
 
   void processMerge(TableToBeMergeds& table)
   {
