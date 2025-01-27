@@ -127,7 +127,7 @@ struct AnalysisMergeTable {
   void processMerge(TableToBeMergeds& table)
   {
     for (auto& dielectron : table) {
-      tableMerged(table.mass(), table.pt(), table.eta(), table.phi(), table.sign(), table.mcDecision(), table.tauz(), table.lz(), table.lxy());
+      tableMerged(dielectron.mass(), dielectron.pt(), dielectron.eta(), dielectron.phi(), dielectron.sign(), dielectron.mcDecision(), dielectron.tauz(), dielectron.lz(), dielectron.lxy());
     }
   }
 
