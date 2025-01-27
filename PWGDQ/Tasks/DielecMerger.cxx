@@ -99,6 +99,7 @@ DECLARE_SOA_COLUMN(dileptonSign, DileptonSign, int);
 DECLARE_SOA_COLUMN(ditrackSign, DitrackSign, int);
 
 } // namespace dqanalysisflags
+} // namespace o2::aod
 
 namespace o2::aod
 {
