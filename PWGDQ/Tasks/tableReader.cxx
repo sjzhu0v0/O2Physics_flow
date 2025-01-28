@@ -202,9 +202,9 @@ struct AnalysisEventSelection {
     }
 
     // CCDB configuration
-    fCCDB->setURL(fConfigCcdbUrl.value);
-    fCCDB->setCaching(true);
-    fCCDB->setLocalObjectValidityChecking();
+    // fCCDB->setURL(fConfigCcdbUrl.value);
+    // fCCDB->setCaching(true);
+    // fCCDB->setLocalObjectValidityChecking();
     // Not later than now objects
     // fCCDB->setCreatedNotAfter(fConfigNoLaterThan.value);
 
@@ -214,7 +214,8 @@ struct AnalysisEventSelection {
   template <uint32_t TEventFillMap, typename TEvent>
   void runEventSelection(TEvent const& event)
   {
-    if (event.runNumber() != fLastRun) {
+    if (false) {
+    // if (event.runNumber() != fLastRun) {
       auto alppar = fCCDB->getForTimeStamp<o2::itsmft::DPLAlpideParam<0>>("ITS/Config/AlpideParam", event.timestamp());
       EventSelectionParams* par = fCCDB->getForTimeStamp<EventSelectionParams>("EventSelection/EventSelectionParams", event.timestamp());
       int itsROFrameStartBorderMargin = fConfigITSROFrameStartBorderMargin < 0 ? par->fITSROFrameStartBorderMargin : fConfigITSROFrameStartBorderMargin;
@@ -362,11 +363,11 @@ struct AnalysisTrackSelection {
     }
     if (fConfigComputeTPCpostCalib) {
       // CCDB configuration
-      fCCDB->setURL(fConfigCcdbUrl.value);
-      fCCDB->setCaching(true);
-      fCCDB->setLocalObjectValidityChecking();
+      // fCCDB->setURL(fConfigCcdbUrl.value);
+      // fCCDB->setCaching(true);
+      // fCCDB->setLocalObjectValidityChecking();
       // Not later than now objects
-      fCCDB->setCreatedNotAfter(fConfigNoLaterThan.value);
+      // fCCDB->setCreatedNotAfter(fConfigNoLaterThan.value);
     }
   }
 
@@ -557,9 +558,9 @@ struct AnalysisPrefilterSelection {
 
     fCurrentRun = 0;
 
-    ccdb->setURL(ccdburl.value);
-    ccdb->setCaching(true);
-    ccdb->setLocalObjectValidityChecking();
+    // ccdb->setURL(ccdburl.value);
+    // ccdb->setCaching(true);
+    // ccdb->setLocalObjectValidityChecking();
 
     fPairCut = new AnalysisCompositeCut(true);
     TString pairCutStr = fConfigPrefilterPairCut.value;
@@ -599,7 +600,7 @@ struct AnalysisPrefilterSelection {
     fPrefiltermap.clear();
 
     if (events.size() > 0 && fCurrentRun != events.begin().runNumber()) {
-      grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(grpmagPath, events.begin().timestamp());
+      // grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(grpmagPath, events.begin().timestamp());
       if (grpmag != nullptr) {
         VarManager::SetMagneticField(grpmag->getNominalL3Field());
       } else {
@@ -675,9 +676,9 @@ struct AnalysisEventMixing {
 
     fCurrentRun = 0;
 
-    ccdb->setURL(ccdburl.value);
-    ccdb->setCaching(true);
-    ccdb->setLocalObjectValidityChecking();
+    // ccdb->setURL(ccdburl.value);
+    // ccdb->setCaching(true);
+    // ccdb->setLocalObjectValidityChecking();
 
     VarManager::SetDefaultVarNames();
     fHistMan = new HistogramManager("analysisHistos", "aa", VarManager::kNVars);
@@ -810,7 +811,7 @@ struct AnalysisEventMixing {
   void runSameSide(TEvents& events, TTracks const& tracks, Preslice<TTracks>& preSlice)
   {
     if (events.size() > 0 && fCurrentRun != events.begin().runNumber()) {
-      grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(grpmagPath, events.begin().timestamp());
+      // grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(grpmagPath, events.begin().timestamp());
       if (grpmag != nullptr) {
         VarManager::SetMagneticField(grpmag->getNominalL3Field());
       } else {
@@ -854,7 +855,7 @@ struct AnalysisEventMixing {
   void runBarrelMuon(TEvents& events, TTracks const& tracks, TMuons const& muons)
   {
     if (events.size() > 0 && fCurrentRun != events.begin().runNumber()) {
-      grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(grpmagPath, events.begin().timestamp());
+      // grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(grpmagPath, events.begin().timestamp());
       if (grpmag != nullptr) {
         VarManager::SetMagneticField(grpmag->getNominalL3Field());
       } else {
@@ -1003,18 +1004,18 @@ struct AnalysisSameEventPairing {
 
     fCurrentRun = 0;
 
-    ccdb->setURL(ccdburl.value);
-    ccdb->setCaching(true);
-    ccdb->setLocalObjectValidityChecking();
+    // ccdb->setURL(ccdburl.value);
+    // ccdb->setCaching(true);
+    /// ccdb->setLocalObjectValidityChecking();
 
     if (fNoCorr) {
       VarManager::SetupFwdDCAFitterNoCorr();
     } else if (fCorrFullGeo || (fConfigUseKFVertexing && fPropToPCA)) {
       if (!o2::base::GeometryManager::isGeometryLoaded()) {
-        ccdb->get<TGeoManager>(geoPath);
+        // ccdb->get<TGeoManager>(geoPath);
       }
     } else {
-      lut = o2::base::MatLayerCylSet::rectifyPtrFromFile(ccdb->get<o2::base::MatLayerCylSet>(lutPath));
+      // lut = o2::base::MatLayerCylSet::rectifyPtrFromFile(ccdb->get<o2::base::MatLayerCylSet>(lutPath));
       VarManager::SetupMatLUTFwdDCAFitter(lut);
     }
 
@@ -1160,7 +1161,7 @@ struct AnalysisSameEventPairing {
     }
     if (fCurrentRun != event.runNumber()) {
       if (fUseRemoteField) {
-        grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(grpmagPath, event.timestamp());
+        // grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(grpmagPath, event.timestamp());
         if (grpmag != nullptr) {
           mMagField = grpmag->getNominalL3Field();
         } else {
@@ -1701,7 +1702,7 @@ struct AnalysisDileptonHadron {
     // set up KF or DCAfitter
     if (fCurrentRun != event.runNumber()) { // start: runNumber
       if (fUseRemoteField.value) {
-        grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(grpmagPath, event.timestamp());
+        // grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(grpmagPath, event.timestamp());
         if (grpmag != nullptr) {
           mMagField = grpmag->getNominalL3Field();
         } else {
