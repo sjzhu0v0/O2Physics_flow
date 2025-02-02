@@ -61,6 +61,7 @@ DECLARE_SOA_COLUMN(IsMuonSelected, isMuonSelected, int);
 DECLARE_SOA_TABLE(EventCuts, "AOD", "EVENTCUTS", dqanalysisflags::IsEventSelected);
 DECLARE_SOA_TABLE(BarrelTrackCuts, "AOD", "BARRELTRACKCUTS", dqanalysisflags::IsBarrelSelected);
 DECLARE_SOA_TABLE(MuonTrackCuts, "AOD", "DQANAMUONCUTS", dqanalysisflags::IsMuonSelected);
+DECLARE_SOA_TABLE(MCTrackInfo, "AOD", "MCTRACKINFO", collision::PosX, collision::PosY, collision::PosZ, collision::NumContrib, reducedevent::MCPosX, reducedevent::MCPosYreducedevent::MCPosZ, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, reducedtrack::Sign, reducedtrack::DcaXY, reducedtrack::DcaZ, reducedtrackMC::Pt, reducedtrackMC::Eta, reducedtrackMC::Phi, mcparticle::PdgCode, mcparticle::Vx, mcparticle::Vy, mcparticle::Vz, mcparticle::Vt);
 } // namespace o2::aod
 
 // using MyEvents = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsMC>;
@@ -163,6 +164,7 @@ struct AnalysisEventSelection {
 
 struct AnalysisTrackSelection {
   Produces<aod::BarrelTrackCuts> trackSel;
+  Produces<aod::MCTrackInfo> mcTrackInfo;
   OutputObj<THashList> fOutputList{"output"};
   Configurable<std::string> fConfigCuts{"cfgTrackCuts", "jpsiPID1", "Comma separated list of barrel track cuts"};
   Configurable<std::string> fConfigMCSignals{"cfgTrackMCSignals", "", "Comma separated list of MC signals"};
@@ -274,6 +276,7 @@ struct AnalysisTrackSelection {
         }
       }
       trackSel(static_cast<int>(filterMap));
+      mcTrackInfo(event.posX(), event.posY(), event.posZ(), event.numContrib(), event.reducedMCevent().mcPosX(), event.reducedMCevent().mcPosY(), event.reducedMCevent().mcPosZ(), track.pt(), track.eta(), track.phi(), track.sign(), track.dcaXY(), track.dcaZ(), track.reducedMCTrack().pt(), track.reducedMCTrack().eta(), track.reducedMCTrack().phi(), track.mcParticle().pdgCode(), track.mcParticle().vx(), track.mcParticle().vy(), track.mcParticle().vz(), track.mcParticle().vt());
       if (!filterMap) {
         continue;
       }
@@ -308,8 +311,8 @@ struct AnalysisTrackSelection {
             fHistMan->FillHistClass(fHistNamesMCMatched[j][i].Data(), VarManager::fgValues);
           }
         } // end loop over cuts
-      }   // end loop over MC signals
-    }     // end loop over tracks
+      } // end loop over MC signals
+    } // end loop over tracks
   }
 
   void processSkimmed(MyEventsSelected::iterator const& event, MyBarrelTracks const& tracks, ReducedMCEvents const& eventsMC, ReducedMCTracks const& tracksMC)
@@ -481,8 +484,8 @@ struct AnalysisMuonSelection {
             fHistMan->FillHistClass(fHistNamesMCMatched[j][i].Data(), VarManager::fgValues);
           }
         } // end loop over cuts
-      }   // end loop over MC signals
-    }     // end loop over muons
+      } // end loop over MC signals
+    } // end loop over muons
   }
 
   void processSkimmed(MyEventsSelected::iterator const& event, MyMuonTracks const& muons, ReducedMCEvents const& eventsMC, ReducedMCTracks const& tracksMC)
@@ -622,8 +625,8 @@ struct AnalysisSameEventPairing {
           }
           fBarrelHistNamesMCmatched.push_back(mcSigClasses);
         } // end loop over cuts
-      }   // end if(cutNames.IsNull())
-    }     // end if processBarrel
+      } // end if(cutNames.IsNull())
+    } // end if processBarrel
 
     if (enableMuonHistos) {
       TString cutNames = fConfigMuonCuts.value;
@@ -650,8 +653,8 @@ struct AnalysisSameEventPairing {
           }
           fMuonHistNamesMCmatched.push_back(mcSigClasses);
         } // end loop over cuts
-      }   // end if(cutNames.IsNull())
-    }     // end if processMuon
+      } // end if(cutNames.IsNull())
+    } // end if processMuon
 
     // NOTE: For the electron-muon pairing, the policy is that the user specifies n track and n muon cuts via configurables
     //     So for each barrel cut there is a corresponding muon cut
@@ -897,7 +900,7 @@ struct AnalysisSameEventPairing {
         }
       }
     } // end loop over barrel track pairs
-  }   // end runPairing
+  } // end runPairing
 
   template <typename TTracksMC>
   void runMCGen(TTracksMC& groupedMCTracks)
@@ -947,7 +950,7 @@ struct AnalysisSameEventPairing {
         }
       }
     } // end of true pairing loop
-  }   // end runMCGen
+  } // end runMCGen
 
   // Preslice<ReducedMCTracks> perReducedMcEvent = aod::reducedtrackMC::reducedMCeventId;
   PresliceUnsorted<ReducedMCTracks> perReducedMcEvent = aod::reducedtrackMC::reducedMCeventId;
