@@ -87,6 +87,7 @@ DECLARE_SOA_TABLE(BarrelTrackCuts, "AOD", "DQANATRKCUTS", dqanalysisflags::IsBar
 DECLARE_SOA_TABLE(MuonTrackCuts, "AOD", "DQANAMUONCUTS", dqanalysisflags::IsMuonSelected);
 DECLARE_SOA_TABLE(Prefilter, "AOD", "DQPREFILTER", dqanalysisflags::IsPrefilterVetoed);
 DECLARE_SOA_TABLE(BmesonCandidates, "AOD", "DQBMESONS", dqanalysisflags::massBcandidate, dqanalysisflags::pTBcandidate, dqanalysisflags::LxyBcandidate, dqanalysisflags::LxyzBcandidate, dqanalysisflags::LzBcandidate, dqanalysisflags::TauxyBcandidate, dqanalysisflags::TauzBcandidate, dqanalysisflags::CosPBcandidate, dqanalysisflags::Chi2Bcandidate);
+DECLARE_SOA_TABLE(TrackInfo, "AOD", "TRACKINFO", collision::PosX, collision::PosY, collision::PosZ, collision::NumContrib, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, reducedtrack::Sign, reducedtrack::DcaXY, reducedtrack::DcaZ, track::ITSClusterMap);
 } // namespace o2::aod
 
 // Declarations of various short names
@@ -300,6 +301,7 @@ struct AnalysisEventSelection {
 
 struct AnalysisTrackSelection {
   Produces<aod::BarrelTrackCuts> trackSel;
+  Produces<aod::TrackInfo> trackInfo;
   OutputObj<THashList> fOutputList{"output"};
   // The list of cuts should contain all the track cuts needed later in analysis, including
   //  for candidate electron selection (+ eventual prefilter cuts) and other needs like quarkonium - hadron correlations
@@ -421,6 +423,7 @@ struct AnalysisTrackSelection {
       }
 
       trackSel(static_cast<int>(filterMap), static_cast<int>(prefilterSelected));
+      trackInfo(event.posX(), event.posY(), event.posZ(), event.numContrib(),  track.pt(), track.eta(), track.phi(), track.sign(), track.dcaXY(), track.dcaZ(), track.itsClusterMap());
     } // end loop over tracks
   }
 
