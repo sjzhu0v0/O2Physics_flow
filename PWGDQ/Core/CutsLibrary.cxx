@@ -6744,7 +6744,7 @@ AnalysisCut* o2::aod::dqcuts::GetAnalysisCut(const char* cutName)
     return cut;
   }
 
-  if (!nameStr.compare("pTCutFlow")) {`
+  if (!nameStr.compare("pTCutFlow")) {
     cut->AddCut(VarManager::kPt, 0.2, 3.0);
     return cut;
   }
@@ -6758,6 +6758,7 @@ AnalysisCut* o2::aod::dqcuts::GetAnalysisCut(const char* cutName)
 
     cut->AddCut(VarManager::kTrackDCAxy, f_lowDCAxy_depPt, f_highDCAxy_depPt, false, VarManager::kPt, 0.1, 4.0, false);
     cut->AddCut(VarManager::kTrackDCAz, f_lowDCAz_depPt, f_highDCAz_depPt, false, VarManager::kPt, 0.1, 4.0, false);
+    return cut;
   }
 
   delete cut;
