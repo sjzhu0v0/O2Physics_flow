@@ -3444,7 +3444,14 @@ AnalysisCompositeCut* o2::aod::dqcuts::GetCompositeCut(const char* cutName)
   }
 
   //////////////////// Cuts for flow ////////////////////
-  if (!nameStr.compare("CutQuarkaniumTrackQuality")) {
+  if (!nameStr.compare("CutPrimaryTrackNew")) {
+    cut->AddCut(GetAnalysisCut("pTCutFlow"));
+    cut->AddCut(GetAnalysisCut("RefTrackQuality"));
+    cut->AddCut(GetAnalysisCut("primaryTrackDCAcutsPtDependent"));
+    return cut;
+  }
+
+  if (!nameStr.compare("CutPrimaryTrack")) {
     cut->AddCut(GetAnalysisCut("pTCutFlow"));
     cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
     return cut;
@@ -6620,6 +6627,13 @@ AnalysisCut* o2::aod::dqcuts::GetAnalysisCut(const char* cutName)
   }
 
   ////////////////////// Cuts for flow ///////////////////////
+  if (!nameStr.compare("RefTrackQuality")) {
+    cut->AddCut(VarManager::kTPCchi2, 0.0, 4.0);
+    cut->AddCut(VarManager::kTPCncls, 80., 159);
+    cut->AddCut(VarManager::kITSncls, 2.5, 7.5);
+    return cut;
+  }
+
   if (!nameStr.compare("quarterEta1")) {
     cut->AddCut(VarManager::kEta, -0.9, -0.45);
     return cut;
@@ -6733,6 +6747,17 @@ AnalysisCut* o2::aod::dqcuts::GetAnalysisCut(const char* cutName)
   if (!nameStr.compare("pTCutFlow")) {
     cut->AddCut(VarManager::kPt, 0.2, 3.0);
     return cut;
+  }
+
+  if (!nameStr.compare("primaryTrackDCAcutsPtDependent")) {
+    TF1* f_highDCAxy_depPt = new TF1("f_highDCAxy_depPt", "(x >= 0.1 && x < 0.2) * 0.03052 + (x >= 0.2 && x < 0.3) * 0.01554 + (x >= 0.3 && x < 0.4) * 0.01088 + (x >= 0.4 && x < 0.5) * 0.00858 + (x >= 0.5 && x < 0.8) * 0.00658 + (x >= 0.8 && x < 1.2) * 0.00480 + (x >= 1.2 && x < 1.6) * 0.00378 + (x >= 1.6 && x < 2.4) * 0.00298 + (x >= 2.4 && x < 3.2) * 0.00228 + (x >= 3.2 && x <= 4.0) * 0.00184", 0.1, 4.0);
+    TF1* f_lowDCAxy_depPt = new TF1("f_lowDCAxy_depPt", "(x >= 0.1 && x < 0.2) * -0.03052 + (x >= 0.2 && x < 0.3) * -0.01554 + (x >= 0.3 && x < 0.4) * -0.01088 + (x >= 0.4 && x < 0.5) * -0.00858 + (x >= 0.5 && x < 0.8) * -0.00658 + (x >= 0.8 && x < 1.2) * -0.00480 + (x >= 1.2 && x < 1.6) * -0.00378 + (x >= 1.6 && x < 2.4) * -0.00298 + (x >= 2.4 && x < 3.2) * -0.00228 + (x >= 3.2 && x <= 4.0) * -0.00184", 0.1, 4.0);
+
+    TF1* f_highDCAz_depPt = new TF1("f_highDCAz_depPt", "(x >= 0.1 && x < 0.2) * 0.03268 + (x >= 0.2 && x < 0.3) * 0.01758 + (x >= 0.3 && x < 0.4) * 0.01238 + (x >= 0.4 && x < 0.5) * 0.00978 + (x >= 0.5 && x < 0.8) * 0.00744 + (x >= 0.8 && x < 1.2) * 0.00536 + (x >= 1.2 && x < 1.6) * 0.00412 + (x >= 1.6 && x < 2.4) * 0.00324 + (x >= 2.4 && x < 3.2) * 0.00242 + (x >= 3.2 && x <= 4.0) * 0.00194", 0.1, 4.0);
+    TF1* f_lowDCAz_depPt = new TF1("f_lowDCAz_depPt", "(x >= 0.1 && x < 0.2) * -0.03268 + (x >= 0.2 && x < 0.3) * -0.01758 + (x >= 0.3 && x < 0.4) * -0.01238 + (x >= 0.4 && x < 0.5) * -0.00978 + (x >= 0.5 && x < 0.8) * -0.00744 + (x >= 0.8 && x < 1.2) * -0.00536 + (x >= 1.2 && x < 1.6) * -0.00412 + (x >= 1.6 && x < 2.4) * -0.00324 + (x >= 2.4 && x < 3.2) * -0.00242 + (x >= 3.2 && x <= 4.0) * -0.00194", 0.1, 4.0);
+
+    cut->AddCut(VarManager::kTrackDCAxy, f_lowDCAxy_depPt, f_highDCAxy_depPt, false, VarManager::kPt, 0.1, 4.0, false);
+    cut->AddCut(VarManager::kTrackDCAz, f_lowDCAz_depPt, f_highDCAz_depPt, false, VarManager::kPt, 0.1, 4.0, false);
   }
 
   delete cut;
