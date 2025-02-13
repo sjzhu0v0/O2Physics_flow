@@ -6744,7 +6744,7 @@ AnalysisCut* o2::aod::dqcuts::GetAnalysisCut(const char* cutName)
     return cut;
   }
 
-  if (!nameStr.compare("pTCutFlow")) {
+  if (!nameStr.compare("pTCutFlow")) {`
     cut->AddCut(VarManager::kPt, 0.2, 3.0);
     return cut;
   }
