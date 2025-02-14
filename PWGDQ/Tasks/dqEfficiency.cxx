@@ -56,12 +56,15 @@ namespace dqanalysisflags
 DECLARE_SOA_COLUMN(IsEventSelected, isEventSelected, int);
 DECLARE_SOA_COLUMN(IsBarrelSelected, isBarrelSelected, int);
 DECLARE_SOA_COLUMN(IsMuonSelected, isMuonSelected, int);
+DECLARE_SOA_COLUMN(McPt, mcPt, float);
+DECLARE_SOA_COLUMN(McEta, mcEta, float);
+DECLARE_SOA_COLUMN(McPhi, mcPhi, float);
 } // namespace dqanalysisflags
 
 DECLARE_SOA_TABLE(EventCuts, "AOD", "EVENTCUTS", dqanalysisflags::IsEventSelected);
 DECLARE_SOA_TABLE(BarrelTrackCuts, "AOD", "BARRELTRACKCUTS", dqanalysisflags::IsBarrelSelected);
 DECLARE_SOA_TABLE(MuonTrackCuts, "AOD", "DQANAMUONCUTS", dqanalysisflags::IsMuonSelected);
-DECLARE_SOA_TABLE(MCTrackInfo, "AOD", "MCTRACKINFO", collision::PosX, collision::PosY, collision::PosZ, collision::NumContrib, reducedevent::MCPosX, reducedevent::MCPosY, reducedevent::MCPosZ, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, reducedtrack::Sign, reducedtrack::DcaXY, reducedtrack::DcaZ, track::ITSClusterMap, mcparticle::PdgCode, mcparticle::Vx, mcparticle::Vy, mcparticle::Vz, mcparticle::Vt);
+DECLARE_SOA_TABLE(MCTrackInfo, "AOD", "MCTRACKINFO", collision::PosX, collision::PosY, collision::PosZ, collision::NumContrib, reducedevent::MCPosX, reducedevent::MCPosY, reducedevent::MCPosZ, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, reducedtrack::Sign, reducedtrack::DcaXY, reducedtrack::DcaZ, track::ITSClusterMap, dqanalysisflags::mcPt, dqanalysisflags::mcEta, dqanalysisflags::mcPhi, mcparticle::PdgCode, mcparticle::Vx, mcparticle::Vy, mcparticle::Vz, mcparticle::Vt);
 } // namespace o2::aod
 
 // using MyEvents = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsMC>;
@@ -276,7 +279,7 @@ struct AnalysisTrackSelection {
         }
       }
       trackSel(static_cast<int>(filterMap));
-      mcTrackInfo(event.posX(), event.posY(), event.posZ(), event.numContrib(), event.reducedMCevent().mcPosX(), event.reducedMCevent().mcPosY(), event.reducedMCevent().mcPosZ(), track.pt(), track.eta(), track.phi(), track.sign(), track.dcaXY(), track.dcaZ(), track.itsClusterMap(), track.reducedMCTrack().pdgCode(), track.reducedMCTrack().vx(), track.reducedMCTrack().vy(), track.reducedMCTrack().vz(), track.reducedMCTrack().vt());
+      mcTrackInfo(event.posX(), event.posY(), event.posZ(), event.numContrib(), event.reducedMCevent().mcPosX(), event.reducedMCevent().mcPosY(), event.reducedMCevent().mcPosZ(), track.pt(), track.eta(), track.phi(), track.sign(), track.dcaXY(), track.dcaZ(), track.itsClusterMap(), track.reducedMCTrack().pt(), track.reducedMCTrack().eta(), track.reducedMCTrack().phi(), track.reducedMCTrack().pdgCode(), track.reducedMCTrack().vx(), track.reducedMCTrack().vy(), track.reducedMCTrack().vz(), track.reducedMCTrack().vt());
       if (!filterMap) {
         continue;
       }
