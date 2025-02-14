@@ -64,7 +64,7 @@ DECLARE_SOA_COLUMN(McPhi, mcPhi, float);
 DECLARE_SOA_TABLE(EventCuts, "AOD", "EVENTCUTS", dqanalysisflags::IsEventSelected);
 DECLARE_SOA_TABLE(BarrelTrackCuts, "AOD", "BARRELTRACKCUTS", dqanalysisflags::IsBarrelSelected);
 DECLARE_SOA_TABLE(MuonTrackCuts, "AOD", "DQANAMUONCUTS", dqanalysisflags::IsMuonSelected);
-DECLARE_SOA_TABLE(MCTrackInfo, "AOD", "MCTRACKINFO", collision::PosX, collision::PosY, collision::PosZ, collision::NumContrib, reducedevent::MCPosX, reducedevent::MCPosY, reducedevent::MCPosZ, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, reducedtrack::Sign, reducedtrack::DcaXY, reducedtrack::DcaZ, track::ITSClusterMap, dqanalysisflags::mcPt, dqanalysisflags::mcEta, dqanalysisflags::mcPhi, mcparticle::PdgCode, mcparticle::Vx, mcparticle::Vy, mcparticle::Vz, mcparticle::Vt);
+DECLARE_SOA_TABLE(MCTrackInfo, "AOD", "MCTRACKINFO", collision::PosX, collision::PosY, collision::PosZ, collision::NumContrib, reducedevent::MCPosX, reducedevent::MCPosY, reducedevent::MCPosZ, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, reducedtrack::Sign, reducedtrack::DcaXY, reducedtrack::DcaZ, track::ITSClusterMap, dqanalysisflags::McPt, dqanalysisflags::McEta, dqanalysisflags::McPhi, mcparticle::PdgCode, mcparticle::Vx, mcparticle::Vy, mcparticle::Vz, mcparticle::Vt);
 } // namespace o2::aod
 
 // using MyEvents = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsMC>;
