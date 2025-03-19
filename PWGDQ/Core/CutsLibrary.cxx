@@ -6768,11 +6768,20 @@ AnalysisCut* o2::aod::dqcuts::GetAnalysisCut(const char* cutName)
   }
 
   if (!nameStr.compare("primaryTrackDCAcutsPtDependent")) {
-    TF1* f_highDCAxy_depPt = new TF1("f_highDCAxy_depPt", "(x >= 0.1 && x < 0.2) * 0.03052 + (x >= 0.2 && x < 0.3) * 0.01554 + (x >= 0.3 && x < 0.4) * 0.01088 + (x >= 0.4 && x < 0.5) * 0.00858 + (x >= 0.5 && x < 0.8) * 0.00658 + (x >= 0.8 && x < 1.2) * 0.00480 + (x >= 1.2 && x < 1.6) * 0.00378 + (x >= 1.6 && x < 2.4) * 0.00298 + (x >= 2.4 && x < 3.2) * 0.00228 + (x >= 3.2 && x <= 4.0) * 0.00184", 0.1, 4.0);
-    TF1* f_lowDCAxy_depPt = new TF1("f_lowDCAxy_depPt", "(x >= 0.1 && x < 0.2) * -0.03052 + (x >= 0.2 && x < 0.3) * -0.01554 + (x >= 0.3 && x < 0.4) * -0.01088 + (x >= 0.4 && x < 0.5) * -0.00858 + (x >= 0.5 && x < 0.8) * -0.00658 + (x >= 0.8 && x < 1.2) * -0.00480 + (x >= 1.2 && x < 1.6) * -0.00378 + (x >= 1.6 && x < 2.4) * -0.00298 + (x >= 2.4 && x < 3.2) * -0.00228 + (x >= 3.2 && x <= 4.0) * -0.00184", 0.1, 4.0);
+    TF1* f_dcacut = new TF1("f3", [](double* x, double* p) { return p[0] / pow(x[0] - p[1], p[2]); }, 0.1, 4, 3);
+    TF1* f_highDCAxy_depPt = (TF1*)f_dcacut->Clone("f_highDCAxy_depPt");
+    TF1* f_lowDCAxy_depPt = (TF1*)f_dcacut->Clone("f_lowDCAxy_depPt");
+    TF1* f_highDCAz_depPt = (TF1*)f_dcacut->Clone("f_highDCAz_depPt");
+    TF1* f_lowDCAz_depPt = (TF1*)f_dcacut->Clone("f_lowDCAz_depPt");
 
-    TF1* f_highDCAz_depPt = new TF1("f_highDCAz_depPt", "(x >= 0.1 && x < 0.2) * 0.03268 + (x >= 0.2 && x < 0.3) * 0.01758 + (x >= 0.3 && x < 0.4) * 0.01238 + (x >= 0.4 && x < 0.5) * 0.00978 + (x >= 0.5 && x < 0.8) * 0.00744 + (x >= 0.8 && x < 1.2) * 0.00536 + (x >= 1.2 && x < 1.6) * 0.00412 + (x >= 1.6 && x < 2.4) * 0.00324 + (x >= 2.4 && x < 3.2) * 0.00242 + (x >= 3.2 && x <= 4.0) * 0.00194", 0.1, 4.0);
-    TF1* f_lowDCAz_depPt = new TF1("f_lowDCAz_depPt", "(x >= 0.1 && x < 0.2) * -0.03268 + (x >= 0.2 && x < 0.3) * -0.01758 + (x >= 0.3 && x < 0.4) * -0.01238 + (x >= 0.4 && x < 0.5) * -0.00978 + (x >= 0.5 && x < 0.8) * -0.00744 + (x >= 0.8 && x < 1.2) * -0.00536 + (x >= 1.2 && x < 1.6) * -0.00412 + (x >= 1.6 && x < 2.4) * -0.00324 + (x >= 2.4 && x < 3.2) * -0.00242 + (x >= 3.2 && x <= 4.0) * -0.00194", 0.1, 4.0);
+    double p_xy[3] = {0.0440387, 0.0968587, 0.659757};
+    double p_xy_minus[3] = {-0.0440387, 0.0968587, 0.659757};
+    double p_z[3] = {0.0440387, 0.0968587, 0.659757};
+    double p_z_minus[3] = {-0.0440387, 0.0968587, 0.659757};
+    f_highDCAxy_depPt->SetParameters(p_xy);
+    f_lowDCAxy_depPt->SetParameters(p_xy_minus);
+    f_highDCAz_depPt->SetParameters(p_z);
+    f_lowDCAz_depPt->SetParameters(p_z_minus);
 
     cut->AddCut(VarManager::kTrackDCAxy, f_lowDCAxy_depPt, f_highDCAxy_depPt, false, VarManager::kPt, 0.1, 4.0, false);
     cut->AddCut(VarManager::kTrackDCAz, f_lowDCAz_depPt, f_highDCAz_depPt, false, VarManager::kPt, 0.1, 4.0, false);
