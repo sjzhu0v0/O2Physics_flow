@@ -6768,16 +6768,15 @@ AnalysisCut* o2::aod::dqcuts::GetAnalysisCut(const char* cutName)
   }
 
   if (!nameStr.compare("primaryTrackDCAcutsPtDependent")) {
-    TF1* f_dcacut = new TF1("f3", [](double* x, double* p) { return p[0] / pow(x[0] - p[1], p[2]); }, 0.1, 4, 3);
-    TF1* f_highDCAxy_depPt = (TF1*)f_dcacut->Clone("f_highDCAxy_depPt");
-    TF1* f_lowDCAxy_depPt = (TF1*)f_dcacut->Clone("f_lowDCAxy_depPt");
-    TF1* f_highDCAz_depPt = (TF1*)f_dcacut->Clone("f_highDCAz_depPt");
-    TF1* f_lowDCAz_depPt = (TF1*)f_dcacut->Clone("f_lowDCAz_depPt");
+    TF1* f_highDCAxy_depPt = new TF1("f3", [](double* x, double* p) { return p[0] / pow(x[0] - p[1], p[2]); }, 0.1, 4, 3);
+    TF1* f_lowDCAxy_depPt = new TF1("f3", [](double* x, double* p) { return p[0] / pow(x[0] - p[1], p[2]); }, 0.1, 4, 3);
+    TF1* f_highDCAz_depPt = new TF1("f3", [](double* x, double* p) { return p[0] / pow(x[0] - p[1], p[2]); }, 0.1, 4, 3);
+    TF1* f_lowDCAz_depPt = new TF1("f3", [](double* x, double* p) { return p[0] / pow(x[0] - p[1], p[2]); }, 0.1, 4, 3);
 
-    double p_xy[3] = {0.0440387, 0.0968587, 0.659757};
-    double p_xy_minus[3] = {-0.0440387, 0.0968587, 0.659757};
-    double p_z[3] = {0.0440387, 0.0968587, 0.659757};
-    double p_z_minus[3] = {-0.0440387, 0.0968587, 0.659757};
+    double p_xy[3] = {0.00439545, 0.095, 0.666164};
+    double p_xy_minus[3] = {-0.00439545, 0.095, 0.666164};
+    double p_z[3] = {0.00495253, 0.081471, 0.705002};
+    double p_z_minus[3] = {-0.00495253, 0.081471, 0.705002};
     f_highDCAxy_depPt->SetParameters(p_xy);
     f_lowDCAxy_depPt->SetParameters(p_xy_minus);
     f_highDCAz_depPt->SetParameters(p_z);
