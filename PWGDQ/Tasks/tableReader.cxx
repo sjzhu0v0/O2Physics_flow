@@ -216,7 +216,7 @@ struct AnalysisEventSelection {
   void runEventSelection(TEvent const& event)
   {
     if (false) {
-    // if (event.runNumber() != fLastRun) {
+      // if (event.runNumber() != fLastRun) {
       auto alppar = fCCDB->getForTimeStamp<o2::itsmft::DPLAlpideParam<0>>("ITS/Config/AlpideParam", event.timestamp());
       EventSelectionParams* par = fCCDB->getForTimeStamp<EventSelectionParams>("EventSelection/EventSelectionParams", event.timestamp());
       int itsROFrameStartBorderMargin = fConfigITSROFrameStartBorderMargin < 0 ? par->fITSROFrameStartBorderMargin : fConfigITSROFrameStartBorderMargin;
@@ -423,7 +423,8 @@ struct AnalysisTrackSelection {
       }
 
       trackSel(static_cast<int>(filterMap), static_cast<int>(prefilterSelected));
-      trackInfo(event.posX(), event.posY(), event.posZ(), event.numContrib(),  track.pt(), track.eta(), track.phi(), track.sign(), track.dcaXY(), track.dcaZ(), track.itsClusterMap());
+      if (filterMap > 0)
+        trackInfo(event.posX(), event.posY(), event.posZ(), event.numContrib(), track.pt(), track.eta(), track.phi(), track.sign(), track.dcaXY(), track.dcaZ(), track.itsClusterMap());
     } // end loop over tracks
   }
 
