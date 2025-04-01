@@ -113,7 +113,6 @@ void o2::aod::dqhistograms::DefineHistograms(HistogramManager* hm, const char* h
         hm->AddHistogram(histClass, "VtxZ_MultITSTPCWithPV", "VtxZ vs MultITSTPCWithPV", false, 240, -12.0, 12.0, VarManager::kVtxZ, 400, 0, 400.0, VarManager::kMultNTracksITSTPC);
         hm->AddHistogram(histClass, "VtxZ_MultITSOnly", "VtxZ vs MultITSOnly", false, 240, -12.0, 12.0, VarManager::kVtxZ, 400, 0, 400.0, VarManager::kMultNTracksITSOnly);
         hm->AddHistogram(histClass, "VtxZ_VtxNcontribReal", "VtxZ vs VtxNcontribReal", false, 240, -12.0, 12.0, VarManager::kVtxZ, 200, 0, 200.0, VarManager::kVtxNcontribReal);
-
       } else {
         hm->AddHistogram(histClass, "MultTPC", "MultTPC", false, 200, 0.0, 50000.0, VarManager::kMultTPC);
         hm->AddHistogram(histClass, "MultTPC_vsTimeSOR", "MultTPC vs time from SOR", true, 10000, 0.0, 1000.0, VarManager::kTimeFromSOR, 10, 0.0, 50000.0, VarManager::kMultTPC);
@@ -459,6 +458,10 @@ void o2::aod::dqhistograms::DefineHistograms(HistogramManager* hm, const char* h
       }
       if (subGroupStr.Contains("clssize")) {
         hm->AddHistogram(histClass, "ITSclssize_p", "Mean ITS cluster size vs P", false, 200, 0.0, 10.0, VarManager::kP, 150, 0.0, 15., VarManager::kITSmeanClsSize);
+      }
+      if (subGroupStr.Contains("dca")) {
+        hm->AddHistogram(histClass, "ITSClusterMap_DCAxy_fine", "", false, 128, -0.5, 127.5, VarManager::kITSClusterMap, 1000, -2., 2., VarManager::kTrackDCAxy);
+        hm->AddHistogram(histClass, "ITSClusterMap_DCAz_fine", "", false, 128, -0.5, 127.5, VarManager::kITSClusterMap, 2000, -4., 4., VarManager::kTrackDCAz);
       }
     }
     if (subGroupStr.Contains("itsvspt")) {

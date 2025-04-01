@@ -87,6 +87,7 @@ DECLARE_SOA_TABLE(BarrelTrackCuts, "AOD", "DQANATRKCUTS", dqanalysisflags::IsBar
 DECLARE_SOA_TABLE(MuonTrackCuts, "AOD", "DQANAMUONCUTS", dqanalysisflags::IsMuonSelected);
 DECLARE_SOA_TABLE(Prefilter, "AOD", "DQPREFILTER", dqanalysisflags::IsPrefilterVetoed);
 DECLARE_SOA_TABLE(BmesonCandidates, "AOD", "DQBMESONS", dqanalysisflags::massBcandidate, dqanalysisflags::pTBcandidate, dqanalysisflags::LxyBcandidate, dqanalysisflags::LxyzBcandidate, dqanalysisflags::LzBcandidate, dqanalysisflags::TauxyBcandidate, dqanalysisflags::TauzBcandidate, dqanalysisflags::CosPBcandidate, dqanalysisflags::Chi2Bcandidate);
+DECLARE_SOA_TABLE(TrackInfo, "AOD", "TRACKINFO", collision::PosX, collision::PosY, collision::PosZ, collision::NumContrib, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, reducedtrack::Sign, reducedtrack::DcaXY, reducedtrack::DcaZ, track::ITSClusterMap);
 } // namespace o2::aod
 
 // Declarations of various short names
@@ -205,9 +206,9 @@ struct AnalysisEventSelection {
     }
 
     // CCDB configuration
-    fCCDB->setURL(fConfigCcdbUrl.value);
-    fCCDB->setCaching(true);
-    fCCDB->setLocalObjectValidityChecking();
+    // fCCDB->setURL(fConfigCcdbUrl.value);
+    // fCCDB->setCaching(true);
+    // fCCDB->setLocalObjectValidityChecking();
     // Not later than now objects
     // fCCDB->setCreatedNotAfter(fConfigNoLaterThan.value);
 
@@ -217,7 +218,8 @@ struct AnalysisEventSelection {
   template <uint32_t TEventFillMap, typename TEvent>
   void runEventSelection(TEvent const& event)
   {
-    if (event.runNumber() != fLastRun) {
+    if (false) {
+      // if (event.runNumber() != fLastRun) {
       auto alppar = fCCDB->getForTimeStamp<o2::itsmft::DPLAlpideParam<0>>("ITS/Config/AlpideParam", event.timestamp());
       EventSelectionParams* par = fCCDB->getForTimeStamp<EventSelectionParams>("EventSelection/EventSelectionParams", event.timestamp());
       int itsROFrameStartBorderMargin = fConfigITSROFrameStartBorderMargin < 0 ? par->fITSROFrameStartBorderMargin : fConfigITSROFrameStartBorderMargin;
@@ -312,6 +314,7 @@ struct AnalysisEventSelection {
 
 struct AnalysisTrackSelection {
   Produces<aod::BarrelTrackCuts> trackSel;
+  Produces<aod::TrackInfo> trackInfo;
   OutputObj<THashList> fOutputList{"output"};
   // The list of cuts should contain all the track cuts needed later in analysis, including
   //  for candidate electron selection (+ eventual prefilter cuts) and other needs like quarkonium - hadron correlations
@@ -375,11 +378,11 @@ struct AnalysisTrackSelection {
     }
     if (fConfigComputeTPCpostCalib) {
       // CCDB configuration
-      fCCDB->setURL(fConfigCcdbUrl.value);
-      fCCDB->setCaching(true);
-      fCCDB->setLocalObjectValidityChecking();
+      // fCCDB->setURL(fConfigCcdbUrl.value);
+      // fCCDB->setCaching(true);
+      // fCCDB->setLocalObjectValidityChecking();
       // Not later than now objects
-      fCCDB->setCreatedNotAfter(fConfigNoLaterThan.value);
+      // fCCDB->setCreatedNotAfter(fConfigNoLaterThan.value);
     }
   }
 
@@ -433,6 +436,8 @@ struct AnalysisTrackSelection {
       }
 
       trackSel(static_cast<int>(filterMap), static_cast<int>(prefilterSelected));
+      if (filterMap > 0)
+        trackInfo(event.posX(), event.posY(), event.posZ(), event.numContrib(), track.pt(), track.eta(), track.phi(), track.sign(), track.dcaXY(), track.dcaZ(), track.itsClusterMap());
     } // end loop over tracks
   }
 
@@ -598,9 +603,9 @@ struct AnalysisPrefilterSelection {
 
     fCurrentRun = 0;
 
-    ccdb->setURL(ccdburl.value);
-    ccdb->setCaching(true);
-    ccdb->setLocalObjectValidityChecking();
+    // ccdb->setURL(ccdburl.value);
+    // ccdb->setCaching(true);
+    // ccdb->setLocalObjectValidityChecking();
 
     fPairCut = new AnalysisCompositeCut(true);
     TString pairCutStr = fConfigPrefilterPairCut.value;
@@ -640,7 +645,7 @@ struct AnalysisPrefilterSelection {
     fPrefiltermap.clear();
 
     if (events.size() > 0 && fCurrentRun != events.begin().runNumber()) {
-      grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(grpmagPath, events.begin().timestamp());
+      // grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(grpmagPath, events.begin().timestamp());
       if (grpmag != nullptr) {
         VarManager::SetMagneticField(grpmag->getNominalL3Field());
       } else {
@@ -722,9 +727,9 @@ struct AnalysisEventMixing {
 
     fCurrentRun = 0;
 
-    ccdb->setURL(ccdburl.value);
-    ccdb->setCaching(true);
-    ccdb->setLocalObjectValidityChecking();
+    // ccdb->setURL(ccdburl.value);
+    // ccdb->setCaching(true);
+    // ccdb->setLocalObjectValidityChecking();
 
     VarManager::SetDefaultVarNames();
     fHistMan = new HistogramManager("analysisHistos", "aa", VarManager::kNVars);
@@ -876,7 +881,7 @@ struct AnalysisEventMixing {
   void runSameSide(TEvents& events, TTracks const& tracks, Preslice<TTracks>& preSlice)
   {
     if (events.size() > 0 && fCurrentRun != events.begin().runNumber()) {
-      grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(grpmagPath, events.begin().timestamp());
+      // grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(grpmagPath, events.begin().timestamp());
       if (grpmag != nullptr) {
         VarManager::SetMagneticField(grpmag->getNominalL3Field());
       } else {
@@ -934,7 +939,7 @@ struct AnalysisEventMixing {
   void runBarrelMuon(TEvents& events, TTracks const& tracks, TMuons const& muons)
   {
     if (events.size() > 0 && fCurrentRun != events.begin().runNumber()) {
-      grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(grpmagPath, events.begin().timestamp());
+      // grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(grpmagPath, events.begin().timestamp());
       if (grpmag != nullptr) {
         VarManager::SetMagneticField(grpmag->getNominalL3Field());
       } else {
@@ -1089,18 +1094,18 @@ struct AnalysisSameEventPairing {
 
     fCurrentRun = 0;
 
-    ccdb->setURL(ccdburl.value);
-    ccdb->setCaching(true);
-    ccdb->setLocalObjectValidityChecking();
+    // ccdb->setURL(ccdburl.value);
+    // ccdb->setCaching(true);
+    /// ccdb->setLocalObjectValidityChecking();
 
     if (fNoCorr) {
       VarManager::SetupFwdDCAFitterNoCorr();
     } else if (fCorrFullGeo || (fConfigUseKFVertexing && fPropToPCA)) {
       if (!o2::base::GeometryManager::isGeometryLoaded()) {
-        ccdb->get<TGeoManager>(geoPath);
+        // ccdb->get<TGeoManager>(geoPath);
       }
     } else {
-      lut = o2::base::MatLayerCylSet::rectifyPtrFromFile(ccdb->get<o2::base::MatLayerCylSet>(lutPath));
+      // lut = o2::base::MatLayerCylSet::rectifyPtrFromFile(ccdb->get<o2::base::MatLayerCylSet>(lutPath));
       VarManager::SetupMatLUTFwdDCAFitter(lut);
     }
 
@@ -1247,7 +1252,7 @@ struct AnalysisSameEventPairing {
     }
     if (fCurrentRun != event.runNumber()) {
       if (fUseRemoteField) {
-        grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(grpmagPath, event.timestamp());
+        // grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(grpmagPath, event.timestamp());
         if (grpmag != nullptr) {
           mMagField = grpmag->getNominalL3Field();
         } else {
@@ -1819,7 +1824,7 @@ struct AnalysisDileptonHadron {
     // set up KF or DCAfitter
     if (fCurrentRun != event.runNumber()) { // start: runNumber
       if (fUseRemoteField.value) {
-        grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(grpmagPath, event.timestamp());
+        // grpmag = ccdb->getForTimeStamp<o2::parameters::GRPMagField>(grpmagPath, event.timestamp());
         if (grpmag != nullptr) {
           mMagField = grpmag->getNominalL3Field();
         } else {

@@ -157,12 +157,17 @@ DECLARE_SOA_TABLE(ReducedEventsMultPV_000, "AOD", "REMULTPV", //!  Multiplicity 
                   mult::MultNTracksITSOnly, mult::MultNTracksTPCOnly, mult::MultNTracksITSTPC,
                   evsel::NumTracksInTimeRange);
 
+<<<<<<< HEAD
 DECLARE_SOA_TABLE_VERSIONED(ReducedEventsMultPV_001, "AOD", "REMULTPV", 1, //!  Multiplicity information for primary vertex
                             mult::MultNTracksHasITS, mult::MultNTracksHasTPC, mult::MultNTracksHasTOF, mult::MultNTracksHasTRD,
                             mult::MultNTracksITSOnly, mult::MultNTracksTPCOnly, mult::MultNTracksITSTPC,
                             mult::MultNTracksPVeta1, mult::MultNTracksPVetaHalf, evsel::NumTracksInTimeRange, evsel::SumAmpFT0CInTimeRange);
 
 using ReducedEventsMultPV = ReducedEventsMultPV_001;
+=======
+DECLARE_SOA_TABLE(ReducedEventsMultFt0Occ, "AOD", "REMULTFT0OCC", //!  Multiplicity FT0C Occupancy
+                  evsel::SumAmpFT0CInTimeRange);
+>>>>>>> flow
 
 DECLARE_SOA_TABLE(ReducedEventsMultAll, "AOD", "REMULTALL", //!  Multiplicity information for all tracks in the event
                   mult::MultAllTracksTPCOnly, mult::MultAllTracksITSTPC,

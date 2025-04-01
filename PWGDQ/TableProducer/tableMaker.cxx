@@ -150,6 +150,7 @@ struct TableMaker {
   Produces<ReducedEventsVtxCov> eventVtxCov;
   Produces<ReducedEventsInfo> eventInfo;
   Produces<ReducedEventsMultPV> multPV;
+  Produces<ReducedEventsMultFt0Occ> multFt0Occ;
   Produces<ReducedEventsMultAll> multAll;
   Produces<ReducedTracksBarrelInfo> trackBarrelInfo;
   Produces<ReducedTracks> trackBasic;
@@ -505,6 +506,7 @@ struct TableMaker {
              collision.multNTracksPVeta1(), collision.multNTracksPVetaHalf(), collision.trackOccupancyInTimeRange(), collision.ft0cOccupancyInTimeRange());
       multAll(collision.multAllTracksTPCOnly(), collision.multAllTracksITSTPC(),
               0, 0, 0.0, 0.0, 0.0, 0.0, 0, 0, 0.0, 0.0, 0.0, 0.0);
+      multFt0Occ(collision.ft0cOccupancyInTimeRange());        
     }
 
     uint64_t trackFilteringTag = 0;
@@ -974,8 +976,13 @@ struct TableMaker {
     eventInfo(collision.globalIndex());
     if constexpr ((TEventFillMap & VarManager::ObjTypes::CollisionMultExtra) > 0) {
       multPV(collision.multNTracksHasITS(), collision.multNTracksHasTPC(), collision.multNTracksHasTOF(), collision.multNTracksHasTRD(),
+<<<<<<< HEAD
              collision.multNTracksITSOnly(), collision.multNTracksTPCOnly(), collision.multNTracksITSTPC(),
              collision.multNTracksPVeta1(), collision.multNTracksPVetaHalf(), collision.trackOccupancyInTimeRange(), collision.ft0cOccupancyInTimeRange());
+=======
+             collision.multNTracksITSOnly(), collision.multNTracksTPCOnly(), collision.multNTracksITSTPC(), collision.trackOccupancyInTimeRange());
+      multFt0Occ(collision.ft0cOccupancyInTimeRange());       
+>>>>>>> flow
       multAll(collision.multAllTracksTPCOnly(), collision.multAllTracksITSTPC(),
               0, 0, 0.0, 0.0, 0.0, 0.0, 0, 0, 0.0, 0.0, 0.0, 0.0);
     }
