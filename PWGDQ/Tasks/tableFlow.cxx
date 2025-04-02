@@ -483,7 +483,7 @@ struct AnalysisFlow {
   Preslice<soa::Filtered<MyDielectronCandidates>> perEventPairs = aod::reducedpair::reducedeventId;
   Preslice<soa::Filtered<MyBarrelTracksSelectedWithCov>> perEventTracks = aod::reducedtrack::reducedeventId;
 
-  void processMEFlowPairRefOnly(soa::Filtered<MyEventsVtxCovSelected>& events, MyBarrelTracksSelectedWithCov const& tracks)
+  void processMEFlowPairRefOnly(soa::Filtered<MyEventsHashVtxCovSelected>& events, MyBarrelTracksSelectedWithCov const& tracks)
   {
     events.bindExternalIndices(&tracks);
     for (auto& [event1, event2] : selfCombinations(hashBin, fConfigMixingDepthRR.value, -1, events, events)) {
@@ -504,7 +504,7 @@ struct AnalysisFlow {
     }
   }
 
-  void processMEFlowPairPoiRef(soa::Filtered<MyEventsVtxCovSelected>& events, MyBarrelTracksSelectedWithCov const& tracks, soa::Filtered<MyDielectronCandidates> const& dileptons)
+  void processMEFlowPairPoiRef(soa::Filtered<MyEventsHashVtxCovSelected>& events, MyBarrelTracksSelectedWithCov const& tracks, soa::Filtered<MyDielectronCandidates> const& dileptons)
   {
     events.bindExternalIndices(&dileptons);
     events.bindExternalIndices(&tracks);
