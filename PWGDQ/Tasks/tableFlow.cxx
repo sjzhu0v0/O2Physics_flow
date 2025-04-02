@@ -281,8 +281,7 @@ struct AnalysisFlow {
     }
   }
 
-  template <int TCandidateType, uint32_t TEventFillMap, uint32_t TTrackFillMap, typename TEvent, typename TTracks>
-  void runFlow(TEvent const& event, TTracks const& tracks, soa::Filtered<MyDielectronCandidates> const& dileptons)
+  void processSkimmed(soa::Filtered<MyEventsVtxCovSelected>::iterator const& event, MyBarrelTracksSelectedWithCov const& tracks, soa::Filtered<MyDielectronCandidates> const& dileptons)
   {
     std::vector<int> trackGlobalIndexes;
     std::vector<int> daugDileptonGlobalIndexes;
@@ -369,8 +368,7 @@ struct AnalysisFlow {
     qVectors(event.selection_raw(), event.multFT0C(), event.numContrib(), event.posZ(), vecPT, vecEta, vecPhi, vecMass, vecSign, qvecRe, qvecIm, qvecAmp);
   }
 
-  template <int TCandidateType, uint32_t TEventFillMap, uint32_t TTrackFillMap, typename TEvent, typename TTracks>
-  void runFlow2(TEvent const& event, TTracks const& tracks)
+  void processSkimmedWithoutDilepton(soa::Filtered<MyEventsVtxCovSelected>::iterator const& event, MyBarrelTracksSelectedWithCov const& tracks)
   {
     qvecRe.resize(nCfgQvectorBarrel2Cal);
     qvecIm.resize(nCfgQvectorBarrel2Cal);
@@ -428,16 +426,6 @@ struct AnalysisFlow {
     qVectors(event.selection_raw(), event.multFT0C(), event.numContrib(), event.posZ(), vecPT, vecEta, vecPhi, vecMass, vecSign, qvecRe, qvecIm, qvecAmp);
   }
 
-  void processSkimmed(soa::Filtered<MyEventsVtxCovSelected>::iterator const& event, MyBarrelTracksSelectedWithCov const& tracks, soa::Filtered<MyDielectronCandidates> const& dileptons)
-  {
-    runFlow<VarManager::kBtoJpsiEEK, gkEventFillMapWithCov, gkTrackFillMapWithCov>(event, tracks, dileptons);
-  }
-
-  void processSkimmedWithoutDilepton(soa::Filtered<MyEventsVtxCovSelected>::iterator const& event, MyBarrelTracksSelectedWithCov const& tracks)
-  {
-    runFlow2<VarManager::kBtoJpsiEEK, gkEventFillMapWithCov, gkTrackFillMapWithCov>(event, tracks);
-  }
-
   void processSEFlowPairRefOnly(soa::Filtered<MyEventsVtxCovSelected>::iterator const& event, MyBarrelTracksSelectedWithCov const& tracks)
   {
     std::vector<float> vecPT;
@@ -493,7 +481,7 @@ struct AnalysisFlow {
   }
 
   Preslice<soa::Filtered<MyDielectronCandidates>> perEventPairs = aod::reducedpair::reducedeventId;
-  Preslice<soa::Filtered<MyBarrelTracksSelected>> perEventTracks = aod::reducedtrack::reducedeventId;
+  Preslice<soa::Filtered<MyBarrelTracksSelectedWithCov>> perEventTracks = aod::reducedtrack::reducedeventId;
 
   void processMEFlowPairRefOnly(soa::Filtered<MyEventsVtxCovSelected>& events, MyBarrelTracksSelectedWithCov const& tracks)
   {
@@ -547,7 +535,7 @@ struct AnalysisFlow {
   PROCESS_SWITCH(AnalysisFlow, processSEFlowPairPoiRef, "processSEFlowPairPoiRef", false);
   PROCESS_SWITCH(AnalysisFlow, processMEFlowPairRefOnly, "processMEFlowPairRefOnly", false);
   PROCESS_SWITCH(AnalysisFlow, processMEFlowPairPoiRef, "processMEFlowPairPoiRef", false);
-  PROCESS_SWITCH(AnalysisFlow, processDummy, "Dummy function", false);
+  PROCESS_SWITCH(AnalysisFlow, processDummy, "Dummy function", true);
 };
 
 WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)
