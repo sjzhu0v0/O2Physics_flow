@@ -60,6 +60,7 @@ namespace dqanalysisflags
 // TODO: the barrel amd muon selection columns are bit maps so unsigned types should be used, however, for now this is not supported in Filter expressions
 // TODO: For now in the tasks we just statically convert from unsigned int to int, which should be fine as long as we do
 //      not use a large number of bits (>=30)
+// Bcandidate columns for ML analysis of B->Jpsi+K
 DECLARE_SOA_COLUMN(MixingHash, mixingHash, int);
 DECLARE_SOA_COLUMN(IsEventSelected, isEventSelected, int);
 DECLARE_SOA_COLUMN(IsBarrelSelected, isBarrelSelected, int);
@@ -67,6 +68,13 @@ DECLARE_SOA_COLUMN(IsMuonSelected, isMuonSelected, int);
 DECLARE_SOA_COLUMN(IsBarrelSelectedPrefilter, isBarrelSelectedPrefilter, int);
 DECLARE_SOA_COLUMN(IsPrefilterVetoed, isPrefilterVetoed, int);
 } // namespace dqanalysisflags
+
+DECLARE_SOA_TABLE(EventCuts, "AOD", "DQANAEVCUTS", dqanalysisflags::IsEventSelected);
+DECLARE_SOA_TABLE(MixingHashes, "AOD", "DQANAMIXHASH", dqanalysisflags::MixingHash);
+DECLARE_SOA_TABLE(BarrelTrackCuts, "AOD", "DQANATRKCUTS", dqanalysisflags::IsBarrelSelected, dqanalysisflags::IsBarrelSelectedPrefilter);
+DECLARE_SOA_TABLE(MuonTrackCuts, "AOD", "DQANAMUONCUTS", dqanalysisflags::IsMuonSelected);
+DECLARE_SOA_TABLE(Prefilter, "AOD", "DQPREFILTER", dqanalysisflags::IsPrefilterVetoed);
+DECLARE_SOA_TABLE(TrackInfo, "AOD", "TRACKINFO", collision::PosX, collision::PosY, collision::PosZ, collision::NumContrib, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, reducedtrack::Sign, reducedtrack::DcaXY, reducedtrack::DcaZ, track::ITSClusterMap);
 
 namespace flowVec
 {
@@ -81,14 +89,31 @@ DECLARE_SOA_COLUMN(Sign, sign, std::vector<float>);
 DECLARE_SOA_COLUMN(QvecRe, qvecRe, std::vector<float>);
 DECLARE_SOA_COLUMN(QvecIm, qvecIm, std::vector<float>);
 DECLARE_SOA_COLUMN(QvecAmp, qvecAmp, std::vector<float>);
+DECLARE_SOA_COLUMN(PTREF, pTRef, std::vector<float>);
+DECLARE_SOA_COLUMN(EtaREF, etaRef, std::vector<float>);
+DECLARE_SOA_COLUMN(PhiREF, phiRef, std::vector<float>);
 } // namespace flowVec
 
-DECLARE_SOA_TABLE(EventCuts, "AOD", "DQANAEVCUTS", dqanalysisflags::IsEventSelected);
-DECLARE_SOA_TABLE(MixingHashes, "AOD", "DQANAMIXHASH", dqanalysisflags::MixingHash);
-DECLARE_SOA_TABLE(BarrelTrackCuts, "AOD", "DQANATRKCUTS", dqanalysisflags::IsBarrelSelected, dqanalysisflags::IsBarrelSelectedPrefilter);
-DECLARE_SOA_TABLE(MuonTrackCuts, "AOD", "DQANAMUONCUTS", dqanalysisflags::IsMuonSelected);
-DECLARE_SOA_TABLE(Prefilter, "AOD", "DQPREFILTER", dqanalysisflags::IsPrefilterVetoed);
+namespace flowPair
+{
+DECLARE_SOA_COLUMN(PT, pT, float);
+DECLARE_SOA_COLUMN(Eta, eta, float);
+DECLARE_SOA_COLUMN(Phi, phi, float);
+DECLARE_SOA_COLUMN(Mass, mass, float);
+DECLARE_SOA_COLUMN(Sign, sign, float);
+DECLARE_SOA_COLUMN(PT1, pT1, float);
+DECLARE_SOA_COLUMN(Eta1, eta1, float);
+DECLARE_SOA_COLUMN(Phi1, phi1, float);
+DECLARE_SOA_COLUMN(PT2, pT2, float);
+DECLARE_SOA_COLUMN(Eta2, eta2, float);
+DECLARE_SOA_COLUMN(Phi2, phi2, float);
+} // namespace flowPair
+
 DECLARE_SOA_TABLE(FlowVecs, "AOD", "DQFLOWVECS", evsel::Selection, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowVec::PT, flowVec::Eta, flowVec::Phi, flowVec::Mass, flowVec::Sign, flowVec::QvecRe, flowVec::QvecIm, flowVec::QvecAmp);
+DECLARE_SOA_TABLE(FlowVecD, "AOD", "DQFLOWVECD", evsel::Selection, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowVec::PT, flowVec::Eta, flowVec::Phi, flowVec::Mass, flowVec::Sign, flowVec::PTREF, flowVec::EtaREF, flowVec::PhiREF);
+DECLARE_SOA_TABLE(FlowPairRR, "AOD", "DQFLOWPAIRRR", evsel::Selection, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowPair::PT1, flowPair::Eta1, flowPair::Phi1, flowPair::PT2, flowPair::Eta2, flowPair::Phi2);
+DECLARE_SOA_TABLE(FlowPairPR, "AOD", "DQFLOWPAIRPR", evsel::Selection, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowPair::PT, flowPair::Eta, flowPair::Phi, flowPair::Mass, flowPair::Sign, flowPair::PT1, flowPair::Eta1, flowPair::Phi1);
+
 } // namespace o2::aod
 
 // Declarations of various short names
@@ -97,6 +122,7 @@ using MyEventsSelected = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtende
 using MyEventsHashSelected = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::EventCuts, aod::MixingHashes>;
 using MyEventsVtxCov = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsVtxCov>;
 using MyEventsVtxCovSelected = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsVtxCov, aod::EventCuts>;
+using MyEventsHashVtxCovSelected = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsVtxCov, aod::EventCuts, aod::MixingHashes>;
 using MyEventsVtxCovSelectedQvector = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsVtxCov, aod::EventCuts, aod::ReducedEventsQvector>;
 using MyEventsVtxCovSelectedQvectorExtraWithRefFlow = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsVtxCov, aod::EventCuts, aod::ReducedEventsQvector, aod::ReducedEventsQvectorExtra, aod::ReducedEventsRefFlow>;
 using MyEventsVtxCovSelectedQvectorCentr = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsVtxCov, aod::EventCuts, aod::ReducedEventsQvectorCentr>;
@@ -157,7 +183,12 @@ struct AnalysisFlow {
   Configurable<float> fConfigDileptonHighMass{"cfgDileptonHighMass", 5.0, "High mass cut for the dileptons used in analysis"};
   Configurable<std::string> fConfigQVectorsBarrel2Cal{"cfgQVectorsBarrel", "4,1;2,1:0,1", "Semicolon separated list of q vector to be calculated"};
   Configurable<int> fConfigBarrelTrackCutBitMask{"cfgBarrelTrackCutBitMask", 1, "bit mask of the track cuts"};
+  Configurable<int> fConfigMixingDepthRR{"cfgMixingDepthRR", 5, "Event mixing pool depth rr"};
+  Configurable<int> fConfigMixingDepthPR{"cfgMixingDepthPR", 5, "Event mixing pool depth pr"};
   Produces<aod::FlowVecs> qVectors;
+  Produces<aod::FlowVecD> flowVectorsDetailed;
+  Produces<aod::FlowPairRR> flowPairsRR;
+  Produces<aod::FlowPairPR> flowPairsPR;
 
   Filter eventFilter = aod::dqanalysisflags::isEventSelected == 1;
   Filter dileptonFilter = aod::reducedpair::mass > fConfigDileptonLowMass&& aod::reducedpair::mass < fConfigDileptonHighMass;
@@ -175,6 +206,8 @@ struct AnalysisFlow {
   constexpr static uint32_t candidateTypeDilepton = VarManager::PairCandidateType::kDecayToEE;
   constexpr static uint32_t eventFillMapDilepton = VarManager::ObjTypes::ReducedEventVtxCov;
   constexpr static uint32_t fillMapDilepton = VarManager::ObjTypes::ReducedTrackBarrelCov;
+
+  NoBinningPolicy<aod::dqanalysisflags::MixingHash> hashBin;
 
   // float* fValuesDilepton;
   // float* fValuesHadron;
@@ -402,12 +435,115 @@ struct AnalysisFlow {
     runFlow2<VarManager::kBtoJpsiEEK, gkEventFillMapWithCov, gkTrackFillMapWithCov>(event, tracks);
   }
 
+  void processSEFlowPairRefOnly(soa::Filtered<MyEventsVtxCovSelected>::iterator const& event, MyBarrelTracksSelectedWithCov const& tracks)
+  {
+    std::vector<float> vecPT;
+    std::vector<float> vecEta;
+    std::vector<float> vecPhi;
+    std::vector<float> vecMass;
+    std::vector<float> vecSign;
+
+    std::vector<float> vecPTRef;
+    std::vector<float> vecEtaRef;
+    std::vector<float> vecPhiRef;
+
+    for (auto& track : tracks) {
+      if (!(uint32_t(track.isBarrelSelected()) & fConfigBarrelTrackCutBitMask.value))
+        continue;
+      vecPTRef.push_back(track.pt());
+      vecEtaRef.push_back(track.eta());
+      vecPhiRef.push_back(track.phi());
+    }
+
+    flowVectorsDetailed(event.selection_raw(), event.multFT0C(), event.numContrib(), event.posZ(), vecPT, vecEta, vecPhi, vecMass, vecSign, vecPTRef, vecEtaRef, vecPhiRef);
+  }
+
+  void processSEFlowPairPoiRef(soa::Filtered<MyEventsVtxCovSelected>::iterator const& event, MyBarrelTracksSelectedWithCov const& tracks, soa::Filtered<MyDielectronCandidates> const& dileptons)
+  {
+    std::vector<float> vecPT;
+    std::vector<float> vecEta;
+    std::vector<float> vecPhi;
+    std::vector<float> vecMass;
+    std::vector<float> vecSign;
+
+    std::vector<float> vecPTRef;
+    std::vector<float> vecEtaRef;
+    std::vector<float> vecPhiRef;
+
+    for (auto& dilepton : dileptons) {
+      vecPT.push_back(dilepton.pt());
+      vecEta.push_back(dilepton.eta());
+      vecPhi.push_back(dilepton.phi());
+      vecMass.push_back(dilepton.mass());
+      vecSign.push_back(dilepton.sign());
+    }
+
+    for (auto& track : tracks) {
+      if (!(uint32_t(track.isBarrelSelected()) & fConfigBarrelTrackCutBitMask.value))
+        continue;
+      vecPTRef.push_back(track.pt());
+      vecEtaRef.push_back(track.eta());
+      vecPhiRef.push_back(track.phi());
+    }
+
+    flowVectorsDetailed(event.selection_raw(), event.multFT0C(), event.numContrib(), event.posZ(), vecPT, vecEta, vecPhi, vecMass, vecSign, vecPTRef, vecEtaRef, vecPhiRef);
+  }
+
+  Preslice<soa::Filtered<MyDielectronCandidates>> perEventPairs = aod::reducedpair::reducedeventId;
+  Preslice<soa::Filtered<MyBarrelTracksSelected>> perEventTracks = aod::reducedtrack::reducedeventId;
+
+  void processMEFlowPairRefOnly(soa::Filtered<MyEventsVtxCovSelected>& events, MyBarrelTracksSelectedWithCov const& tracks)
+  {
+    events.bindExternalIndices(&tracks);
+    for (auto& [event1, event2] : selfCombinations(hashBin, fConfigMixingDepthRR.value, -1, events, events)) {
+      auto evTracks1 = tracks.sliceBy(perEventTracks, event1.globalIndex());
+      evTracks1.bindExternalIndices(&events);
+      auto evTracks2 = tracks.sliceBy(perEventTracks, event2.globalIndex());
+      evTracks2.bindExternalIndices(&events);
+
+      for (auto& track1 : evTracks1) {
+        for (auto& track2 : evTracks2) {
+          if (!(uint32_t(track1.isBarrelSelected()) & fConfigBarrelTrackCutBitMask.value))
+            continue;
+          if (!(uint32_t(track2.isBarrelSelected()) & fConfigBarrelTrackCutBitMask.value))
+            continue;
+          flowPairsRR(event1.selection_raw(), event1.multFT0C(), event1.numContrib(), event1.posZ(), track1.pt(), track1.eta(), track1.phi(), track2.pt(), track2.eta(), track2.phi());
+        }
+      }
+    }
+  }
+
+  void processMEFlowPairPoiRef(soa::Filtered<MyEventsVtxCovSelected>& events, MyBarrelTracksSelectedWithCov const& tracks, soa::Filtered<MyDielectronCandidates> const& dileptons)
+  {
+    events.bindExternalIndices(&dileptons);
+    events.bindExternalIndices(&tracks);
+    for (auto& [event1, event2] : selfCombinations(hashBin, fConfigMixingDepthPR.value, -1, events, events)) {
+      auto evDileptons = dileptons.sliceBy(perEventPairs, event1.globalIndex());
+      evDileptons.bindExternalIndices(&events);
+
+      auto evTracks = tracks.sliceBy(perEventTracks, event2.globalIndex());
+      evTracks.bindExternalIndices(&events);
+
+      for (auto dilepton : evDileptons) {
+        for (auto& track : evTracks) {
+          if (!(uint32_t(track.isBarrelSelected()) & fConfigBarrelTrackCutBitMask.value))
+            continue;
+          flowPairsPR(event1.selection_raw(), event1.multFT0C(), event1.numContrib(), event1.posZ(), dilepton.pt(), dilepton.eta(), dilepton.phi(), dilepton.mass(), dilepton.sign(), track.pt(), track.eta(), track.phi());
+        }
+      }
+    }
+  }
+
   void processDummy(MyEvents&)
   {
   }
 
   PROCESS_SWITCH(AnalysisFlow, processSkimmed, "2024.9.30", false);
   PROCESS_SWITCH(AnalysisFlow, processSkimmedWithoutDilepton, "processSkimmedWithoutDilepton", false);
+  PROCESS_SWITCH(AnalysisFlow, processSEFlowPairRefOnly, "processSEFlowPairRefOnly", false);
+  PROCESS_SWITCH(AnalysisFlow, processSEFlowPairPoiRef, "processSEFlowPairPoiRef", false);
+  PROCESS_SWITCH(AnalysisFlow, processMEFlowPairRefOnly, "processMEFlowPairRefOnly", false);
+  PROCESS_SWITCH(AnalysisFlow, processMEFlowPairPoiRef, "processMEFlowPairPoiRef", false);
   PROCESS_SWITCH(AnalysisFlow, processDummy, "Dummy function", false);
 };
 
