@@ -14,6 +14,9 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <map>
+#include <string>
+#include <memory>
 #include <TH1F.h>
 #include <TH3F.h>
 #include <THashList.h>
