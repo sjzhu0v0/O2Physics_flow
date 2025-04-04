@@ -70,6 +70,7 @@ DECLARE_SOA_COLUMN(IsBarrelSelected, isBarrelSelected, int);
 DECLARE_SOA_COLUMN(IsMuonSelected, isMuonSelected, int);
 DECLARE_SOA_COLUMN(IsBarrelSelectedPrefilter, isBarrelSelectedPrefilter, int);
 DECLARE_SOA_COLUMN(IsPrefilterVetoed, isPrefilterVetoed, int);
+DECLARE_SOA_COLUMN(CacheTrackDaughter, cacheTrackDaughter, std::vector<int>);
 } // namespace dqanalysisflags
 
 DECLARE_SOA_TABLE(EventCuts, "AOD", "DQANAEVCUTS", dqanalysisflags::IsEventSelected);
@@ -451,6 +452,8 @@ struct AnalysisFlow {
 
   void processSEFlowPairPoiRef(soa::Filtered<MyEventsVtxCovSelected>::iterator const& event, MyBarrelTracksSelectedWithCov const& tracks, soa::Filtered<MyDielectronCandidates> const& dileptons)
   {
+    std::vector<int> trackGlobalIndexes;
+    std::vector<int> daugDileptonGlobalIndexes;
     std::vector<float> vecPT;
     std::vector<float> vecEta;
     std::vector<float> vecPhi;
@@ -467,10 +470,23 @@ struct AnalysisFlow {
       vecPhi.push_back(dilepton.phi());
       vecMass.push_back(dilepton.mass());
       vecSign.push_back(dilepton.sign());
+      int indexLepton1 = dilepton.index0Id();
+      int indexLepton2 = dilepton.index1Id();
+      daugDileptonGlobalIndexes.push_back(indexLepton1);
+      daugDileptonGlobalIndexes.push_back(indexLepton2);
     }
 
     for (auto& track : tracks) {
       if (!(uint32_t(track.isBarrelSelected()) & fConfigBarrelTrackCutBitMask.value))
+        continue;
+      bool isDileptonDaug = false;
+      for (int daugDileptonGlobalIndexe : daugDileptonGlobalIndexes) {
+        if (track.globalIndex() == daugDileptonGlobalIndexe) {
+          isDileptonDaug = true;
+          break;
+        }
+      }
+      if (isDileptonDaug)
         continue;
       vecPTRef.push_back(track.pt());
       vecEtaRef.push_back(track.eta());
