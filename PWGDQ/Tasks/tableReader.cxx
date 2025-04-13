@@ -93,7 +93,7 @@ DECLARE_SOA_TABLE(Prefilter, "AOD", "DQPREFILTER", dqanalysisflags::IsPrefilterV
 DECLARE_SOA_TABLE(BmesonCandidates, "AOD", "DQBMESONS", dqanalysisflags::massBcandidate, dqanalysisflags::pTBcandidate, dqanalysisflags::LxyBcandidate, dqanalysisflags::LxyzBcandidate, dqanalysisflags::LzBcandidate, dqanalysisflags::TauxyBcandidate, dqanalysisflags::TauzBcandidate, dqanalysisflags::CosPBcandidate, dqanalysisflags::Chi2Bcandidate);
 DECLARE_SOA_TABLE(TrackInfo, "AOD", "TRACKINFO", collision::PosX, collision::PosY, collision::PosZ, collision::NumContrib, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, reducedtrack::Sign, reducedtrack::DcaXY, reducedtrack::DcaZ, track::ITSClusterMap);
 
-DECLARE_SOA_TABLE(DielectronsV0, "RTDIELECTRONV0", //!
+DECLARE_SOA_TABLE(DielectronsV0, "AOD", "RTDIELECTRONV0",
                   reducedpair::ReducedEventId,
                   reducedpair::Mass, reducedpair::Pt, reducedpair::Eta, reducedpair::Phi, reducedpair::Sign,
                   dilepton_track_index::Pt1, dilepton_track_index::Eta1, dilepton_track_index::Phi1, dqanalysisflags::TrackFilterMap1, dqanalysisflags::TrackIndex1, dilepton_track_index::Pt2, dilepton_track_index::Eta2, dilepton_track_index::Phi2, dqanalysisflags::TrackFilterMap2, dqanalysisflags::TrackIndex2);
