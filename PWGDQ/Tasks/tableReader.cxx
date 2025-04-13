@@ -1351,7 +1351,7 @@ struct AnalysisSameEventPairing {
           }
         }
       }
-      int gMIndexDilepton = 0;
+
       for (auto& [t1, t2] : combinations(tracks1, tracks2)) {
         if constexpr (TPairType == VarManager::kDecayToMuMu) {
           twoTrackFilter = static_cast<uint32_t>(t1.isMuonSelected()) & static_cast<uint32_t>(t2.isMuonSelected()) & fTwoMuonFilterMask;
@@ -1370,7 +1370,7 @@ struct AnalysisSameEventPairing {
     if (fConfigFlowReso) {
       VarManager::FillEventFlowResoFactor(ResoFlowSP, ResoFlowEP);
     }
-
+    int gMIndexDilepton = 0;
     bool isFirst = true;
     for (auto& [t1, t2] : combinations(tracks1, tracks2)) {
       if constexpr (TPairType == VarManager::kDecayToEE || TPairType == VarManager::kDecayToPiPi) {
