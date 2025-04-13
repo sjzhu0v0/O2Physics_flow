@@ -79,6 +79,10 @@ DECLARE_SOA_COLUMN(TauxyBcandidate, tauxyBcandidate, float);
 DECLARE_SOA_COLUMN(TauzBcandidate, tauzBcandidate, float);
 DECLARE_SOA_COLUMN(CosPBcandidate, cosPBcandidate, float);
 DECLARE_SOA_COLUMN(Chi2Bcandidate, chi2Bcandidate, float);
+DECLARE_SOA_COLUMN(TrackFilterMap1, trackFilterMap1, int);
+DECLARE_SOA_COLUMN(TrackFilterMap2, trackFilterMap2, int);
+DECLARE_SOA_COLUMN(TrackIndex1, trackIndex1, int);
+DECLARE_SOA_COLUMN(TrackIndex2, trackIndex2, int);
 } // namespace dqanalysisflags
 
 DECLARE_SOA_TABLE(EventCuts, "AOD", "DQANAEVCUTS", dqanalysisflags::IsEventSelected);
@@ -88,6 +92,11 @@ DECLARE_SOA_TABLE(MuonTrackCuts, "AOD", "DQANAMUONCUTS", dqanalysisflags::IsMuon
 DECLARE_SOA_TABLE(Prefilter, "AOD", "DQPREFILTER", dqanalysisflags::IsPrefilterVetoed);
 DECLARE_SOA_TABLE(BmesonCandidates, "AOD", "DQBMESONS", dqanalysisflags::massBcandidate, dqanalysisflags::pTBcandidate, dqanalysisflags::LxyBcandidate, dqanalysisflags::LxyzBcandidate, dqanalysisflags::LzBcandidate, dqanalysisflags::TauxyBcandidate, dqanalysisflags::TauzBcandidate, dqanalysisflags::CosPBcandidate, dqanalysisflags::Chi2Bcandidate);
 DECLARE_SOA_TABLE(TrackInfo, "AOD", "TRACKINFO", collision::PosX, collision::PosY, collision::PosZ, collision::NumContrib, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, reducedtrack::Sign, reducedtrack::DcaXY, reducedtrack::DcaZ, track::ITSClusterMap);
+
+DECLARE_SOA_TABLE(DielectronsV0, "RTDIELECTRONV0", //!
+                  reducedpair::ReducedEventId,
+                  reducedpair::Mass, reducedpair::Pt, reducedpair::Eta, reducedpair::Phi, reducedpair::Sign,
+                  dilepton_track_index::Pt1, dilepton_track_index::Eta1, dilepton_track_index::Phi1, dqanalysisflags::TrackFilterMap1, dqanalysisflags::TrackIndex1, dilepton_track_index::Pt2, dilepton_track_index::Eta2, dilepton_track_index::Phi2, dqanalysisflags::TrackFilterMap2, dqanalysisflags::TrackIndex2);
 } // namespace o2::aod
 
 // Declarations of various short names
@@ -1015,9 +1024,11 @@ struct AnalysisEventMixing {
 struct AnalysisSameEventPairing {
 
   Produces<aod::Dielectrons> dielectronList;
+  Produces<aod::DielectronsV0> dielectronV0List;
   Produces<aod::Dimuons> dimuonList;
-  Produces<aod::DielectronsExtra> dielectronExtraList;
-  Produces<aod::DielectronsInfo> dielectronInfoList;
+  Produces<aod::DielectronsExtra> dielectronExtraList
+    Produces<aod::DielectronsInfo>
+      dielectronInfoList;
   Produces<aod::DimuonsExtra> dimuonExtraList;
   Produces<aod::DielectronsAll> dielectronAllList;
   Produces<aod::DimuonsAll> dimuonAllList;
@@ -1308,6 +1319,7 @@ struct AnalysisSameEventPairing {
     uint32_t dileptonFilterMap = 0;
     uint32_t dileptonMcDecision = 0; // placeholder, copy of the dqEfficiency.cxx one
     dielectronList.reserve(1);
+    dielectronV0List.reserve(1);
     dimuonList.reserve(1);
     dielectronExtraList.reserve(1);
     dielectronInfoList.reserve(1);
@@ -1339,7 +1351,7 @@ struct AnalysisSameEventPairing {
           }
         }
       }
-
+      int gMIndexDilepton = 0;
       for (auto& [t1, t2] : combinations(tracks1, tracks2)) {
         if constexpr (TPairType == VarManager::kDecayToMuMu) {
           twoTrackFilter = static_cast<uint32_t>(t1.isMuonSelected()) & static_cast<uint32_t>(t2.isMuonSelected()) & fTwoMuonFilterMask;
@@ -1395,6 +1407,10 @@ struct AnalysisSameEventPairing {
 
       if constexpr (TPairType == pairTypeEE) {
         dielectronList(event, VarManager::fgValues[VarManager::kMass], VarManager::fgValues[VarManager::kPt], VarManager::fgValues[VarManager::kEta], VarManager::fgValues[VarManager::kPhi], t1.sign() + t2.sign(), dileptonFilterMap, dileptonMcDecision);
+        dielectronV0List(gMIndexDilepton, VarManager::fgValues[VarManager::kMass], VarManager::fgValues[VarManager::kPt], VarManager::fgValues[VarManager::kEta], VarManager::fgValues[VarManager::kPhi], t1.sign() + t2.sign(), t1.pt(), t1.eta(), t1.phi(), t1.isBarrelSelected(),
+                         t1.globalIndex(), t2.pt(), t2.eta(), t2.phi(), t2.isBarrelSelected(),
+                         t2.globalIndex());
+        gMIndexDilepton++;
         if constexpr ((TTrackFillMap & VarManager::ObjTypes::ReducedTrackCollInfo) > 0) {
           dielectronInfoList(t1.collisionId(), t1.trackId(), t2.trackId());
         }

@@ -187,6 +187,7 @@ struct AnalysisFlow {
   Configurable<float> fConfigDileptonHighMass{"cfgDileptonHighMass", 5.0, "High mass cut for the dileptons used in analysis"};
   Configurable<std::string> fConfigQVectorsBarrel2Cal{"cfgQVectorsBarrel", "4,1;2,1:0,1", "Semicolon separated list of q vector to be calculated"};
   Configurable<int> fConfigBarrelTrackCutBitMask{"cfgBarrelTrackCutBitMask", 1, "bit mask of the track cuts"};
+  Configurable<int> fConfigDQFilterMap{"fConfigDQFilterMap", 1, "fConfigDQFilterMap"};
   Configurable<int> fConfigMixingDepthRR{"cfgMixingDepthRR", 5, "Event mixing pool depth rr"};
   Configurable<int> fConfigMixingDepthPR{"cfgMixingDepthPR", 5, "Event mixing pool depth pr"};
   Produces<aod::FlowVecs> qVectors;
@@ -197,6 +198,7 @@ struct AnalysisFlow {
   Filter eventFilter = aod::dqanalysisflags::isEventSelected == 1;
   Filter dileptonFilter = aod::reducedpair::mass > fConfigDileptonLowMass&& aod::reducedpair::mass < fConfigDileptonHighMass;
   Filter filterBarrelTrackSelected = aod::dqanalysisflags::isBarrelSelected > 0;
+  Filter filterfConfigDQFilterMap = fConfigDQFilterMap.value | reducedpair::filterMap > 0;
 
   std::vector<float> qvecRe;
   std::vector<float> qvecIm;
