@@ -3717,6 +3717,13 @@ AnalysisCompositeCut* o2::aod::dqcuts::GetCompositeCut(const char* cutName)
     return cut;
   }
 
+  if (!nameStr.compare("electronFromGamma")) {
+    cut->AddCut(GetAnalysisCut("PIDStandardKine2"));
+    cut->AddCut(GetAnalysisCut("electronPIDLooseSkimmed2"));
+    cut->AddCut(GetAnalysisCut("electronStandardQualityForO2MCdebug3"));
+    return cut;
+  }
+
   // -------------------------------------------------------------------------------------------------
   //
   // Below are a list of single electron single muon and in order or optimize the trigger
