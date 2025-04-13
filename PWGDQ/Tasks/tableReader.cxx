@@ -1026,9 +1026,8 @@ struct AnalysisSameEventPairing {
   Produces<aod::Dielectrons> dielectronList;
   Produces<aod::DielectronsV0> dielectronV0List;
   Produces<aod::Dimuons> dimuonList;
-  Produces<aod::DielectronsExtra> dielectronExtraList
-    Produces<aod::DielectronsInfo>
-      dielectronInfoList;
+  Produces<aod::DielectronsExtra> dielectronExtraList;
+  Produces<aod::DielectronsInfo> dielectronInfoList;
   Produces<aod::DimuonsExtra> dimuonExtraList;
   Produces<aod::DielectronsAll> dielectronAllList;
   Produces<aod::DimuonsAll> dimuonAllList;
