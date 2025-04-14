@@ -195,6 +195,7 @@ struct AnalysisFlow {
   Produces<aod::FlowPairPR> flowPairsPR;
 
   Filter eventFilter = aod::dqanalysisflags::isEventSelected == 1;
+  Filter dileptonFilter = aod::reducedpair::mass > fConfigDileptonLowMass&& aod::reducedpair::mass < fConfigDileptonHighMass;
   Filter filterBarrelTrackSelected = aod::dqanalysisflags::isBarrelSelected > 0;
 
   std::vector<float> qvecRe;
