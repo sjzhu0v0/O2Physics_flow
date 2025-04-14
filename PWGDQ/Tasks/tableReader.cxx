@@ -1404,6 +1404,12 @@ struct AnalysisSameEventPairing {
       // TODO: provide the type of pair to the dilepton table (e.g. ee, mumu, emu...)
       dileptonFilterMap = twoTrackFilter;
 
+      bool onlyTrigger2 = dileptonFilterMap == 2;
+      bool isMassHigh = VarManager::fgValues[VarManager::kMass] > 0.015;
+
+      if (onlyTrigger2 && isMassHigh)
+        continue; // skip the event if the mass is high and only trigger 2 is set
+
       if constexpr (TPairType == pairTypeEE) {
         dielectronList(event, VarManager::fgValues[VarManager::kMass], VarManager::fgValues[VarManager::kPt], VarManager::fgValues[VarManager::kEta], VarManager::fgValues[VarManager::kPhi], t1.sign() + t2.sign(), dileptonFilterMap, dileptonMcDecision);
         dielectronV0List(gMIndexDilepton, VarManager::fgValues[VarManager::kMass], VarManager::fgValues[VarManager::kPt], VarManager::fgValues[VarManager::kEta], VarManager::fgValues[VarManager::kPhi], t1.sign() + t2.sign(), t1.pt(), t1.eta(), t1.phi(), t1.isBarrelSelected(),
