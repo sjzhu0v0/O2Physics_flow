@@ -495,7 +495,7 @@ struct AnalysisFlow {
       vecPhiRef.push_back(track.phi());
     }
 
-    flowVectorsDetailed(event.selection_raw(), event.multFT0C(), event.numContrib(), event.posZ(), vecPT, vecEta, vecPhi, vecMass, vecSign, vecPTRef, vecEtaRef, vecPhiRef);
+    flowVectorsDetailed(event.selection_raw(), event.hadronicRate(), event.multFT0C(), event.numContrib(), event.posZ(), vecPT, vecEta, vecPhi, vecMass, vecSign, vecPTRef, vecEtaRef, vecPhiRef);
   }
 
   Preslice<soa::Filtered<MyDielectronCandidates>> perEventPairs = aod::reducedpair::reducedeventId;
