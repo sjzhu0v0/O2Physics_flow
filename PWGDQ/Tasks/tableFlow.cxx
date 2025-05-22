@@ -71,6 +71,7 @@ DECLARE_SOA_COLUMN(IsMuonSelected, isMuonSelected, int);
 DECLARE_SOA_COLUMN(IsBarrelSelectedPrefilter, isBarrelSelectedPrefilter, int);
 DECLARE_SOA_COLUMN(IsPrefilterVetoed, isPrefilterVetoed, int);
 DECLARE_SOA_COLUMN(CacheTrackDaughter, cacheTrackDaughter, std::vector<int>);
+DECLARE_SOA_COLUMN(HadronicRate, hadronicRate, float);
 } // namespace dqanalysisflags
 
 DECLARE_SOA_TABLE(EventCuts, "AOD", "DQANAEVCUTS", dqanalysisflags::IsEventSelected);
@@ -79,6 +80,7 @@ DECLARE_SOA_TABLE(BarrelTrackCuts, "AOD", "DQANATRKCUTS", dqanalysisflags::IsBar
 DECLARE_SOA_TABLE(MuonTrackCuts, "AOD", "DQANAMUONCUTS", dqanalysisflags::IsMuonSelected);
 DECLARE_SOA_TABLE(Prefilter, "AOD", "DQPREFILTER", dqanalysisflags::IsPrefilterVetoed);
 DECLARE_SOA_TABLE(TrackInfo, "AOD", "TRACKINFO", collision::PosX, collision::PosY, collision::PosZ, collision::NumContrib, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, reducedtrack::Sign, reducedtrack::DcaXY, reducedtrack::DcaZ, track::ITSClusterMap);
+DECLARE_SOA_TABLE(HadronicRates, "AOD", "DQHADRATE", dqanalysisflags::HadronicRate);
 
 namespace flowVec
 {
@@ -114,7 +116,7 @@ DECLARE_SOA_COLUMN(Phi2, phi2, float);
 } // namespace flowPair
 
 DECLARE_SOA_TABLE(FlowVecs, "AOD", "DQFLOWVECS", evsel::Selection, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowVec::PT, flowVec::Eta, flowVec::Phi, flowVec::Mass, flowVec::Sign, flowVec::QvecRe, flowVec::QvecIm, flowVec::QvecAmp);
-DECLARE_SOA_TABLE(FlowVecD, "AOD", "DQFLOWVECD", evsel::Selection, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowVec::PT, flowVec::Eta, flowVec::Phi, flowVec::Mass, flowVec::Sign, flowVec::PTREF, flowVec::EtaREF, flowVec::PhiREF);
+DECLARE_SOA_TABLE(FlowVecD, "AOD", "DQFLOWVECD", evsel::Selection, dqanalysisflags::HadronicRate, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowVec::PT, flowVec::Eta, flowVec::Phi, flowVec::Mass, flowVec::Sign, flowVec::PTREF, flowVec::EtaREF, flowVec::PhiREF);
 DECLARE_SOA_TABLE(FlowPairRR, "AOD", "DQFLOWPAIRRR", evsel::Selection, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowPair::PT1, flowPair::Eta1, flowPair::Phi1, flowPair::PT2, flowPair::Eta2, flowPair::Phi2);
 DECLARE_SOA_TABLE(FlowPairPR, "AOD", "DQFLOWPAIRPR", evsel::Selection, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowPair::PT, flowPair::Eta, flowPair::Phi, flowPair::Mass, flowPair::Sign, flowPair::PT1, flowPair::Eta1, flowPair::Phi1);
 
@@ -125,8 +127,8 @@ using MyEvents = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended>;
 using MyEventsSelected = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::EventCuts>;
 using MyEventsHashSelected = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::EventCuts, aod::MixingHashes>;
 using MyEventsVtxCov = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsVtxCov>;
-using MyEventsVtxCovSelected = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsVtxCov, aod::EventCuts>;
-using MyEventsHashVtxCovSelected = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsVtxCov, aod::EventCuts, aod::MixingHashes>;
+using MyEventsVtxCovSelected = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsVtxCov, aod::EventCuts, aod::HadronicRates>;
+using MyEventsHashVtxCovSelected = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsVtxCov, aod::EventCuts, aod::MixingHashes, aod::HadronicRates>;
 using MyEventsVtxCovSelectedQvector = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsVtxCov, aod::EventCuts, aod::ReducedEventsQvector>;
 using MyEventsVtxCovSelectedQvectorExtraWithRefFlow = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsVtxCov, aod::EventCuts, aod::ReducedEventsQvector, aod::ReducedEventsQvectorExtra, aod::ReducedEventsRefFlow>;
 using MyEventsVtxCovSelectedQvectorCentr = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsVtxCov, aod::EventCuts, aod::ReducedEventsQvectorCentr>;
@@ -447,7 +449,7 @@ struct AnalysisFlow {
       vecPhiRef.push_back(track.phi());
     }
 
-    flowVectorsDetailed(event.selection_raw(), event.multFT0C(), event.numContrib(), event.posZ(), vecPT, vecEta, vecPhi, vecMass, vecSign, vecPTRef, vecEtaRef, vecPhiRef);
+    flowVectorsDetailed(event.selection_raw(), event.hadronicRate(), event.multFT0C(), event.numContrib(), event.posZ(), vecPT, vecEta, vecPhi, vecMass, vecSign, vecPTRef, vecEtaRef, vecPhiRef);
   }
 
   void processSEFlowPairPoiRef(soa::Filtered<MyEventsVtxCovSelected>::iterator const& event, MyBarrelTracksSelectedWithCov const& tracks, soa::Filtered<MyDielectronCandidates> const& dileptons)

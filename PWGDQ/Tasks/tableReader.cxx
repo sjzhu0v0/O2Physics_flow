@@ -44,6 +44,7 @@
 #include "DetectorsBase/GeometryManager.h"
 #include "ITSMFTBase/DPLAlpideParam.h"
 #include "Common/CCDB/EventSelectionParams.h"
+#include "Common/CCDB/ctpRateFetcher.h"
 
 using std::cout;
 using std::endl;
@@ -83,6 +84,7 @@ DECLARE_SOA_COLUMN(TrackFilterMap1, trackFilterMap1, int);
 DECLARE_SOA_COLUMN(TrackFilterMap2, trackFilterMap2, int);
 DECLARE_SOA_COLUMN(TrackIndex1, trackIndex1, int);
 DECLARE_SOA_COLUMN(TrackIndex2, trackIndex2, int);
+DECLARE_SOA_COLUMN(HadronicRate, hadronicRate, float);
 } // namespace dqanalysisflags
 
 DECLARE_SOA_TABLE(EventCuts, "AOD", "DQANAEVCUTS", dqanalysisflags::IsEventSelected);
@@ -92,6 +94,7 @@ DECLARE_SOA_TABLE(MuonTrackCuts, "AOD", "DQANAMUONCUTS", dqanalysisflags::IsMuon
 DECLARE_SOA_TABLE(Prefilter, "AOD", "DQPREFILTER", dqanalysisflags::IsPrefilterVetoed);
 DECLARE_SOA_TABLE(BmesonCandidates, "AOD", "DQBMESONS", dqanalysisflags::massBcandidate, dqanalysisflags::pTBcandidate, dqanalysisflags::LxyBcandidate, dqanalysisflags::LxyzBcandidate, dqanalysisflags::LzBcandidate, dqanalysisflags::TauxyBcandidate, dqanalysisflags::TauzBcandidate, dqanalysisflags::CosPBcandidate, dqanalysisflags::Chi2Bcandidate);
 DECLARE_SOA_TABLE(TrackInfo, "AOD", "TRACKINFO", collision::PosX, collision::PosY, collision::PosZ, collision::NumContrib, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, reducedtrack::Sign, reducedtrack::DcaXY, reducedtrack::DcaZ, track::ITSClusterMap);
+DECLARE_SOA_TABLE(HadronicRates, "AOD", "DQHADRATE", dqanalysisflags::HadronicRate);
 
 DECLARE_SOA_TABLE(DielectronsV0, "AOD", "RTDIELECTRONV0",
                   reducedpair::ReducedEventId,
@@ -165,6 +168,7 @@ void DefineHistograms(HistogramManager* histMan, TString histClasses, Configurab
 struct AnalysisEventSelection {
   Produces<aod::EventCuts> eventSel;
   Produces<aod::MixingHashes> hash;
+  Produces<aod::HadronicRates> hadronicRates;
   OutputObj<THashList> fOutputList{"output"};
   // TODO: Provide the mixing variables and binning directly via configurables (e.g. vectors of float)
   Configurable<string> fConfigMixingVariables{"cfgMixingVars", "", "Mixing configs separated by a comma, default no mixing"};
@@ -182,6 +186,7 @@ struct AnalysisEventSelection {
   int fLastRun;
 
   Service<o2::ccdb::BasicCCDBManager> fCCDB;
+  ctpRateFetcher mRateFetcher;
 
   void init(o2::framework::InitContext& context)
   {
@@ -215,11 +220,11 @@ struct AnalysisEventSelection {
     }
 
     // CCDB configuration
-    // fCCDB->setURL(fConfigCcdbUrl.value);
-    // fCCDB->setCaching(true);
-    // fCCDB->setLocalObjectValidityChecking();
+    fCCDB->setURL(fConfigCcdbUrl.value);
+    fCCDB->setCaching(true);
+    fCCDB->setLocalObjectValidityChecking();
     // Not later than now objects
-    // fCCDB->setCreatedNotAfter(fConfigNoLaterThan.value);
+    fCCDB->setCreatedNotAfter(fConfigNoLaterThan.value);
 
     fLastRun = -1;
   }
@@ -255,6 +260,8 @@ struct AnalysisEventSelection {
       } else {
         eventSel(0);
       }
+      float hadronicRate = mRateFetcher.fetch(fCCDB.service, event.timestamp(), event.runNumber(), "T0VTX");
+      hadronicRates(hadronicRate);
     } else {
       if (fEventCut->IsSelected(VarManager::fgValues) && event.tag_bit(56)) { // This is the bit used for the software trigger event selections [TO BE DONE: find a more clear way to use it]
         if (fConfigQA) {
