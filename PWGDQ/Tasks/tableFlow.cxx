@@ -516,7 +516,7 @@ struct AnalysisFlow {
             continue;
           if (!(uint32_t(track2.isBarrelSelected()) & fConfigBarrelTrackCutBitMask.value))
             continue;
-          flowPairsRR(event1.selection_raw(), event1.multFT0C(), event1.numContrib(), event1.posZ(), track1.pt(), track1.eta(), track1.phi(), track2.pt(), track2.eta(), track2.phi());
+          flowPairsRR(event1.multTPC(), event1.multTracklets(), event1.multNTracksPV(), event1.selection_raw(), event1.multFT0C(), event1.numContrib(), event1.posZ(), track1.pt(), track1.eta(), track1.phi(), track2.pt(), track2.eta(), track2.phi());
         }
       }
     }
@@ -537,7 +537,7 @@ struct AnalysisFlow {
         for (auto& track : evTracks) {
           if (!(uint32_t(track.isBarrelSelected()) & fConfigBarrelTrackCutBitMask.value))
             continue;
-          flowPairsPR(event1.selection_raw(), event1.multFT0C(), event1.numContrib(), event1.posZ(), dilepton.pt(), dilepton.eta(), dilepton.phi(), dilepton.mass(), dilepton.sign(), track.pt(), track.eta(), track.phi());
+          flowPairsPR(event1.multTPC(), event1.multTracklets(), event1.multNTracksPV(), event1.selection_raw(), event1.multFT0C(), event1.numContrib(), event1.posZ(), dilepton.pt(), dilepton.eta(), dilepton.phi(), dilepton.mass(), dilepton.sign(), track.pt(), track.eta(), track.phi());
         }
       }
     }
