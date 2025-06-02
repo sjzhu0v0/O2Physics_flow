@@ -449,7 +449,7 @@ struct AnalysisFlow {
       vecPhiRef.push_back(track.phi());
     }
 
-    flowVectorsDetailed(event.hadronicRate(), event.multFT0C(), vecPT, vecEta, vecPhi, vecMass, vecSign, vecPTRef, vecEtaRef, vecPhiRef);
+    flowVectorsDetailed(event.hadronicRate(), vecPT, vecEta, vecPhi, vecMass, vecSign, vecPTRef, vecEtaRef, vecPhiRef);
   }
 
   void processSEFlowPairPoiRef(soa::Filtered<MyEventsVtxCovSelected>::iterator const& event, MyBarrelTracksSelectedWithCov const& tracks, soa::Filtered<MyDielectronCandidates> const& dileptons)
@@ -495,7 +495,7 @@ struct AnalysisFlow {
       vecPhiRef.push_back(track.phi());
     }
 
-    flowVectorsDetailed(event.hadronicRate(), event.multFT0C(), vecPT, vecEta, vecPhi, vecMass, vecSign, vecPTRef, vecEtaRef, vecPhiRef);
+    flowVectorsDetailed(event.hadronicRate(), vecPT, vecEta, vecPhi, vecMass, vecSign, vecPTRef, vecEtaRef, vecPhiRef);
   }
 
   Preslice<soa::Filtered<MyDielectronCandidates>> perEventPairs = aod::reducedpair::reducedeventId;
