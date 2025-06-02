@@ -115,7 +115,7 @@ DECLARE_SOA_COLUMN(Eta2, eta2, float);
 DECLARE_SOA_COLUMN(Phi2, phi2, float);
 } // namespace flowPair
 
-DECLARE_SOA_TABLE(FlowVecs, "AOD", "DQFLOWVECS", evsel::Selection, mult::MultTPC, mult::MultTracklets, mult::MultNTracksPV, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowVec::PT, flowVec::Eta, flowVec::Phi, flowVec::Mass, flowVec::Sign, flowVec::QvecRe, flowVec::QvecIm, flowVec::QvecAmp);
+DECLARE_SOA_TABLE(FlowVecs, "AOD", "DQFLOWVECS", evsel::Selection, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowVec::PT, flowVec::Eta, flowVec::Phi, flowVec::Mass, flowVec::Sign, flowVec::QvecRe, flowVec::QvecIm, flowVec::QvecAmp);
 DECLARE_SOA_TABLE(FlowVecD, "AOD", "DQFLOWVECD", mult::MultTPC, mult::MultTracklets, mult::MultNTracksPV, evsel::Selection, dqanalysisflags::HadronicRate, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowVec::PT, flowVec::Eta, flowVec::Phi, flowVec::Mass, flowVec::Sign, flowVec::PTREF, flowVec::EtaREF, flowVec::PhiREF);
 DECLARE_SOA_TABLE(FlowPairRR, "AOD", "DQFLOWPAIRRR", mult::MultTPC, mult::MultTracklets, mult::MultNTracksPV, evsel::Selection, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowPair::PT1, flowPair::Eta1, flowPair::Phi1, flowPair::PT2, flowPair::Eta2, flowPair::Phi2);
 DECLARE_SOA_TABLE(FlowPairPR, "AOD", "DQFLOWPAIRPR", mult::MultTPC, mult::MultTracklets, mult::MultNTracksPV, evsel::Selection, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowPair::PT, flowPair::Eta, flowPair::Phi, flowPair::Mass, flowPair::Sign, flowPair::PT1, flowPair::Eta1, flowPair::Phi1);
