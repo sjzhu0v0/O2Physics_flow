@@ -3521,6 +3521,11 @@ AnalysisCompositeCut* o2::aod::dqcuts::GetCompositeCut(const char* cutName)
     return cut;
   }
 
+  if (!nameStr.compare("TrackQualityRefBasic")) {
+    cut->AddCut(GetAnalysisCut("RefTrackQuality"));
+    return cut;
+  }
+
   if (!nameStr.compare("CutPrimaryTrack")) {
     cut->AddCut(GetAnalysisCut("pTCutFlow"));
     cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
@@ -3570,118 +3575,6 @@ AnalysisCompositeCut* o2::aod::dqcuts::GetCompositeCut(const char* cutName)
     cut->AddCut(GetAnalysisCut("QuarkaniumTrackQuality"));
     cut->AddCut(GetAnalysisCut("pTCutFlow"));
     cut->AddCut(GetAnalysisCut("quarterEta4"));
-    return cut;
-  }
-
-  if (!nameStr.compare("flowTrackQualityfineEta1")) {
-    cut->AddCut(GetAnalysisCut("pTCutFlow"));
-    cut->AddCut(GetAnalysisCut("RefTrackQuality"));
-    cut->AddCut(GetAnalysisCut("primaryTrackDCAcutsPtDependent"));
-    cut->AddCut(GetAnalysisCut("fineEta1"));
-    return cut;
-  }
-
-  if (!nameStr.compare("flowTrackQualityfineEta2")) {
-    cut->AddCut(GetAnalysisCut("pTCutFlow"));
-    cut->AddCut(GetAnalysisCut("RefTrackQuality"));
-    cut->AddCut(GetAnalysisCut("primaryTrackDCAcutsPtDependent"));
-    cut->AddCut(GetAnalysisCut("fineEta2"));
-    return cut;
-  }
-
-  if (!nameStr.compare("flowTrackQualityfineEta3")) {
-    cut->AddCut(GetAnalysisCut("pTCutFlow"));
-    cut->AddCut(GetAnalysisCut("RefTrackQuality"));
-    cut->AddCut(GetAnalysisCut("primaryTrackDCAcutsPtDependent"));
-    cut->AddCut(GetAnalysisCut("fineEta3"));
-    return cut;
-  }
-
-  if (!nameStr.compare("flowTrackQualityfineEta4")) {
-    cut->AddCut(GetAnalysisCut("pTCutFlow"));
-    cut->AddCut(GetAnalysisCut("RefTrackQuality"));
-    cut->AddCut(GetAnalysisCut("primaryTrackDCAcutsPtDependent"));
-    cut->AddCut(GetAnalysisCut("fineEta4"));
-    return cut;
-  }
-
-  if (!nameStr.compare("flowTrackQualityfineEta5")) {
-    cut->AddCut(GetAnalysisCut("pTCutFlow"));
-    cut->AddCut(GetAnalysisCut("RefTrackQuality"));
-    cut->AddCut(GetAnalysisCut("primaryTrackDCAcutsPtDependent"));
-    cut->AddCut(GetAnalysisCut("fineEta5"));
-    return cut;
-  }
-
-  if (!nameStr.compare("flowTrackQualityfineEta6")) {
-    cut->AddCut(GetAnalysisCut("pTCutFlow"));
-    cut->AddCut(GetAnalysisCut("RefTrackQuality"));
-    cut->AddCut(GetAnalysisCut("primaryTrackDCAcutsPtDependent"));
-    cut->AddCut(GetAnalysisCut("fineEta6"));
-    return cut;
-  }
-
-  if (!nameStr.compare("flowTrackQualityfineEta7")) {
-    cut->AddCut(GetAnalysisCut("pTCutFlow"));
-    cut->AddCut(GetAnalysisCut("RefTrackQuality"));
-    cut->AddCut(GetAnalysisCut("primaryTrackDCAcutsPtDependent"));
-    cut->AddCut(GetAnalysisCut("fineEta7"));
-    return cut;
-  }
-
-  if (!nameStr.compare("flowTrackQualityfineEta8")) {
-    cut->AddCut(GetAnalysisCut("pTCutFlow"));
-    cut->AddCut(GetAnalysisCut("RefTrackQuality"));
-    cut->AddCut(GetAnalysisCut("primaryTrackDCAcutsPtDependent"));
-    cut->AddCut(GetAnalysisCut("fineEta8"));
-    return cut;
-  }
-
-  if (!nameStr.compare("flowTrackQualityfineEta9")) {
-    cut->AddCut(GetAnalysisCut("pTCutFlow"));
-    cut->AddCut(GetAnalysisCut("RefTrackQuality"));
-    cut->AddCut(GetAnalysisCut("primaryTrackDCAcutsPtDependent"));
-    cut->AddCut(GetAnalysisCut("fineEta9"));
-    return cut;
-  }
-
-  if (!nameStr.compare("flowTrackQualityfineEta10")) {
-    cut->AddCut(GetAnalysisCut("pTCutFlow"));
-    cut->AddCut(GetAnalysisCut("RefTrackQuality"));
-    cut->AddCut(GetAnalysisCut("primaryTrackDCAcutsPtDependent"));
-    cut->AddCut(GetAnalysisCut("fineEta10"));
-    return cut;
-  }
-
-  if (!nameStr.compare("flowTrackQualityfineEta11")) {
-    cut->AddCut(GetAnalysisCut("pTCutFlow"));
-    cut->AddCut(GetAnalysisCut("RefTrackQuality"));
-    cut->AddCut(GetAnalysisCut("primaryTrackDCAcutsPtDependent"));
-    cut->AddCut(GetAnalysisCut("fineEta11"));
-    return cut;
-  }
-
-  if (!nameStr.compare("flowTrackQualityfineEta12")) {
-    cut->AddCut(GetAnalysisCut("pTCutFlow"));
-    cut->AddCut(GetAnalysisCut("RefTrackQuality"));
-    cut->AddCut(GetAnalysisCut("primaryTrackDCAcutsPtDependent"));
-    cut->AddCut(GetAnalysisCut("fineEta12"));
-    return cut;
-  }
-
-  if (!nameStr.compare("flowTrackQualityfineEta13")) {
-    cut->AddCut(GetAnalysisCut("pTCutFlow"));
-    cut->AddCut(GetAnalysisCut("RefTrackQuality"));
-    cut->AddCut(GetAnalysisCut("primaryTrackDCAcutsPtDependent"));
-    cut->AddCut(GetAnalysisCut("fineEta13"));
-    return cut;
-  }
-
-  if (!nameStr.compare("flowTrackQualityfineEta14")) {
-    cut->AddCut(GetAnalysisCut("pTCutFlow"));
-    cut->AddCut(GetAnalysisCut("RefTrackQuality"));
-    cut->AddCut(GetAnalysisCut("primaryTrackDCAcutsPtDependent"));
-    cut->AddCut(GetAnalysisCut("fineEta14"));
     return cut;
   }
 
