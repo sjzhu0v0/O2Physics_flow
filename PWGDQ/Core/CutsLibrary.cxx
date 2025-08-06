@@ -3521,6 +3521,13 @@ AnalysisCompositeCut* o2::aod::dqcuts::GetCompositeCut(const char* cutName)
     return cut;
   }
 
+  if (!nameStr.compare("CutPrimaryTrack24")) {
+    cut->AddCut(GetAnalysisCut("pTCutFlow24"));
+    cut->AddCut(GetAnalysisCut("RefTrackQuality"));
+    cut->AddCut(GetAnalysisCut("primaryTrackDCAcutsPtDependent24"));
+    return cut;
+  }
+
   if (!nameStr.compare("TrackQualityRefBasic")) {
     cut->AddCut(GetAnalysisCut("RefTrackQuality"));
     return cut;
@@ -6837,6 +6844,11 @@ AnalysisCut* o2::aod::dqcuts::GetAnalysisCut(const char* cutName)
     return cut;
   }
 
+  if (!nameStr.compare("pTCutFlow24")) {
+    cut->AddCut(VarManager::kPt, 0.1, 6.0);
+    return cut;
+  }
+
   if (!nameStr.compare("primaryTrackDCAcutsPtDependent")) {
     TF1* f_highDCAxy_depPt = new TF1("f_highDCAxy_depPt", [](double* x, double* p) { return p[0] / pow(x[0] - p[1], p[2]); }, 0.1, 4, 3);
     TF1* f_lowDCAxy_depPt = new TF1("f_lowDCAxy_depPt", [](double* x, double* p) { return p[0] / pow(x[0] - p[1], p[2]); }, 0.1, 4, 3);
@@ -6854,6 +6866,15 @@ AnalysisCut* o2::aod::dqcuts::GetAnalysisCut(const char* cutName)
 
     cut->AddCut(VarManager::kTrackDCAxy, f_lowDCAxy_depPt, f_highDCAxy_depPt, false, VarManager::kPt, 0.1, 4.0, false);
     cut->AddCut(VarManager::kTrackDCAz, f_lowDCAz_depPt, f_highDCAz_depPt, false, VarManager::kPt, 0.1, 4.0, false);
+    return cut;
+  }
+
+  if (!nameStr.compare("primaryTrackDCAcutsPtDependent24")) {
+    TF1* f_highDCA_depPt = new TF1("f_highDCA_depPt", "0.000924651 + 0.000924651 * pow(1./x, 1.4062)", 0.1, 6, 3);
+    TF1* f_lowDCA_depPt = new TF1("f_lowDCA_depPt", "0.000924651 + 0.000924651 * pow(1./x, 1.4062)", 0.1, 6, 3);
+
+    cut->AddCut(VarManager::kTrackDCAxy, f_lowDCA_depPt, f_highDCA_depPt, false, VarManager::kPt, 0.1, 4.0, false);
+    cut->AddCut(VarManager::kTrackDCAz, f_lowDCA_depPt, f_highDCA_depPt, false, VarManager::kPt, 0.1, 4.0, false);
     return cut;
   }
 
