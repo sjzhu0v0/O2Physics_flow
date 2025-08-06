@@ -6870,8 +6870,8 @@ AnalysisCut* o2::aod::dqcuts::GetAnalysisCut(const char* cutName)
   }
 
   if (!nameStr.compare("primaryTrackDCAcutsPtDependent24")) {
-    TF1* f_highDCA_depPt = new TF1("f_highDCA_depPt", "0.000924651 + 0.000924651 * pow(1./x, 1.4062)", 0.1, 6, 3);
-    TF1* f_lowDCA_depPt = new TF1("f_lowDCA_depPt", "0.000924651 + 0.000924651 * pow(1./x, 1.4062)", 0.1, 6, 3);
+    TF1* f_highDCA_depPt = new TF1("f_highDCA_depPt", "0.000924651 + 0.000924651 * pow(1./x, 1.4062)", 0.1, 6);
+    TF1* f_lowDCA_depPt = new TF1("f_lowDCA_depPt", "0.000924651 + 0.000924651 * pow(1./x, 1.4062)", 0.1, 6);
 
     cut->AddCut(VarManager::kTrackDCAxy, f_lowDCA_depPt, f_highDCA_depPt, false, VarManager::kPt, 0.1, 4.0, false);
     cut->AddCut(VarManager::kTrackDCAz, f_lowDCA_depPt, f_highDCA_depPt, false, VarManager::kPt, 0.1, 4.0, false);
