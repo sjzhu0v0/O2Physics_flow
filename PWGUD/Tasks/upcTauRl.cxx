@@ -43,7 +43,7 @@
 #include "PWGUD/Core/SGSelector.h"
 
 // ROOT headers
-#include "TLorentzVector.h"
+#include "Math/Vector4D.h"
 #include "TPDGCode.h"
 
 using namespace o2;
@@ -79,9 +79,13 @@ DECLARE_SOA_COLUMN(VtxITSTPC, vtxITSTPC, int);
 DECLARE_SOA_COLUMN(TotalFT0AmplitudeA, totalFT0AmplitudeA, float);
 DECLARE_SOA_COLUMN(TotalFT0AmplitudeC, totalFT0AmplitudeC, float);
 DECLARE_SOA_COLUMN(TotalFV0AmplitudeA, totalFV0AmplitudeA, float);
+DECLARE_SOA_COLUMN(EnergyCommonZNA, energyCommonZNA, float);
+DECLARE_SOA_COLUMN(EnergyCommonZNC, energyCommonZNC, float);
 DECLARE_SOA_COLUMN(TimeFT0A, timeFT0A, float);
 DECLARE_SOA_COLUMN(TimeFT0C, timeFT0C, float);
 DECLARE_SOA_COLUMN(TimeFV0A, timeFV0A, float);
+DECLARE_SOA_COLUMN(TimeZNA, timeZNA, float);
+DECLARE_SOA_COLUMN(TimeZNC, timeZNC, float);
 // tracks
 DECLARE_SOA_COLUMN(TrkPx, trkPx, float[2]);
 DECLARE_SOA_COLUMN(TrkPy, trkPy, float[2]);
@@ -90,6 +94,8 @@ DECLARE_SOA_COLUMN(TrkSign, trkSign, int[2]);
 DECLARE_SOA_COLUMN(TrkDCAxy, trkDCAxy, float[2]);
 DECLARE_SOA_COLUMN(TrkDCAz, trkDCAz, float[2]);
 DECLARE_SOA_COLUMN(TrkTimeRes, trkTimeRes, float[2]);
+DECLARE_SOA_COLUMN(Trk1ITSclusterSizes, trk1ITSclusterSizes, uint32_t);
+DECLARE_SOA_COLUMN(Trk2ITSclusterSizes, trk2ITSclusterSizes, uint32_t);
 DECLARE_SOA_COLUMN(TrkTPCsignal, trkTPCsignal, float[2]);
 DECLARE_SOA_COLUMN(TrkTPCnSigmaEl, trkTPCnSigmaEl, float[2]);
 DECLARE_SOA_COLUMN(TrkTPCnSigmaMu, trkTPCnSigmaMu, float[2]);
@@ -103,18 +109,19 @@ DECLARE_SOA_COLUMN(TrkTOFnSigmaMu, trkTOFnSigmaMu, float[2]);
 DECLARE_SOA_COLUMN(TrkTOFnSigmaPi, trkTOFnSigmaPi, float[2]);
 DECLARE_SOA_COLUMN(TrkTOFnSigmaKa, trkTOFnSigmaKa, float[2]);
 DECLARE_SOA_COLUMN(TrkTOFnSigmaPr, trkTOFnSigmaPr, float[2]);
-DECLARE_SOA_COLUMN(TrkTPCexpMom, trkTPCexpMom, float[2]);
+DECLARE_SOA_COLUMN(TrkTOFexpMom, trkTOFexpMom, float[2]);
 
 } // namespace tau_tree
 DECLARE_SOA_TABLE(TauTwoTracks, "AOD", "TAUTWOTRACK",
                   tau_tree::RunNumber, tau_tree::Bc, tau_tree::TotalTracks, tau_tree::NumContrib, tau_tree::GlobalNonPVtracks, tau_tree::PosX, tau_tree::PosY, tau_tree::PosZ,
                   tau_tree::RecoMode, tau_tree::OccupancyInTime, tau_tree::HadronicRate,
                   tau_tree::Trs, tau_tree::Trofs, tau_tree::Hmpr, tau_tree::Tfb, tau_tree::ItsRofb, tau_tree::Sbp, tau_tree::ZvtxFT0vsPv, tau_tree::VtxITSTPC,
-                  tau_tree::TotalFT0AmplitudeA, tau_tree::TotalFT0AmplitudeC, tau_tree::TotalFV0AmplitudeA,
-                  tau_tree::TimeFT0A, tau_tree::TimeFT0C, tau_tree::TimeFV0A,
+                  tau_tree::TotalFT0AmplitudeA, tau_tree::TotalFT0AmplitudeC, tau_tree::TotalFV0AmplitudeA, tau_tree::EnergyCommonZNA, tau_tree::EnergyCommonZNC,
+                  tau_tree::TimeFT0A, tau_tree::TimeFT0C, tau_tree::TimeFV0A, tau_tree::TimeZNA, tau_tree::TimeZNC,
                   tau_tree::TrkPx, tau_tree::TrkPy, tau_tree::TrkPz, tau_tree::TrkSign, tau_tree::TrkDCAxy, tau_tree::TrkDCAz, tau_tree::TrkTimeRes,
+                  tau_tree::Trk1ITSclusterSizes, tau_tree::Trk2ITSclusterSizes,
                   tau_tree::TrkTPCsignal, tau_tree::TrkTPCnSigmaEl, tau_tree::TrkTPCnSigmaMu, tau_tree::TrkTPCnSigmaPi, tau_tree::TrkTPCnSigmaKa, tau_tree::TrkTPCnSigmaPr, tau_tree::TrkTPCinnerParam,
-                  tau_tree::TrkTOFsignal, tau_tree::TrkTOFnSigmaEl, tau_tree::TrkTOFnSigmaMu, tau_tree::TrkTOFnSigmaPi, tau_tree::TrkTOFnSigmaKa, tau_tree::TrkTOFnSigmaPr, tau_tree::TrkTPCexpMom);
+                  tau_tree::TrkTOFsignal, tau_tree::TrkTOFnSigmaEl, tau_tree::TrkTOFnSigmaMu, tau_tree::TrkTOFnSigmaPi, tau_tree::TrkTOFnSigmaKa, tau_tree::TrkTOFnSigmaPr, tau_tree::TrkTOFexpMom);
 
 } // namespace o2::aod
 
@@ -144,11 +151,17 @@ struct UpcTauRl {
     Configurable<bool> useNumContribs{"useNumContribs", true, {"Use coll.numContribs as event cut"}};
     Configurable<int> cutRecoFlag{"cutRecoFlag", 1, {"0 = std mode, 1 = upc mode"}};
     Configurable<bool> useRecoFlag{"useRecoFlag", false, {"Use coll.flags as event cut"}};
+    Configurable<int> cutRCTflag{"cutRCTflag", 0, {"0 = off, 1 = CBT, 2 = CBT+ZDC, 3 = CBThadron, 4 = CBThadron+ZDC"}};
     Configurable<float> cutTrueGapSideFV0{"cutTrueGapSideFV0", -1, "FV0A threshold for SG selector"};
     Configurable<float> cutTrueGapSideFT0A{"cutTrueGapSideFT0A", 150., "FT0A threshold for SG selector"};
     Configurable<float> cutTrueGapSideFT0C{"cutTrueGapSideFT0C", 50., "FT0C threshold for SG selector"};
     Configurable<float> cutTrueGapSideZDC{"cutTrueGapSideZDC", 0., "ZDC threshold for SG selector. 0 is <1n, 4.2 is <2n, 6.7 is <3n, 9.5 is <4n, 12.5 is <5n"};
     Configurable<float> cutFITtime{"cutFITtime", 40., "Maximum FIT time allowed. Default is 40ns"};
+    Configurable<bool> cutEvTFb{"cutEvTFb", true, {"Event selection bit kNoTimeFrameBorder"}};
+    Configurable<bool> cutEvITSROFb{"cutEvITSROFb", true, {"Event selection bit kNoITSROFrameBorder"}};
+    Configurable<bool> cutEvSbp{"cutEvSbp", true, {"Event selection bit kNoSameBunchPileup"}};
+    Configurable<bool> cutEvZvtxFT0vPV{"cutEvZvtxFT0vPV", false, {"Event selection bit kIsGoodZvtxFT0vsPV"}};
+    Configurable<bool> cutEvVtxITSTPC{"cutEvVtxITSTPC", true, {"Event selection bit kIsVertexITSTPC"}};
     Configurable<float> cutEvOccupancy{"cutEvOccupancy", 100000., "Maximum allowed occupancy"};
     Configurable<bool> cutEvTrs{"cutEvTrs", true, {"Event selection bit kNoCollInTimeRangeStandard"}};
     Configurable<bool> cutEvTrofs{"cutEvTrofs", true, {"Event selection bit kNoCollInRofStandard"}};
@@ -216,6 +229,8 @@ struct UpcTauRl {
   } cutTauEvent;
 
   struct : ConfigurableGroup {
+    Configurable<bool> cutCanUseTrackPID{"cutUseTrackPID", true, {"Apply weak PID check on tracks."}};
+    Configurable<int> cutCanNgoodPVtracs{"cutCanNgoodPVtracs", 2, {"How many good PV tracks to select."}};
     Configurable<float> cutCanMinElectronNsigmaEl{"cutCanMinElectronNsigmaEl", 4.0, {"Good el candidate hypo in. Upper n sigma cut on el hypo of selected electron. What is more goes away."}};
     Configurable<float> cutCanMaxElectronNsigmaEl{"cutCanMaxElectronNsigmaEl", -2.0, {"Good el candidate hypo in. Lower n sigma cut on el hypo of selected electron. What is less goes away."}};
     Configurable<bool> cutCanElectronHasTOF{"cutCanElectronHasTOF", true, {"Electron candidated is required to hit TOF."}};
@@ -753,7 +768,7 @@ struct UpcTauRl {
       return false; // TPC chi2
     if (cutGlobalTrack.cutGoodITSTPCmatching) {
       if (track.itsChi2NCl() < 0.)
-        return false; // TPC chi2
+        return false; // good ITS-TPC matching means ITS ch2 is not negative
     }
     //  TOF
     if (track.hasTOF()) {
@@ -843,15 +858,52 @@ struct UpcTauRl {
       return false;
 
     // FTOC
-    if ((std::abs(coll.timeFT0C()) > maxFITtime) && coll.timeFT0A() > -998.)
+    if ((std::abs(coll.timeFT0C()) > maxFITtime) && coll.timeFT0C() > -998.)
       return false;
 
     return true;
   }
 
   template <typename C>
+  bool isGoodRCTflag(C const& coll)
+  {
+    switch (cutSample.cutRCTflag) {
+      case 1:
+        return sgSelector.isCBTOk(coll);
+      case 2:
+        return sgSelector.isCBTZdcOk(coll);
+      case 3:
+        return sgSelector.isCBTHadronOk(coll);
+      case 4:
+        return sgSelector.isCBTHadronZdcOk(coll);
+      default:
+        return true;
+    }
+  }
+
+  template <typename C>
   bool isGoodROFtime(C const& coll)
   {
+
+    // kNoTimeFrameBorder
+    if (cutSample.cutEvTFb && !coll.tfb())
+      return false;
+
+    // kNoITSROFrameBorder
+    if (cutSample.cutEvITSROFb && !coll.itsROFb())
+      return false;
+
+    // kNoSameBunchPileup
+    if (cutSample.cutEvSbp && !coll.sbp())
+      return false;
+
+    // kIsGoodZvtxFT0vsPV
+    if (cutSample.cutEvZvtxFT0vPV && !coll.zVtxFT0vPV())
+      return false;
+
+    // kIsVertexITSTPC
+    if (cutSample.cutEvVtxITSTPC && !coll.vtxITSTPC())
+      return false;
 
     // Occupancy
     if (coll.occupancyInTime() > cutSample.cutEvOccupancy)
@@ -1003,7 +1055,7 @@ struct UpcTauRl {
   template <typename T>
   bool selectedTauEvent(T const& trkDaug1, T const& trkDaug2)
   {
-    TLorentzVector mother, daug[2], motherOfPions, pion[2];
+    ROOT::Math::LorentzVector<ROOT::Math::PxPyPzE4D<double>> mother, daug[2], motherOfPions, pion[2];
     daug[0].SetPxPyPzE(trkDaug1.px(), trkDaug1.py(), trkDaug1.pz(), energy(pdg->Mass(trackPDG(trkDaug1, cutPID.cutSiTPC, cutPID.cutSiTOF, cutPID.usePIDwTOF, cutPID.useScutTOFinTPC)), trkDaug1.px(), trkDaug1.py(), trkDaug1.pz()));
     daug[1].SetPxPyPzE(trkDaug2.px(), trkDaug2.py(), trkDaug2.pz(), energy(pdg->Mass(trackPDG(trkDaug2, cutPID.cutSiTPC, cutPID.cutSiTOF, cutPID.usePIDwTOF, cutPID.useScutTOFinTPC)), trkDaug2.px(), trkDaug2.py(), trkDaug2.pz()));
     if (cutTauEvent.useThresholdsPID) {
@@ -1173,7 +1225,7 @@ struct UpcTauRl {
       histos.get<TH1>(HIST("Events/hChannels"))->Fill(CH_EMUPI);
 
     if (isTwoSelectedTracks && doTwoTracks) {
-      TLorentzVector mother, daug[2], motherOfPions, pion[2], motherOfMuons, muon[2];
+      ROOT::Math::LorentzVector<ROOT::Math::PxPyPzE4D<double>> mother, daug[2], motherOfPions, pion[2], motherOfMuons, muon[2];
       const auto& trkDaug1 = reconstructedBarrelTracks.iteratorAt(cutTauEvent.useThresholdsPID ? vecPVnewPIDidx[0] : vecPVidx[0]);
       const auto& trkDaug2 = reconstructedBarrelTracks.iteratorAt(cutTauEvent.useThresholdsPID ? vecPVnewPIDidx[1] : vecPVidx[1]);
       daug[0].SetPxPyPzE(trkDaug1.px(), trkDaug1.py(), trkDaug1.pz(), energy(pdg->Mass(trackPDG(trkDaug1, cutPID.cutSiTPC, cutPID.cutSiTOF, cutPID.usePIDwTOF, cutPID.useScutTOFinTPC)), trkDaug1.px(), trkDaug1.py(), trkDaug1.pz()));
@@ -1281,7 +1333,7 @@ struct UpcTauRl {
         const auto& mupionP = (cutTauEvent.useThresholdsPID ? isElectronCandidate(trkDaug1) : enumMyParticle(trackPDG(trkDaug1, cutPID.cutSiTPC, cutPID.cutSiTOF, cutPID.usePIDwTOF, cutPID.useScutTOFinTPC)) == P_ELECTRON) ? daug[1].P() : daug[0].P();
         const auto& mupionE = (cutTauEvent.useThresholdsPID ? isElectronCandidate(trkDaug1) : enumMyParticle(trackPDG(trkDaug1, cutPID.cutSiTPC, cutPID.cutSiTOF, cutPID.usePIDwTOF, cutPID.useScutTOFinTPC)) == P_ELECTRON) ? daug[1].E() : daug[0].E();
 
-        TLorentzVector motherOfPiKaon, kaon;
+        ROOT::Math::LorentzVector<ROOT::Math::PxPyPzE4D<double>> motherOfPiKaon, kaon;
         if (isElectronCandidate(trkDaug1)) {
           kaon.SetPxPyPzE(trkDaug1.px(), trkDaug1.py(), trkDaug1.pz(), energy(MassKaonCharged, trkDaug1.px(), trkDaug1.py(), trkDaug1.pz()));
           motherOfPiKaon = kaon + daug[1];
@@ -1595,7 +1647,7 @@ struct UpcTauRl {
     } // Loop over tracks with selections
 
     if (countPVGT == 2 && doTwoTracks) {
-      TLorentzVector daug[2], pion[2], muon[2];
+      ROOT::Math::LorentzVector<ROOT::Math::PxPyPzE4D<double>> daug[2];
       const auto& trkDaug1 = reconstructedBarrelTracks.iteratorAt(vecPVnoPIDidx[0]);
       const auto& trkDaug2 = reconstructedBarrelTracks.iteratorAt(vecPVnoPIDidx[1]);
       daug[0].SetPxPyPzE(trkDaug1.px(), trkDaug1.py(), trkDaug1.pz(), energy(pdg->Mass(trackPDG(trkDaug1, cutPID.cutSiTPC, cutPID.cutSiTOF, cutPID.usePIDwTOF, cutPID.useScutTOFinTPC)), trkDaug1.px(), trkDaug1.py(), trkDaug1.pz()));
@@ -1636,7 +1688,7 @@ struct UpcTauRl {
     bool isElEl = (cutTauEvent.useThresholdsPID ? countPVGTelectronsAlt == 2 : countPVGTelectrons == 2);
     bool isElMuPion = (cutTauEvent.useThresholdsPID ? (countPVGTelectronsAlt == 1 && countPVGTmupionsAlt == 1) : ((countPVGTelectrons == 1 && countPVGTmuons == 1) || (countPVGTelectrons == 1 && countPVGTpions == 1)));
     if (isTwoSelectedTracks && doTwoTracks) {
-      TLorentzVector daug[2], pion[2], muon[2];
+      ROOT::Math::LorentzVector<ROOT::Math::PxPyPzE4D<double>> daug[2], pion[2], muon[2];
       const auto& trkDaug1 = reconstructedBarrelTracks.iteratorAt(cutTauEvent.useThresholdsPID ? vecPVnewPIDidx[0] : vecPVidx[0]);
       const auto& trkDaug2 = reconstructedBarrelTracks.iteratorAt(cutTauEvent.useThresholdsPID ? vecPVnewPIDidx[1] : vecPVidx[1]);
       daug[0].SetPxPyPzE(trkDaug1.px(), trkDaug1.py(), trkDaug1.pz(), energy(pdg->Mass(trackPDG(trkDaug1, cutPID.cutSiTPC, cutPID.cutSiTOF, cutPID.usePIDwTOF, cutPID.useScutTOFinTPC)), trkDaug1.px(), trkDaug1.py(), trkDaug1.pz()));
@@ -1835,7 +1887,7 @@ struct UpcTauRl {
     bool isElEl = (cutTauEvent.useThresholdsPID ? countPVGTelectronsAlt == 2 : countPVGTelectrons == 2);
     bool isElMuPion = (cutTauEvent.useThresholdsPID ? (countPVGTelectronsAlt == 1 && countPVGTmupionsAlt == 1) : ((countPVGTelectrons == 1 && countPVGTmuons == 1) || (countPVGTelectrons == 1 && countPVGTpions == 1)));
     if (isTwoSelectedTracks && doTwoTracks) {
-      TLorentzVector daug[2];
+      ROOT::Math::LorentzVector<ROOT::Math::PxPyPzE4D<double>> daug[2];
       const auto& trkDaug1 = reconstructedBarrelTracks.iteratorAt(cutTauEvent.useThresholdsPID ? vecPVnewPIDidx[0] : vecPVidx[0]);
       const auto& trkDaug2 = reconstructedBarrelTracks.iteratorAt(cutTauEvent.useThresholdsPID ? vecPVnewPIDidx[1] : vecPVidx[1]);
       daug[0].SetPxPyPzE(trkDaug1.px(), trkDaug1.py(), trkDaug1.pz(), energy(pdg->Mass(trackPDG(trkDaug1, cutPID.cutSiTPC, cutPID.cutSiTOF, cutPID.usePIDwTOF, cutPID.useScutTOFinTPC)), trkDaug1.px(), trkDaug1.py(), trkDaug1.pz()));
@@ -2082,8 +2134,7 @@ struct UpcTauRl {
 
     int countTracksPerCollision = 0;
     int countGoodNonPVtracks = 0;
-    int countPVGTel = 0;
-    int countPVGTmupi = 0;
+    int countGoodPVtracks = 0;
     std::vector<int> vecTrkIdx;
     // Loop over tracks with selections
     for (const auto& track : tracks) {
@@ -2094,19 +2145,27 @@ struct UpcTauRl {
         countGoodNonPVtracks++;
         continue;
       }
-      // alternative selection
-      if (isElectronCandidate(track)) {
-        countPVGTel++;
-        vecTrkIdx.push_back(track.index());
-        continue;
-      }
-      if (isMuPionCandidate(track)) {
-        countPVGTmupi++;
-        vecTrkIdx.push_back(track.index());
-      }
+      countGoodPVtracks++;
+      vecTrkIdx.push_back(track.index());
     } // Loop over tracks with selections
 
-    if ((countPVGTel == 2 && countPVGTmupi == 0) || (countPVGTel == 1 && countPVGTmupi == 1)) {
+    // Apply weak condition on track PID
+    int countPVGTel = 0;
+    int countPVGTmupi = 0;
+    if (countGoodPVtracks == 2) {
+      for (const auto& vecMember : vecTrkIdx) {
+        const auto& thisTrk = tracks.iteratorAt(vecMember);
+        if (isElectronCandidate(thisTrk)) {
+          countPVGTel++;
+          continue;
+        }
+        if (isMuPionCandidate(thisTrk)) {
+          countPVGTmupi++;
+        }
+      }
+    }
+
+    if (cutPreselect.cutCanUseTrackPID ? ((countPVGTel == 2 && countPVGTmupi == 0) || (countPVGTel == 1 && countPVGTmupi == 1)) : countGoodPVtracks == cutPreselect.cutCanNgoodPVtracs) {
       const auto& trk1 = tracks.iteratorAt(vecTrkIdx[0]);
       const auto& trk2 = tracks.iteratorAt(vecTrkIdx[1]);
 
@@ -2117,6 +2176,8 @@ struct UpcTauRl {
       float dcaxy[2] = {trk1.dcaXY(), trk2.dcaXY()};
       float dcaz[2] = {trk1.dcaZ(), trk2.dcaZ()};
       float trkTimeRes[2] = {trk1.trackTimeRes(), trk2.trackTimeRes()};
+      uint32_t itsClusterSizesTrk1 = trk1.itsClusterSizes();
+      uint32_t itsClusterSizesTrk2 = trk2.itsClusterSizes();
       float tpcSignal[2] = {trk1.tpcSignal(), trk2.tpcSignal()};
       float tpcEl[2] = {trk1.tpcNSigmaEl(), trk2.tpcNSigmaEl()};
       float tpcMu[2] = {trk1.tpcNSigmaMu(), trk2.tpcNSigmaMu()};
@@ -2131,13 +2192,21 @@ struct UpcTauRl {
       float tofKa[2] = {trk1.tofNSigmaKa(), trk2.tofNSigmaKa()};
       float tofPr[2] = {trk1.tofNSigmaPr(), trk2.tofNSigmaPr()};
       float tofEP[2] = {trk1.tofExpMom(), trk2.tofExpMom()};
+      float ZNinfo[4] = {-999., -999., -999., -999.};
+      if constexpr (requires { collision.udZdcsReduced(); }) {
+        ZNinfo[0] = collision.energyCommonZNA();
+        ZNinfo[1] = collision.energyCommonZNC();
+        ZNinfo[2] = collision.timeZNA();
+        ZNinfo[3] = collision.timeZNC();
+      }
 
       tauTwoTracks(collision.runNumber(), collision.globalBC(), countTracksPerCollision, collision.numContrib(), countGoodNonPVtracks, collision.posX(), collision.posY(), collision.posZ(),
                    collision.flags(), collision.occupancyInTime(), collision.hadronicRate(), collision.trs(), collision.trofs(), collision.hmpr(),
                    collision.tfb(), collision.itsROFb(), collision.sbp(), collision.zVtxFT0vPV(), collision.vtxITSTPC(),
-                   collision.totalFT0AmplitudeA(), collision.totalFT0AmplitudeC(), collision.totalFV0AmplitudeA(),
-                   collision.timeFT0A(), collision.timeFT0C(), collision.timeFV0A(),
+                   collision.totalFT0AmplitudeA(), collision.totalFT0AmplitudeC(), collision.totalFV0AmplitudeA(), ZNinfo[0], ZNinfo[1],
+                   collision.timeFT0A(), collision.timeFT0C(), collision.timeFV0A(), ZNinfo[2], ZNinfo[3],
                    px, py, pz, sign, dcaxy, dcaz, trkTimeRes,
+                   itsClusterSizesTrk1, itsClusterSizesTrk2,
                    tpcSignal, tpcEl, tpcMu, tpcPi, tpcKa, tpcPr, tpcIP,
                    tofSignal, tofEl, tofMu, tofPi, tofKa, tofPr, tofEP);
     } else {
@@ -2229,6 +2298,9 @@ struct UpcTauRl {
     fillRejectionReasonDG(reconstructedCollision);
     outputGlobalRejectionHistogram();
 
+    if (!isGoodRCTflag(reconstructedCollision))
+      return;
+
     if (!isGoodROFtime(reconstructedCollision))
       return;
 
@@ -2261,6 +2333,9 @@ struct UpcTauRl {
   {
     fillRejectionReasonSG(reconstructedCollision);
     outputGlobalRejectionHistogram();
+
+    if (!isGoodRCTflag(reconstructedCollision))
+      return;
 
     int gapSide = reconstructedCollision.gapSide();
     int trueGapSide = sgSelector.trueGap(reconstructedCollision, cutSample.cutTrueGapSideFV0, cutSample.cutTrueGapSideFT0A, cutSample.cutTrueGapSideFT0C, cutSample.cutTrueGapSideZDC);
