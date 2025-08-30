@@ -11,39 +11,43 @@
 //
 // Contact: iarsene@cern.ch, i.c.arsene@fys.uio.no
 //
-#include <iostream>
-#include <vector>
-#include <algorithm>
-#include <map>
-#include <string>
-#include <memory>
+#include "PWGDQ/Core/AnalysisCompositeCut.h"
+#include "PWGDQ/Core/AnalysisCut.h"
+#include "PWGDQ/Core/CutsLibrary.h"
+#include "PWGDQ/Core/HistogramManager.h"
+#include "PWGDQ/Core/HistogramsLibrary.h"
+#include "PWGDQ/Core/MixingHandler.h"
+#include "PWGDQ/Core/MixingLibrary.h"
+#include "PWGDQ/Core/VarManager.h"
+#include "PWGDQ/DataModel/ReducedInfoTables.h"
+
+#include "Common/CCDB/EventSelectionParams.h"
+
+#include "CCDB/BasicCCDBManager.h"
+#include "DataFormatsParameters/GRPMagField.h"
+#include "DataFormatsParameters/GRPObject.h"
+#include "DetectorsBase/GeometryManager.h"
+#include "DetectorsBase/Propagator.h"
+#include "Field/MagneticField.h"
+#include "Framework/ASoAHelpers.h"
+#include "Framework/AnalysisDataModel.h"
+#include "Framework/AnalysisTask.h"
+#include "Framework/runDataProcessing.h"
+#include "ITSMFTBase/DPLAlpideParam.h"
+
+#include "TGeoGlobalMagField.h"
 #include <TH1F.h>
 #include <TH3F.h>
 #include <THashList.h>
 #include <TList.h>
 #include <TString.h>
-#include "CCDB/BasicCCDBManager.h"
-#include "DataFormatsParameters/GRPObject.h"
-#include "Framework/runDataProcessing.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/ASoAHelpers.h"
-#include "PWGDQ/DataModel/ReducedInfoTables.h"
-#include "PWGDQ/Core/VarManager.h"
-#include "PWGDQ/Core/HistogramManager.h"
-#include "PWGDQ/Core/MixingHandler.h"
-#include "PWGDQ/Core/AnalysisCut.h"
-#include "PWGDQ/Core/AnalysisCompositeCut.h"
-#include "PWGDQ/Core/HistogramsLibrary.h"
-#include "PWGDQ/Core/CutsLibrary.h"
-#include "PWGDQ/Core/MixingLibrary.h"
-#include "DataFormatsParameters/GRPMagField.h"
-#include "Field/MagneticField.h"
-#include "TGeoGlobalMagField.h"
-#include "DetectorsBase/Propagator.h"
-#include "DetectorsBase/GeometryManager.h"
-#include "ITSMFTBase/DPLAlpideParam.h"
-#include "Common/CCDB/EventSelectionParams.h"
+
+#include <algorithm>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
 
 using std::cout;
 using std::endl;
@@ -98,6 +102,31 @@ DECLARE_SOA_COLUMN(QvecAmp, qvecAmp, std::vector<float>);
 DECLARE_SOA_COLUMN(PTREF, pTRef, std::vector<float>);
 DECLARE_SOA_COLUMN(EtaREF, etaRef, std::vector<float>);
 DECLARE_SOA_COLUMN(PhiREF, phiRef, std::vector<float>);
+
+DECLARE_SOA_COLUMN(Pt1, pt1, std::vector<float>);
+DECLARE_SOA_COLUMN(Eta1, eta1, std::vector<float>);
+DECLARE_SOA_COLUMN(Phi1, phi1, std::vector<float>);
+DECLARE_SOA_COLUMN(Sign1, sign1, std::vector<int>);
+DECLARE_SOA_COLUMN(ITSChi2NCl1, iTSChi2NCl1, std::vector<float>);
+DECLARE_SOA_COLUMN(TPCNClsCR1, tPCNClsCR1, std::vector<float>);
+DECLARE_SOA_COLUMN(TPCNClsFound1, tPCNClsFound1, std::vector<float>);
+DECLARE_SOA_COLUMN(TPCChi2NCl1, tPCChi2NCl1, std::vector<int>);
+DECLARE_SOA_COLUMN(TPCSignal1, tPCSignal1, std::vector<float>);
+DECLARE_SOA_COLUMN(TPCNSigmaEl1, tPCNSigmaEl1, std::vector<float>);
+DECLARE_SOA_COLUMN(TPCNSigmaPi1, tPCNSigmaPi1, std::vector<float>);
+DECLARE_SOA_COLUMN(TPCNSigmaPr1, tPCNSigmaPr1, std::vector<float>);
+DECLARE_SOA_COLUMN(Pt2, pt2, std::vector<float>);
+DECLARE_SOA_COLUMN(Eta2, eta2, std::vector<float>);
+DECLARE_SOA_COLUMN(Phi2, phi2, std::vector<float>);
+DECLARE_SOA_COLUMN(Sign2, sign2, std::vector<int>);
+DECLARE_SOA_COLUMN(ITSChi2NCl2, iTSChi2NCl2, std::vector<float>);
+DECLARE_SOA_COLUMN(TPCNClsCR2, tPCNClsCR2, std::vector<float>);
+DECLARE_SOA_COLUMN(TPCNClsFound2, tPCNClsFound2, std::vector<float>);
+DECLARE_SOA_COLUMN(TPCChi2NCl2, tPCChi2NCl2, std::vector<int>);
+DECLARE_SOA_COLUMN(TPCSignal2, tPCSignal2, std::vector<float>);
+DECLARE_SOA_COLUMN(TPCNSigmaEl2, tPCNSigmaEl2, std::vector<float>);
+DECLARE_SOA_COLUMN(TPCNSigmaPi2, tPCNSigmaPi2, std::vector<float>);
+DECLARE_SOA_COLUMN(TPCNSigmaPr2, tPCNSigmaPr2, std::vector<float>);
 } // namespace flowVec
 
 namespace flowPair
@@ -116,7 +145,9 @@ DECLARE_SOA_COLUMN(Phi2, phi2, float);
 } // namespace flowPair
 
 DECLARE_SOA_TABLE(FlowVecs, "AOD", "DQFLOWVECS", evsel::Selection, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowVec::PT, flowVec::Eta, flowVec::Phi, flowVec::Mass, flowVec::Sign, flowVec::QvecRe, flowVec::QvecIm, flowVec::QvecAmp);
-DECLARE_SOA_TABLE(FlowVecD, "AOD", "DQFLOWVECD", mult::MultTPC, mult::MultTracklets, mult::MultNTracksPV, mult::MultFT0C, collision::NumContrib, collision::PosX, collision::PosY, collision::PosZ, evsel::Selection, dqanalysisflags::HadronicRate, flowVec::PT, flowVec::Eta, flowVec::Phi, flowVec::Mass, flowVec::Sign, flowVec::PTREF, flowVec::EtaREF, flowVec::PhiREF);
+
+DECLARE_SOA_TABLE(FlowVecD, "AOD", "DQFLOWVECD", mult::MultTPC, mult::MultTracklets, mult::MultNTracksPV, mult::MultFT0C, collision::NumContrib, collision::PosX, collision::PosY, collision::PosZ, evsel::Selection, dqanalysisflags::HadronicRate, flowVec::PT, flowVec::Eta, flowVec::Phi, flowVec::Mass, flowVec::Sign, flowVec::PTREF, flowVec::EtaREF, flowVec::PhiREF, flowVec::Pt1, flowVec::Eta1, flowVec::Phi1, flowVec::Sign1, flowVec::ITSChi2NCl1, flowVec::TPCNClsCR1, flowVec::TPCNClsFound1, flowVec::TPCChi2NCl1, flowVec::TPCSignal1, flowVec::TPCNSigmaEl1, flowVec::TPCNSigmaPi1, flowVec::TPCNSigmaPr1, flowVec::Pt2, flowVec::Eta2, flowVec::Phi2, flowVec::Sign1, flowVec::ITSChi2NCl2, flowVec::TPCNClsCR2, flowVec::TPCNClsFound2, flowVec::TPCChi2NCl2, flowVec::TPCSignal2, flowVec::TPCNSigmaEl2, flowVec::TPCNSigmaPi2, flowVec::TPCNSigmaPr2);
+
 DECLARE_SOA_TABLE(FlowPairRR, "AOD", "DQFLOWPAIRRR", mult::MultTPC, mult::MultTracklets, mult::MultNTracksPV, evsel::Selection, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowPair::PT1, flowPair::Eta1, flowPair::Phi1, flowPair::PT2, flowPair::Eta2, flowPair::Phi2);
 DECLARE_SOA_TABLE(FlowPairPR, "AOD", "DQFLOWPAIRPR", mult::MultTPC, mult::MultTracklets, mult::MultNTracksPV, evsel::Selection, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowPair::PT, flowPair::Eta, flowPair::Phi, flowPair::Mass, flowPair::Sign, flowPair::PT1, flowPair::Eta1, flowPair::Phi1);
 
@@ -466,6 +497,41 @@ struct AnalysisFlow {
     std::vector<float> vecEtaRef;
     std::vector<float> vecPhiRef;
 
+    std::vector<float> vecPt1;
+    std::vector<float> vecEta1;
+    std::vector<float> vecPhi1;
+    std::vector<int> vecSign1;
+    std::vector<float> vecITSChi2NCl1;
+    std::vector<float> vecTPCNClsCR1;
+    std::vector<float> vecTPCNClsFound1;
+    std::vector<float> vecTPCChi2NCl1;
+    std::vector<float> vecTPCSignal1;
+    std::vector<float> vecTPCNSigmaEl1;
+    std::vector<float> vecTPCNSigmaPi1;
+    std::vector<float> vecTPCNSigmaPr1;
+    std::vector<float> vecPt2;
+    std::vector<float> vecEta2;
+    std::vector<float> vecPhi2;
+    std::vector<int> vecSign2;
+    std::vector<float> vecITSChi2NCl2;
+    std::vector<float> vecTPCNClsCR2;
+    std::vector<float> vecTPCNClsFound2;
+    std::vector<float> vecTPCChi2NCl2;
+    std::vector<float> vecTPCSignal2;
+    std::vector<float> vecTPCNSigmaEl2;
+    std::vector<float> vecTPCNSigmaPi2;
+    std::vector<float> vecTPCNSigmaPr2;
+
+    int indexOffset = -999;
+
+    if (dileptons.size() > 0) {
+      for (auto track : tracks) {
+        // trackGlobalIndexes.push_back(track.globalIndex());
+        indexOffset = track.globalIndex();
+        break;
+      }
+    }
+
     for (auto& dilepton : dileptons) {
       vecPT.push_back(dilepton.pt());
       vecEta.push_back(dilepton.eta());
@@ -476,6 +542,32 @@ struct AnalysisFlow {
       int indexLepton2 = dilepton.index1Id();
       daugDileptonGlobalIndexes.push_back(indexLepton1);
       daugDileptonGlobalIndexes.push_back(indexLepton2);
+      auto lepton1 = tracks.iteratorAt(indexLepton1 - indexOffset);
+      auto lepton2 = tracks.iteratorAt(indexLepton2 - indexOffset);
+      vecPt1.push_back(lepton1.pt());
+      vecEta1.push_back(lepton1.eta());
+      vecPhi1.push_back(lepton1.phi());
+      vecSign1.push_back(lepton1.sign());
+      vecITSChi2NCl1.push_back(lepton1.itsChi2NCl());
+      vecTPCNClsCR1.push_back(lepton1.tpcNClsCrossedRows());
+      vecTPCNClsFound1.push_back(lepton1.tpcNClsFound());
+      vecTPCChi2NCl1.push_back(lepton1.tpcChi2NCl());
+      vecTPCSignal1.push_back(lepton1.tpcSignal());
+      vecTPCNSigmaEl1.push_back(lepton1.tpcNSigmaEl());
+      vecTPCNSigmaPi1.push_back(lepton1.tpcNSigmaPi());
+      vecTPCNSigmaPr1.push_back(lepton1.tpcNSigmaPr());
+      vecPt2.push_back(lepton2.pt());
+      vecEta2.push_back(lepton2.eta());
+      vecPhi2.push_back(lepton2.phi());
+      vecSign2.push_back(lepton2.sign());
+      vecITSChi2NCl2.push_back(lepton2.itsChi2NCl());
+      vecTPCNClsCR2.push_back(lepton2.tpcNClsCrossedRows());
+      vecTPCNClsFound2.push_back(lepton2.tpcNClsFound());
+      vecTPCChi2NCl2.push_back(lepton2.tpcChi2NCl());
+      vecTPCSignal2.push_back(lepton2.tpcSignal());
+      vecTPCNSigmaEl2.push_back(lepton2.tpcNSigmaEl());
+      vecTPCNSigmaPi2.push_back(lepton2.tpcNSigmaPi());
+      vecTPCNSigmaPr2.push_back(lepton2.tpcNSigmaPr());
     }
 
     for (auto& track : tracks) {
@@ -495,7 +587,7 @@ struct AnalysisFlow {
       vecPhiRef.push_back(track.phi());
     }
 
-    flowVectorsDetailed(event.multTPC(), event.multTracklets(), event.multNTracksPV(), event.multFT0C(), event.numContrib(), event.posX(), event.posY(), event.posZ(), event.selection_raw(), event.hadronicRate(), vecPT, vecEta, vecPhi, vecMass, vecSign, vecPTRef, vecEtaRef, vecPhiRef);
+    flowVectorsDetailed(event.multTPC(), event.multTracklets(), event.multNTracksPV(), event.multFT0C(), event.numContrib(), event.posX(), event.posY(), event.posZ(), event.selection_raw(), event.hadronicRate(), vecPT, vecEta, vecPhi, vecMass, vecSign, vecPTRef, vecEtaRef, vecPhiRef, vecPt1, vecEta1, vecPhi1, vecSign1, vecITSChi2NCl1, vecTPCNClsCR1, vecTPCNClsFound1, vecTPCChi2NCl1, vecTPCSignal1, vecTPCNSigmaEl1, vecTPCNSigmaPi1, vecTPCNSigmaPr1, vecPt2, vecEta2, vecPhi2, vecSign2, vecITSChi2NCl2, vecTPCNClsCR2, vecTPCNClsFound2, vecTPCChi2NCl2, vecTPCSignal2, vecTPCNSigmaEl2, vecTPCNSigmaPi2, vecTPCNSigmaPr2);
   }
 
   Preslice<soa::Filtered<MyDielectronCandidates>> perEventPairs = aod::reducedpair::reducedeventId;
