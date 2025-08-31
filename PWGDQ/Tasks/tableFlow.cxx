@@ -600,8 +600,8 @@ struct AnalysisFlow {
       vecPTRef.push_back(track.pt());
       vecEtaRef.push_back(track.eta());
       vecPhiRef.push_back(track.phi());
-      vecITSChi2NCl.push_back(track.itsChi2NCl())
-        vecTPCNClsCR.push_back(track.tpcNClsCrossedRows());
+      vecITSChi2NCl.push_back(track.itsChi2NCl());
+      vecTPCNClsCR.push_back(track.tpcNClsCrossedRows());
       vecTPCNClsFound.push_back(track.tpcNClsFound());
       vecTPCChi2NCl.push_back(track.tpcChi2NCl());
       vecTPCSignal.push_back(track.tpcSignal());
