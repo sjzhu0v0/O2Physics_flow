@@ -127,9 +127,6 @@ DECLARE_SOA_COLUMN(TPCSignal2, tPCSignal2, std::vector<float>);
 DECLARE_SOA_COLUMN(TPCNSigmaEl2, tPCNSigmaEl2, std::vector<float>);
 DECLARE_SOA_COLUMN(TPCNSigmaPi2, tPCNSigmaPi2, std::vector<float>);
 DECLARE_SOA_COLUMN(TPCNSigmaPr2, tPCNSigmaPr2, std::vector<float>);
-DECLARE_SOA_COLUMN(Pt, pt, std::vector<float>);
-DECLARE_SOA_COLUMN(Eta, eta, std::vector<float>);
-DECLARE_SOA_COLUMN(Phi, phi, std::vector<float>);
 DECLARE_SOA_COLUMN(Sign, sign, std::vector<int>);
 DECLARE_SOA_COLUMN(ITSChi2NCl, iTSChi2NCl, std::vector<float>);
 DECLARE_SOA_COLUMN(TPCNClsCR, tPCNClsCR, std::vector<float>);
@@ -605,8 +602,8 @@ struct AnalysisFlow {
       vecPTRef.push_back(track.pt());
       vecEtaRef.push_back(track.eta());
       vecPhiRef.push_back(track.phi());
-      vecITSChi2NCl.push_back(track.itsChi2NCl());
-      vecTPCNClsCR.push_back(track.tpcNClsCrossedRows());
+      vecITSChi2NCl.push_back(track.itsChi2NCl())
+        vecTPCNClsCR.push_back(track.tpcNClsCrossedRows());
       vecTPCNClsFound.push_back(track.tpcNClsFound());
       vecTPCChi2NCl.push_back(track.tpcChi2NCl());
       vecTPCSignal.push_back(track.tpcSignal());
@@ -615,7 +612,7 @@ struct AnalysisFlow {
       vecTPCNSigmaPr.push_back(track.tpcNSigmaPr());
     }
 
-    flowVectorsDetailed(event.multTPC(), event.multTracklets(), event.multNTracksPV(), event.multFT0C(), event.numContrib(), event.posX(), event.posY(), event.posZ(), event.selection_raw(), event.hadronicRate(), vecPT, vecEta, vecPhi, vecMass, vecSign, vecPTRef, vecEtaRef, vecPhiRef, vecPt1, vecEta1, vecPhi1, vecSign1, vecITSChi2NCl1, vecTPCNClsCR1, vecTPCNClsFound1, vecTPCChi2NCl1, vecTPCSignal1, vecTPCNSigmaEl1, vecTPCNSigmaPi1, vecTPCNSigmaPr1, vecPt2, vecEta2, vecPhi2, vecSign2, vecITSChi2NCl2, vecTPCNClsCR2, vecTPCNClsFound2, vecTPCChi2NCl2, vecTPCSignal2, vecTPCNSigmaEl2, vecTPCNSigmaPi2, vecTPCNSigmaPr2);
+    flowVectorsDetailed(event.multTPC(), event.multTracklets(), event.multNTracksPV(), event.multFT0C(), event.numContrib(), event.posX(), event.posY(), event.posZ(), event.selection_raw(), event.hadronicRate(), vecPT, vecEta, vecPhi, vecMass, vecSign, vecPTRef, vecEtaRef, vecPhiRef, vecITSChi2NCl, vecTPCNClsCR, vecTPCNClsFound, vecTPCChi2NCl, vecTPCSignal, vecTPCNSigmaEl, vecTPCNSigmaPi, vecTPCNSigmaPr, vecPt1, vecEta1, vecPhi1, vecSign1, vecITSChi2NCl1, vecTPCNClsCR1, vecTPCNClsFound1, vecTPCChi2NCl1, vecTPCSignal1, vecTPCNSigmaEl1, vecTPCNSigmaPi1, vecTPCNSigmaPr1, vecPt2, vecEta2, vecPhi2, vecSign2, vecITSChi2NCl2, vecTPCNClsCR2, vecTPCNClsFound2, vecTPCChi2NCl2, vecTPCSignal2, vecTPCNSigmaEl2, vecTPCNSigmaPi2, vecTPCNSigmaPr2);
   }
 
   Preslice<soa::Filtered<MyDielectronCandidates>> perEventPairs = aod::reducedpair::reducedeventId;
