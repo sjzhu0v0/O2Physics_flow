@@ -467,28 +467,28 @@ struct AnalysisFlow {
     qVectors(event.selection_raw(), event.multFT0C(), event.numContrib(), event.posZ(), vecPT, vecEta, vecPhi, vecMass, vecSign, qvecRe, qvecIm, qvecAmp);
   }
 
-  void processSEFlowPairRefOnly(soa::Filtered<MyEventsVtxCovSelected>::iterator const& event, MyBarrelTracksSelectedWithCov const& tracks)
-  {
-    std::vector<float> vecPT;
-    std::vector<float> vecEta;
-    std::vector<float> vecPhi;
-    std::vector<float> vecMass;
-    std::vector<float> vecSign;
+  // void processSEFlowPairRefOnly(soa::Filtered<MyEventsVtxCovSelected>::iterator const& event, MyBarrelTracksSelectedWithCov const& tracks)
+  // {
+  //   std::vector<float> vecPT;
+  //   std::vector<float> vecEta;
+  //   std::vector<float> vecPhi;
+  //   std::vector<float> vecMass;
+  //   std::vector<float> vecSign;
 
-    std::vector<float> vecPTRef;
-    std::vector<float> vecEtaRef;
-    std::vector<float> vecPhiRef;
+  //   std::vector<float> vecPTRef;
+  //   std::vector<float> vecEtaRef;
+  //   std::vector<float> vecPhiRef;
 
-    for (auto& track : tracks) {
-      if (!(uint32_t(track.isBarrelSelected()) & fConfigBarrelTrackCutBitMask.value))
-        continue;
-      vecPTRef.push_back(track.pt());
-      vecEtaRef.push_back(track.eta());
-      vecPhiRef.push_back(track.phi());
-    }
+  //   for (auto& track : tracks) {
+  //     if (!(uint32_t(track.isBarrelSelected()) & fConfigBarrelTrackCutBitMask.value))
+  //       continue;
+  //     vecPTRef.push_back(track.pt());
+  //     vecEtaRef.push_back(track.eta());
+  //     vecPhiRef.push_back(track.phi());
+  //   }
 
-    flowVectorsDetailed(event.multTPC(), event.multTracklets(), event.multNTracksPV(), event.multFT0C(), event.numContrib(), event.posX(), event.posY(), event.posZ(), event.selection_raw(), event.hadronicRate(), vecPT, vecEta, vecPhi, vecMass, vecSign, vecPTRef, vecEtaRef, vecPhiRef);
-  }
+  //   flowVectorsDetailed(event.multTPC(), event.multTracklets(), event.multNTracksPV(), event.multFT0C(), event.numContrib(), event.posX(), event.posY(), event.posZ(), event.selection_raw(), event.hadronicRate(), vecPT, vecEta, vecPhi, vecMass, vecSign, vecPTRef, vecEtaRef, vecPhiRef);
+  // }
 
   void processSEFlowPairPoiRef(soa::Filtered<MyEventsVtxCovSelected>::iterator const& event, MyBarrelTracksSelectedWithCov const& tracks, soa::Filtered<MyDielectronCandidates> const& dileptons)
   {
@@ -664,7 +664,7 @@ struct AnalysisFlow {
 
   PROCESS_SWITCH(AnalysisFlow, processSkimmed, "2024.9.30", false);
   PROCESS_SWITCH(AnalysisFlow, processSkimmedWithoutDilepton, "processSkimmedWithoutDilepton", false);
-  PROCESS_SWITCH(AnalysisFlow, processSEFlowPairRefOnly, "processSEFlowPairRefOnly", false);
+  // PROCESS_SWITCH(AnalysisFlow, processSEFlowPairRefOnly, "processSEFlowPairRefOnly", false);
   PROCESS_SWITCH(AnalysisFlow, processSEFlowPairPoiRef, "processSEFlowPairPoiRef", false);
   PROCESS_SWITCH(AnalysisFlow, processMEFlowPairRefOnly, "processMEFlowPairRefOnly", false);
   PROCESS_SWITCH(AnalysisFlow, processMEFlowPairPoiRef, "processMEFlowPairPoiRef", false);
