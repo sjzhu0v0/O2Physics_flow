@@ -102,7 +102,14 @@ DECLARE_SOA_COLUMN(QvecAmp, qvecAmp, std::vector<float>);
 DECLARE_SOA_COLUMN(PTREF, pTRef, std::vector<float>);
 DECLARE_SOA_COLUMN(EtaREF, etaRef, std::vector<float>);
 DECLARE_SOA_COLUMN(PhiREF, phiRef, std::vector<float>);
-
+DECLARE_SOA_COLUMN(ITSChi2NCl, iTSChi2NCl, std::vector<float>);
+DECLARE_SOA_COLUMN(TPCNClsCR, tPCNClsCR, std::vector<float>);
+DECLARE_SOA_COLUMN(TPCNClsFound, tPCNClsFound, std::vector<float>);
+DECLARE_SOA_COLUMN(TPCChi2NCl, tPCChi2NCl, std::vector<int>);
+DECLARE_SOA_COLUMN(TPCSignal, tPCSignal, std::vector<float>);
+DECLARE_SOA_COLUMN(TPCNSigmaEl, tPCNSigmaEl, std::vector<float>);
+DECLARE_SOA_COLUMN(TPCNSigmaPi, tPCNSigmaPi, std::vector<float>);
+DECLARE_SOA_COLUMN(TPCNSigmaPr, tPCNSigmaPr, std::vector<float>);
 DECLARE_SOA_COLUMN(Pt1, pt1, std::vector<float>);
 DECLARE_SOA_COLUMN(Eta1, eta1, std::vector<float>);
 DECLARE_SOA_COLUMN(Phi1, phi1, std::vector<float>);
@@ -127,15 +134,6 @@ DECLARE_SOA_COLUMN(TPCSignal2, tPCSignal2, std::vector<float>);
 DECLARE_SOA_COLUMN(TPCNSigmaEl2, tPCNSigmaEl2, std::vector<float>);
 DECLARE_SOA_COLUMN(TPCNSigmaPi2, tPCNSigmaPi2, std::vector<float>);
 DECLARE_SOA_COLUMN(TPCNSigmaPr2, tPCNSigmaPr2, std::vector<float>);
-DECLARE_SOA_COLUMN(Sign, sign, std::vector<int>);
-DECLARE_SOA_COLUMN(ITSChi2NCl, iTSChi2NCl, std::vector<float>);
-DECLARE_SOA_COLUMN(TPCNClsCR, tPCNClsCR, std::vector<float>);
-DECLARE_SOA_COLUMN(TPCNClsFound, tPCNClsFound, std::vector<float>);
-DECLARE_SOA_COLUMN(TPCChi2NCl, tPCChi2NCl, std::vector<int>);
-DECLARE_SOA_COLUMN(TPCSignal, tPCSignal, std::vector<float>);
-DECLARE_SOA_COLUMN(TPCNSigmaEl, tPCNSigmaEl, std::vector<float>);
-DECLARE_SOA_COLUMN(TPCNSigmaPi, tPCNSigmaPi, std::vector<float>);
-DECLARE_SOA_COLUMN(TPCNSigmaPr, tPCNSigmaPr, std::vector<float>);
 } // namespace flowVec
 
 namespace flowPair
