@@ -322,7 +322,7 @@ struct AnalysisTrackSelection {
       } // end loop over MC signals
     } // end loop over tracks
 
-    for (auto& mcTrack : racksMC) {
+    for (auto& mcTrack : tracksMC) {
       mcTrackInfoTruth(event.posX(), event.posY(), event.posZ(), event.selection_raw(), event.numContrib(), event.reducedMCevent().mcPosX(), event.reducedMCevent().mcPosY(), event.reducedMCevent().mcPosZ(), mcTrack.pt(), mcTrack.eta(), mcTrack.phi(), mcTrack.sign(), mcTrack.pdgCode(), mcTrack.vx(), mcTrack.vy(), mcTrack.vz(), mcTrack.vt());
     }
   }
