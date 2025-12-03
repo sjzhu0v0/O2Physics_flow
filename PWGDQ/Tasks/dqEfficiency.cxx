@@ -68,7 +68,7 @@ DECLARE_SOA_TABLE(EventCuts, "AOD", "EVENTCUTS", dqanalysisflags::IsEventSelecte
 DECLARE_SOA_TABLE(BarrelTrackCuts, "AOD", "BARRELTRACKCUTS", dqanalysisflags::IsBarrelSelected);
 DECLARE_SOA_TABLE(MuonTrackCuts, "AOD", "DQANAMUONCUTS", dqanalysisflags::IsMuonSelected);
 DECLARE_SOA_TABLE(MCTrackInfo, "AOD", "MCTRACKINFO", collision::PosX, collision::PosY, collision::PosZ, evsel::Selection, collision::NumContrib, reducedevent::MCPosX, reducedevent::MCPosY, reducedevent::MCPosZ, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, reducedtrack::Sign, reducedtrack::DcaXY, reducedtrack::DcaZ, track::ITSClusterMap, dqanalysisflags::McPt, dqanalysisflags::McEta, dqanalysisflags::McPhi, mcparticle::PdgCode, mcparticle::Vx, mcparticle::Vy, mcparticle::Vz, mcparticle::Vt);
-DECLARE_SOA_TABLE(MCTrackInfoTruth, "AOD", "MCTRACKINFOTRUTH", collision::PosX, collision::PosY, collision::PosZ, evsel::Selection, collision::NumContrib, reducedevent::MCPosX, reducedevent::MCPosY, reducedevent::MCPosZ, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, reducedtrack::Sign, mcparticle::PdgCode, mcparticle::Vx, mcparticle::Vy, mcparticle::Vz, mcparticle::Vt);
+DECLARE_SOA_TABLE(MCTrackInfoTruth, "AOD", "MCTRACKINFOTRUTH", collision::PosX, collision::PosY, collision::PosZ, evsel::Selection, collision::NumContrib, reducedevent::MCPosX, reducedevent::MCPosY, reducedevent::MCPosZ, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, mcparticle::PdgCode, mcparticle::Vx, mcparticle::Vy, mcparticle::Vz, mcparticle::Vt);
 } // namespace o2::aod
 
 // using MyEvents = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsMC>;
@@ -323,7 +323,7 @@ struct AnalysisTrackSelection {
     } // end loop over tracks
 
     for (auto& mcTrack : tracksMC) {
-      mcTrackInfoTruth(event.posX(), event.posY(), event.posZ(), event.selection_raw(), event.numContrib(), event.reducedMCevent().mcPosX(), event.reducedMCevent().mcPosY(), event.reducedMCevent().mcPosZ(), mcTrack.pt(), mcTrack.eta(), mcTrack.phi(), mcTrack.sign(), mcTrack.pdgCode(), mcTrack.vx(), mcTrack.vy(), mcTrack.vz(), mcTrack.vt());
+      mcTrackInfoTruth(event.posX(), event.posY(), event.posZ(), event.selection_raw(), event.numContrib(), event.reducedMCevent().mcPosX(), event.reducedMCevent().mcPosY(), event.reducedMCevent().mcPosZ(), mcTrack.pt(), mcTrack.eta(), mcTrack.phi(), mcTrack.pdgCode(), mcTrack.vx(), mcTrack.vy(), mcTrack.vz(), mcTrack.vt());
     }
   }
 
