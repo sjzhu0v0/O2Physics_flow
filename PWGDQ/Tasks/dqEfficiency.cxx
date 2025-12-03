@@ -67,7 +67,8 @@ DECLARE_SOA_COLUMN(McPhi, mcPhi, float);
 DECLARE_SOA_TABLE(EventCuts, "AOD", "EVENTCUTS", dqanalysisflags::IsEventSelected);
 DECLARE_SOA_TABLE(BarrelTrackCuts, "AOD", "BARRELTRACKCUTS", dqanalysisflags::IsBarrelSelected);
 DECLARE_SOA_TABLE(MuonTrackCuts, "AOD", "DQANAMUONCUTS", dqanalysisflags::IsMuonSelected);
-DECLARE_SOA_TABLE(MCTrackInfo, "AOD", "MCTRACKINFO", collision::PosX, collision::PosY, collision::PosZ, collision::NumContrib, reducedevent::MCPosX, reducedevent::MCPosY, reducedevent::MCPosZ, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, reducedtrack::Sign, reducedtrack::DcaXY, reducedtrack::DcaZ, track::ITSClusterMap, dqanalysisflags::McPt, dqanalysisflags::McEta, dqanalysisflags::McPhi, mcparticle::PdgCode, mcparticle::Vx, mcparticle::Vy, mcparticle::Vz, mcparticle::Vt);
+DECLARE_SOA_TABLE(MCTrackInfo, "AOD", "MCTRACKINFO", collision::PosX, collision::PosY, collision::PosZ, evsel::Selection, collision::NumContrib, reducedevent::MCPosX, reducedevent::MCPosY, reducedevent::MCPosZ, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, reducedtrack::Sign, reducedtrack::DcaXY, reducedtrack::DcaZ, track::ITSClusterMap, dqanalysisflags::McPt, dqanalysisflags::McEta, dqanalysisflags::McPhi, mcparticle::PdgCode, mcparticle::Vx, mcparticle::Vy, mcparticle::Vz, mcparticle::Vt);
+DECLARE_SOA_TABLE(MCTrackInfoTruth, "AOD", "MCTRACKINFOTRUTH", collision::PosX, collision::PosY, collision::PosZ, evsel::Selection, collision::NumContrib, reducedevent::MCPosX, reducedevent::MCPosY, reducedevent::MCPosZ, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, reducedtrack::Sign, mcparticle::PdgCode, mcparticle::Vx, mcparticle::Vy, mcparticle::Vz, mcparticle::Vt);
 } // namespace o2::aod
 
 // using MyEvents = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsMC>;
@@ -171,6 +172,7 @@ struct AnalysisEventSelection {
 struct AnalysisTrackSelection {
   Produces<aod::BarrelTrackCuts> trackSel;
   Produces<aod::MCTrackInfo> mcTrackInfo;
+  Produces<aod::MCTrackInfoTruth> mcTrackInfoTruth;
   OutputObj<THashList> fOutputList{"output"};
   Configurable<std::string> fConfigCuts{"cfgTrackCuts", "jpsiPID1", "Comma separated list of barrel track cuts"};
   Configurable<std::string> fConfigMCSignals{"cfgTrackMCSignals", "", "Comma separated list of MC signals"};
@@ -241,7 +243,7 @@ struct AnalysisTrackSelection {
   }
 
   template <uint32_t TEventFillMap, uint32_t TEventMCFillMap, uint32_t TTrackFillMap, uint32_t TTrackMCFillMap, typename TEvent, typename TTracks, typename TEventsMC, typename TTracksMC>
-  void runSelection(TEvent const& event, TTracks const& tracks, TEventsMC const& /*eventsMC*/, TTracksMC const& /*tracksMC*/)
+  void runSelection(TEvent const& event, TTracks const& tracks, TEventsMC const& /*eventsMC*/, TTracksMC const& tracksMC)
   {
     VarManager::ResetValues(0, VarManager::kNMCParticleVariables);
     // fill event information which might be needed in histograms that combine track and event properties
@@ -282,10 +284,10 @@ struct AnalysisTrackSelection {
         }
       }
       trackSel(static_cast<int>(filterMap));
-      mcTrackInfo(event.posX(), event.posY(), event.posZ(), event.numContrib(), event.reducedMCevent().mcPosX(), event.reducedMCevent().mcPosY(), event.reducedMCevent().mcPosZ(), track.pt(), track.eta(), track.phi(), track.sign(), track.dcaXY(), track.dcaZ(), track.itsClusterMap(), track.reducedMCTrack().pt(), track.reducedMCTrack().eta(), track.reducedMCTrack().phi(), track.reducedMCTrack().pdgCode(), track.reducedMCTrack().vx(), track.reducedMCTrack().vy(), track.reducedMCTrack().vz(), track.reducedMCTrack().vt());
       if (!filterMap) {
         continue;
       }
+      mcTrackInfo(event.posX(), event.posY(), event.posZ(), event.selection_raw(), event.numContrib(), event.reducedMCevent().mcPosX(), event.reducedMCevent().mcPosY(), event.reducedMCevent().mcPosZ(), track.pt(), track.eta(), track.phi(), track.sign(), track.dcaXY(), track.dcaZ(), track.itsClusterMap(), track.reducedMCTrack().pt(), track.reducedMCTrack().eta(), track.reducedMCTrack().phi(), track.reducedMCTrack().pdgCode(), track.reducedMCTrack().vx(), track.reducedMCTrack().vy(), track.reducedMCTrack().vz(), track.reducedMCTrack().vt());
 
       if (!fConfigQA) {
         continue;
@@ -319,6 +321,10 @@ struct AnalysisTrackSelection {
         } // end loop over cuts
       } // end loop over MC signals
     } // end loop over tracks
+
+    for (auto& mcTrack : racksMC) {
+      mcTrackInfoTruth(event.posX(), event.posY(), event.posZ(), event.selection_raw(), event.numContrib(), event.reducedMCevent().mcPosX(), event.reducedMCevent().mcPosY(), event.reducedMCevent().mcPosZ(), mcTrack.pt(), mcTrack.eta(), mcTrack.phi(), mcTrack.sign(), mcTrack.pdgCode(), mcTrack.vx(), mcTrack.vy(), mcTrack.vz(), mcTrack.vt());
+    }
   }
 
   void processSkimmed(MyEventsSelected::iterator const& event, MyBarrelTracks const& tracks, ReducedMCEvents const& eventsMC, ReducedMCTracks const& tracksMC)
