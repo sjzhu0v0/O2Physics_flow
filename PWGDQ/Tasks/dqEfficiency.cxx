@@ -256,7 +256,7 @@ struct AnalysisTrackSelection {
     }
 
     if (!event.has_reducedMCevent()) {
-      break;
+      return;
     }
 
     uint32_t filterMap = 0;
@@ -358,7 +358,7 @@ struct AnalysisTrackSelection {
         }
 
         auto mcTrack = tracksMC.rawIteratorAt(track.globalIndex());
-        mcTrackInfoTruth(event.posX(), event.posY(), event.posZ(), event.selection_raw(), event.numContrib(), event.reducedMCevent().mcPosX(), event.reducedMCevent().mcPosY(), event.reducedMCevent().mcPosZ(), mcTrack.pt(), mcTrack.eta(), mcTrack.phi(), mcTrack.pdgCode(), mcTrack.vx(), mcTrack.vy(), mcTrack.vz(), mcTrack.vt());
+        mcTrackInfoTruth(event.posX(), event.posY(), event.posZ(), event.selection_raw(), event.numContrib(), event.reducedMCevent().mcPosX(), event.reducedMCevent().mcPosY(), event.reducedMCevent().mcPosZ(), mcTrack.pt(), mcTrack.eta(), mcTrack.phi(), mcTrack.pdgCode(), mcTrack.vx(), mcTrack.vy(), mcTrack.vz(), mcTrack.vt(), (uint32_t)0);
       }
     }
   }
