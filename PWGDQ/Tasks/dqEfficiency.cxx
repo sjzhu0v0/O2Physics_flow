@@ -243,7 +243,7 @@ struct AnalysisTrackSelection {
   }
 
   template <uint32_t TEventFillMap, uint32_t TEventMCFillMap, uint32_t TTrackFillMap, uint32_t TTrackMCFillMap, typename TEvent, typename TTracks, typename TEventsMC, typename TTracksMC>
-  void runSelection(TEvent const& event, TTracks const& tracks, TEventsMC const& /*eventsMC*/, TTracksMC const& tracksMC)
+  void runSelection(TEvent const& event, TTracks const& tracks, TEventsMC const& /*eventsMC*/, TTracksMC const& /* tracksMC */)
   {
     VarManager::ResetValues(0, VarManager::kNMCParticleVariables);
     // fill event information which might be needed in histograms that combine track and event properties
@@ -322,8 +322,29 @@ struct AnalysisTrackSelection {
       } // end loop over MC signals
     } // end loop over tracks
 
-    for (auto& mcTrack : tracksMC) {
+    /* for (auto& mcTrack : tracksMC) {
       mcTrackInfoTruth(event.posX(), event.posY(), event.posZ(), event.selection_raw(), event.numContrib(), event.reducedMCevent().mcPosX(), event.reducedMCevent().mcPosY(), event.reducedMCevent().mcPosZ(), mcTrack.pt(), mcTrack.eta(), mcTrack.phi(), mcTrack.pdgCode(), mcTrack.vx(), mcTrack.vy(), mcTrack.vz(), mcTrack.vt());
+    } */
+  }
+
+  template <typename TEvent, typename TTracks, typename TEventsMC, typename TTracksMC>
+  void runSelectionMC(TEvent const& event, TTracks const& tracks, TEventsMC const& /*eventsMC*/, TTracksMC const& tracksMC)
+  {
+    for (auto& event : events) {
+      if (!event.isEventSelected_bit(0)) {
+        continue;
+      }
+      if (!event.has_reducedMCevent()) {
+        continue;
+      }
+      for (auto& track : mcTracks) {
+        if (track.reducedMCeventId() != event.reducedMCeventId()) {
+          continue;
+        }
+
+        auto mcTrack = mcTracks.rawIteratorAt(track.globalIndex());
+        mcTrackInfoTruth(event.posX(), event.posY(), event.posZ(), event.selection_raw(), event.numContrib(), event.reducedMCevent().mcPosX(), event.reducedMCevent().mcPosY(), event.reducedMCevent().mcPosZ(), mcTrack.pt(), mcTrack.eta(), mcTrack.phi(), mcTrack.pdgCode(), mcTrack.vx(), mcTrack.vy(), mcTrack.vz(), mcTrack.vt());
+      }
     }
   }
 
@@ -335,6 +356,10 @@ struct AnalysisTrackSelection {
   {
     runSelection<gkEventFillMap, gkMCEventFillMap, gkTrackFillMapWithCov, gkParticleMCFillMap>(event, tracks, eventsMC, tracksMC);
   }
+  void processSkimmedTruth(MyEventsSelected::iterator const& event, MyBarrelTracks const& tracks, ReducedMCEvents const& eventsMC, ReducedMCTracks const& tracksMC)
+  {
+    runSelectionMC<gkEventFillMap, gkMCEventFillMap, gkTrackFillMap, gkParticleMCFillMap>(event, tracks, eventsMC, tracksMC);
+  }
   void processDummy(MyEvents&)
   {
     // do nothing
@@ -342,6 +367,7 @@ struct AnalysisTrackSelection {
 
   PROCESS_SWITCH(AnalysisTrackSelection, processSkimmedWithCov, "Run barrel track selection on DQ skimmed tracks with covariance", false);
   PROCESS_SWITCH(AnalysisTrackSelection, processSkimmed, "Run barrel track selection on DQ skimmed tracks", false);
+  PROCESS_SWITCH(AnalysisTrackSelection, processSkimmedTruth, "Run barrel track selection on DQ skimmed tracks", false);
   PROCESS_SWITCH(AnalysisTrackSelection, processDummy, "Dummy process function", false);
 };
 
