@@ -328,10 +328,10 @@ struct AnalysisTrackSelection {
   }
 
   template <typename TEvent, typename TTracks, typename TEventsMC, typename TTracksMC>
-  void runSelectionMC(TEvent const& events, TTracks const& tracks, TEventsMC const& /*eventsMC*/, TTracksMC const& tracksMC)
+  void runSelectionMC(TEvent const& events, TTracks const& /* tracks */, TEventsMC const& /*eventsMC*/, TTracksMC const& tracksMC)
   {
     for (auto& event : events) {
-      if (!event.isEventSelected_bit(0)) {
+      if (!event.isEventSelected()) {
         continue;
       }
       if (!event.has_reducedMCevent()) {
