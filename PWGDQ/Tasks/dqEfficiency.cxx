@@ -358,7 +358,7 @@ struct AnalysisTrackSelection {
   }
   void processSkimmedTruth(MyEventsSelected const& events, MyBarrelTracks const& tracks, ReducedMCEvents const& eventsMC, ReducedMCTracks const& tracksMC)
   {
-    runSelectionMC<gkEventFillMap, gkMCEventFillMap, gkTrackFillMap, gkParticleMCFillMap>(events, tracks, eventsMC, tracksMC);
+    runSelectionMC(events, tracks, eventsMC, tracksMC);
   }
   void processDummy(MyEvents&)
   {
