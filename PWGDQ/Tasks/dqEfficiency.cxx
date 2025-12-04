@@ -328,7 +328,7 @@ struct AnalysisTrackSelection {
   }
 
   template <typename TEvent, typename TTracks, typename TEventsMC, typename TTracksMC>
-  void runSelectionMC(TEvent const& event, TTracks const& tracks, TEventsMC const& /*eventsMC*/, TTracksMC const& tracksMC)
+  void runSelectionMC(TEvent const& events, TTracks const& tracks, TEventsMC const& /*eventsMC*/, TTracksMC const& tracksMC)
   {
     for (auto& event : events) {
       if (!event.isEventSelected_bit(0)) {
@@ -356,9 +356,9 @@ struct AnalysisTrackSelection {
   {
     runSelection<gkEventFillMap, gkMCEventFillMap, gkTrackFillMapWithCov, gkParticleMCFillMap>(event, tracks, eventsMC, tracksMC);
   }
-  void processSkimmedTruth(MyEventsSelected::iterator const& event, MyBarrelTracks const& tracks, ReducedMCEvents const& eventsMC, ReducedMCTracks const& tracksMC)
+  void processSkimmedTruth(MyEventsSelected const& events, MyBarrelTracks const& tracks, ReducedMCEvents const& eventsMC, ReducedMCTracks const& tracksMC)
   {
-    runSelectionMC<gkEventFillMap, gkMCEventFillMap, gkTrackFillMap, gkParticleMCFillMap>(event, tracks, eventsMC, tracksMC);
+    runSelectionMC<gkEventFillMap, gkMCEventFillMap, gkTrackFillMap, gkParticleMCFillMap>(events, tracks, eventsMC, tracksMC);
   }
   void processDummy(MyEvents&)
   {
