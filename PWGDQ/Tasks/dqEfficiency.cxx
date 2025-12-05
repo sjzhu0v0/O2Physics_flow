@@ -67,7 +67,7 @@ DECLARE_SOA_COLUMN(McPhi, mcPhi, float);
 DECLARE_SOA_TABLE(EventCuts, "AOD", "EVENTCUTS", dqanalysisflags::IsEventSelected);
 DECLARE_SOA_TABLE(BarrelTrackCuts, "AOD", "BARRELTRACKCUTS", dqanalysisflags::IsBarrelSelected);
 DECLARE_SOA_TABLE(MuonTrackCuts, "AOD", "DQANAMUONCUTS", dqanalysisflags::IsMuonSelected);
-DECLARE_SOA_TABLE(MCTrackInfo, "AOD", "MCTRACKINFO", collision::PosX, collision::PosY, collision::PosZ, evsel::Selection, collision::NumContrib, reducedevent::MCPosX, reducedevent::MCPosY, reducedevent::MCPosZ, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, reducedtrack::Sign, reducedtrack::DcaXY, reducedtrack::DcaZ, track::ITSClusterMap, dqanalysisflags::McPt, dqanalysisflags::McEta, dqanalysisflags::McPhi, mcparticle::PdgCode, mcparticle::Vx, mcparticle::Vy, mcparticle::Vz, mcparticle::Vt);
+DECLARE_SOA_TABLE(MCTrackInfo, "AOD", "MCTRACKINFO", collision::PosX, collision::PosY, collision::PosZ, evsel::Selection, collision::NumContrib, reducedevent::MCPosX, reducedevent::MCPosY, reducedevent::MCPosZ, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, reducedtrack::Sign, reducedtrack::DcaXY, reducedtrack::DcaZ, track::ITSClusterMap, dqanalysisflags::McPt, dqanalysisflags::McEta, dqanalysisflags::McPhi, mcparticle::PdgCode, mcparticle::Vx, mcparticle::Vy, mcparticle::Vz, mcparticle::Vt, reducedpair::McDecision);
 DECLARE_SOA_TABLE(MCTrackInfoTruth, "AOD", "MCTRKTRUTH", collision::PosX, collision::PosY, collision::PosZ, evsel::Selection, collision::NumContrib, reducedevent::MCPosX, reducedevent::MCPosY, reducedevent::MCPosZ, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, mcparticle::PdgCode, mcparticle::Vx, mcparticle::Vy, mcparticle::Vz, mcparticle::Vt, reducedpair::McDecision);
 } // namespace o2::aod
 
@@ -291,13 +291,6 @@ struct AnalysisTrackSelection {
       if (!filterMap) {
         continue;
       }
-      mcTrackInfo(event.posX(), event.posY(), event.posZ(), event.selection_raw(), event.numContrib(), event.reducedMCevent().mcPosX(), event.reducedMCevent().mcPosY(), event.reducedMCevent().mcPosZ(), track.pt(), track.eta(), track.phi(), track.sign(), track.dcaXY(), track.dcaZ(), track.itsClusterMap(), track.reducedMCTrack().pt(), track.reducedMCTrack().eta(), track.reducedMCTrack().phi(), track.reducedMCTrack().pdgCode(), track.reducedMCTrack().vx(), track.reducedMCTrack().vy(), track.reducedMCTrack().vz(), track.reducedMCTrack().vt());
-
-      if (!fConfigQA) {
-        continue;
-      }
-
-      // compute MC matching decisions
       uint32_t mcDecision = 0;
       int isig = 0;
       for (auto sig = fMCSignals.begin(); sig != fMCSignals.end(); sig++, isig++) {
@@ -312,6 +305,13 @@ struct AnalysisTrackSelection {
           }
         }
       }
+      mcTrackInfo(event.posX(), event.posY(), event.posZ(), event.selection_raw(), event.numContrib(), event.reducedMCevent().mcPosX(), event.reducedMCevent().mcPosY(), event.reducedMCevent().mcPosZ(), track.pt(), track.eta(), track.phi(), track.sign(), track.dcaXY(), track.dcaZ(), track.itsClusterMap(), track.reducedMCTrack().pt(), track.reducedMCTrack().eta(), track.reducedMCTrack().phi(), track.reducedMCTrack().pdgCode(), track.reducedMCTrack().vx(), track.reducedMCTrack().vy(), track.reducedMCTrack().vz(), track.reducedMCTrack().vt(), mcDecision);
+
+      if (!fConfigQA) {
+        continue;
+      }
+
+      // compute MC matching decisions
 
       // fill histograms
       for (unsigned int i = 0; i < fMCSignals.size(); i++) {
