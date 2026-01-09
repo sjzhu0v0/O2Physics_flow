@@ -110,6 +110,8 @@ DECLARE_SOA_COLUMN(TPCSignal, tPCSignal, std::vector<float>);
 DECLARE_SOA_COLUMN(TPCNSigmaEl, tPCNSigmaEl, std::vector<float>);
 DECLARE_SOA_COLUMN(TPCNSigmaPi, tPCNSigmaPi, std::vector<float>);
 DECLARE_SOA_COLUMN(TPCNSigmaPr, tPCNSigmaPr, std::vector<float>);
+DECLARE_SOA_COLUMN(DcaXY, dcaXY, std::vector<float>);
+DECLARE_SOA_COLUMN(DcaZ, dcaZ, std::vector<float>);
 DECLARE_SOA_COLUMN(Pt1, pt1, std::vector<float>);
 DECLARE_SOA_COLUMN(Eta1, eta1, std::vector<float>);
 DECLARE_SOA_COLUMN(Phi1, phi1, std::vector<float>);
@@ -153,7 +155,7 @@ DECLARE_SOA_COLUMN(Phi2, phi2, float);
 
 DECLARE_SOA_TABLE(FlowVecs, "AOD", "DQFLOWVECS", evsel::Selection, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowVec::PT, flowVec::Eta, flowVec::Phi, flowVec::Mass, flowVec::Sign, flowVec::QvecRe, flowVec::QvecIm, flowVec::QvecAmp);
 
-DECLARE_SOA_TABLE(FlowVecD, "AOD", "DQFLOWVECD", mult::MultTPC, mult::MultTracklets, mult::MultNTracksPV, mult::MultFT0C, collision::NumContrib, collision::PosX, collision::PosY, collision::PosZ, evsel::Selection, dqanalysisflags::HadronicRate, flowVec::PT, flowVec::Eta, flowVec::Phi, flowVec::Mass, flowVec::Sign, flowVec::PTREF, flowVec::EtaREF, flowVec::PhiREF, flowVec::ITSChi2NCl, flowVec::TPCNClsCR, flowVec::TPCNClsFound, flowVec::TPCChi2NCl, flowVec::TPCSignal, flowVec::TPCNSigmaEl, flowVec::TPCNSigmaPi, flowVec::TPCNSigmaPr, flowVec::Pt1, flowVec::Eta1, flowVec::Phi1, flowVec::Sign1, flowVec::ITSChi2NCl1, flowVec::TPCNClsCR1, flowVec::TPCNClsFound1, flowVec::TPCChi2NCl1, flowVec::TPCSignal1, flowVec::TPCNSigmaEl1, flowVec::TPCNSigmaPi1, flowVec::TPCNSigmaPr1, flowVec::Pt2, flowVec::Eta2, flowVec::Phi2, flowVec::Sign2, flowVec::ITSChi2NCl2, flowVec::TPCNClsCR2, flowVec::TPCNClsFound2, flowVec::TPCChi2NCl2, flowVec::TPCSignal2, flowVec::TPCNSigmaEl2, flowVec::TPCNSigmaPi2, flowVec::TPCNSigmaPr2);
+DECLARE_SOA_TABLE(FlowVecD, "AOD", "DQFLOWVECD", mult::MultTPC, mult::MultTracklets, mult::MultNTracksPV, mult::MultFT0C, collision::NumContrib, collision::PosX, collision::PosY, collision::PosZ, evsel::Selection, dqanalysisflags::HadronicRate, flowVec::PT, flowVec::Eta, flowVec::Phi, flowVec::Mass, flowVec::Sign, flowVec::PTREF, flowVec::EtaREF, flowVec::PhiREF, flowVec::ITSChi2NCl, flowVec::TPCNClsCR, flowVec::TPCNClsFound, flowVec::TPCChi2NCl, flowVec::TPCSignal, flowVec::TPCNSigmaEl, flowVec::TPCNSigmaPi, flowVec::TPCNSigmaPr, flowVec::DcaXY, flowVec::DcaZ, flowVec::Pt1, flowVec::Eta1, flowVec::Phi1, flowVec::Sign1, flowVec::ITSChi2NCl1, flowVec::TPCNClsCR1, flowVec::TPCNClsFound1, flowVec::TPCChi2NCl1, flowVec::TPCSignal1, flowVec::TPCNSigmaEl1, flowVec::TPCNSigmaPi1, flowVec::TPCNSigmaPr1, flowVec::Pt2, flowVec::Eta2, flowVec::Phi2, flowVec::Sign2, flowVec::ITSChi2NCl2, flowVec::TPCNClsCR2, flowVec::TPCNClsFound2, flowVec::TPCChi2NCl2, flowVec::TPCSignal2, flowVec::TPCNSigmaEl2, flowVec::TPCNSigmaPi2, flowVec::TPCNSigmaPr2);
 
 DECLARE_SOA_TABLE(FlowPairRR, "AOD", "DQFLOWPAIRRR", mult::MultTPC, mult::MultTracklets, mult::MultNTracksPV, evsel::Selection, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowPair::PT1, flowPair::Eta1, flowPair::Phi1, flowPair::PT2, flowPair::Eta2, flowPair::Phi2);
 DECLARE_SOA_TABLE(FlowPairPR, "AOD", "DQFLOWPAIRPR", mult::MultTPC, mult::MultTracklets, mult::MultNTracksPV, evsel::Selection, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowPair::PT, flowPair::Eta, flowPair::Phi, flowPair::Mass, flowPair::Sign, flowPair::PT1, flowPair::Eta1, flowPair::Phi1);
@@ -511,6 +513,8 @@ struct AnalysisFlow {
     std::vector<float> vecTPCNSigmaEl;
     std::vector<float> vecTPCNSigmaPi;
     std::vector<float> vecTPCNSigmaPr;
+    std::vector<float> vecDcaXY;
+    std::vector<float> vecDcaZ;
 
     std::vector<float> vecPt1;
     std::vector<float> vecEta1;
@@ -608,9 +612,11 @@ struct AnalysisFlow {
       vecTPCNSigmaEl.push_back(track.tpcNSigmaEl());
       vecTPCNSigmaPi.push_back(track.tpcNSigmaPi());
       vecTPCNSigmaPr.push_back(track.tpcNSigmaPr());
+      vecDcaXY.push_back(track.dcaXY());
+      vecDcaZ.push_back(track.dcaZ());
     }
 
-    flowVectorsDetailed(event.multTPC(), event.multTracklets(), event.multNTracksPV(), event.multFT0C(), event.numContrib(), event.posX(), event.posY(), event.posZ(), event.selection_raw(), event.hadronicRate(), vecPT, vecEta, vecPhi, vecMass, vecSign, vecPTRef, vecEtaRef, vecPhiRef, vecITSChi2NCl, vecTPCNClsCR, vecTPCNClsFound, vecTPCChi2NCl, vecTPCSignal, vecTPCNSigmaEl, vecTPCNSigmaPi, vecTPCNSigmaPr, vecPt1, vecEta1, vecPhi1, vecSign1, vecITSChi2NCl1, vecTPCNClsCR1, vecTPCNClsFound1, vecTPCChi2NCl1, vecTPCSignal1, vecTPCNSigmaEl1, vecTPCNSigmaPi1, vecTPCNSigmaPr1, vecPt2, vecEta2, vecPhi2, vecSign2, vecITSChi2NCl2, vecTPCNClsCR2, vecTPCNClsFound2, vecTPCChi2NCl2, vecTPCSignal2, vecTPCNSigmaEl2, vecTPCNSigmaPi2, vecTPCNSigmaPr2);
+    flowVectorsDetailed(event.multTPC(), event.multTracklets(), event.multNTracksPV(), event.multFT0C(), event.numContrib(), event.posX(), event.posY(), event.posZ(), event.selection_raw(), event.hadronicRate(), vecPT, vecEta, vecPhi, vecMass, vecSign, vecPTRef, vecEtaRef, vecPhiRef, vecITSChi2NCl, vecTPCNClsCR, vecTPCNClsFound, vecTPCChi2NCl, vecTPCSignal, vecTPCNSigmaEl, vecTPCNSigmaPi, vecTPCNSigmaPr, vecDcaXY, vecDcaZ, vecPt1, vecEta1, vecPhi1, vecSign1, vecITSChi2NCl1, vecTPCNClsCR1, vecTPCNClsFound1, vecTPCChi2NCl1, vecTPCSignal1, vecTPCNSigmaEl1, vecTPCNSigmaPi1, vecTPCNSigmaPr1, vecPt2, vecEta2, vecPhi2, vecSign2, vecITSChi2NCl2, vecTPCNClsCR2, vecTPCNClsFound2, vecTPCChi2NCl2, vecTPCSignal2, vecTPCNSigmaEl2, vecTPCNSigmaPi2, vecTPCNSigmaPr2);
   }
 
   Preslice<soa::Filtered<MyDielectronCandidates>> perEventPairs = aod::reducedpair::reducedeventId;

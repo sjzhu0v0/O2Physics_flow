@@ -3636,6 +3636,13 @@ AnalysisCompositeCut* o2::aod::dqcuts::GetCompositeCut(const char* cutName)
     return cut;
   }
 
+  if (!nameStr.compare("CutPrimaryTrackLoose")) {
+    cut->AddCut(GetAnalysisCut("pTCutFlow24"));
+    cut->AddCut(GetAnalysisCut("RefTrackQualityLoose"));
+    cut->AddCut(GetAnalysisCut("primaryTrackDCAcutsPtDependentLoose"));
+    return cut;
+  }
+
   if (!nameStr.compare("CutPrimaryTrack24")) {
     cut->AddCut(GetAnalysisCut("pTCutFlow24"));
     cut->AddCut(GetAnalysisCut("RefTrackQuality"));
@@ -6811,6 +6818,13 @@ AnalysisCut* o2::aod::dqcuts::GetAnalysisCut(const char* cutName)
   }
 
   ////////////////////// Cuts for flow ///////////////////////
+  if (!nameStr.compare("RefTrackQualityLoose")) {
+    cut->AddCut(VarManager::kTPCchi2, 0.0, 6.0);
+    cut->AddCut(VarManager::kTPCncls, 40., 159);
+    cut->AddCut(VarManager::kITSncls, 0.5, 7.5);
+    return cut;
+  }
+
   if (!nameStr.compare("RefTrackQuality")) {
     cut->AddCut(VarManager::kTPCchi2, 0.0, 4.0);
     cut->AddCut(VarManager::kTPCncls, 80., 159);
@@ -6961,6 +6975,15 @@ AnalysisCut* o2::aod::dqcuts::GetAnalysisCut(const char* cutName)
   if (!nameStr.compare("primaryTrackDCAcutsPtDependent24")) {
     TF1* f_highDCA_depPt = new TF1("f_highDCA_depPt", "4.*(0.00179344+ 0.000924651 * pow(1./x, 1.4062))", 0.1, 6);
     TF1* f_lowDCA_depPt = new TF1("f_lowDCA_depPt", "-4.*(0.00179344+ 0.000924651 * pow(1./x, 1.4062))", 0.1, 6);
+
+    cut->AddCut(VarManager::kTrackDCAxy, f_lowDCA_depPt, f_highDCA_depPt, false, VarManager::kPt, 0.1, 6.0, false);
+    cut->AddCut(VarManager::kTrackDCAz, f_lowDCA_depPt, f_highDCA_depPt, false, VarManager::kPt, 0.1, 6.0, false);
+    return cut;
+  }
+
+  if (!nameStr.compare("primaryTrackDCAcutsPtDependentLoose")) {
+    TF1* f_highDCA_depPt = new TF1("f_highDCA_depPt", "6.*(0.00179344+ 0.000924651 * pow(1./x, 1.4062))", 0.1, 6);
+    TF1* f_lowDCA_depPt = new TF1("f_lowDCA_depPt", "-6.*(0.00179344+ 0.000924651 * pow(1./x, 1.4062))", 0.1, 6);
 
     cut->AddCut(VarManager::kTrackDCAxy, f_lowDCA_depPt, f_highDCA_depPt, false, VarManager::kPt, 0.1, 6.0, false);
     cut->AddCut(VarManager::kTrackDCAz, f_lowDCA_depPt, f_highDCA_depPt, false, VarManager::kPt, 0.1, 6.0, false);
