@@ -619,7 +619,7 @@ struct AnalysisFlow {
       vecDcaZ.push_back(track.dcaZ());
     }
 
-    flowVectorsDetailed(event.multTPC(), event.multTracklets(), event.multNTracksPV(), event.multFT0C(), event.numContrib(), event.posX(), event.posY(), event.posZ(), event.selection_raw(), event.hadronicRate(), vecPT, vecEta, vecPhi, vecMass, vecSign, vecPTRef, vecEtaRef, vecPhiRef, vecITSChi2NCl, vecTPCNClsCR, vecTPCNClsFound, vecTPCChi2NCl, vecTPCSignal, vecTPCNSigmaEl, vecTPCNSigmaPi, vecTPCNSigmaPr, vecDcaXY, vecDcaZ, vecPt1, vecEta1, vecPhi1, vecSign1, vecITSChi2NCl1, vecTPCNClsCR1, vecTPCNClsFound1, vecTPCChi2NCl1, vecTPCSignal1, vecTPCNSigmaEl1, vecTPCNSigmaPi1, vecTPCNSigmaPr1, vecPt2, vecEta2, vecPhi2, vecSign2, vecITSChi2NCl2, vecTPCNClsCR2, vecTPCNClsFound2, vecTPCChi2NCl2, vecITSClusterMap, vecTPCSignal2, vecTPCNSigmaEl2, vecTPCNSigmaPi2, vecTPCNSigmaPr2);
+    flowVectorsDetailed(event.multTPC(), event.multTracklets(), event.multNTracksPV(), event.multFT0C(), event.numContrib(), event.posX(), event.posY(), event.posZ(), event.selection_raw(), event.hadronicRate(), vecPT, vecEta, vecPhi, vecMass, vecSign, vecPTRef, vecEtaRef, vecPhiRef, vecITSChi2NCl, vecTPCNClsCR, vecTPCNClsFound, vecTPCChi2NCl, vecITSClusterMap, vecTPCSignal, vecTPCNSigmaEl, vecTPCNSigmaPi, vecTPCNSigmaPr, vecDcaXY, vecDcaZ, vecPt1, vecEta1, vecPhi1, vecSign1, vecITSChi2NCl1, vecTPCNClsCR1, vecTPCNClsFound1, vecTPCChi2NCl1, vecTPCSignal1, vecTPCNSigmaEl1, vecTPCNSigmaPi1, vecTPCNSigmaPr1, vecPt2, vecEta2, vecPhi2, vecSign2, vecITSChi2NCl2, vecTPCNClsCR2, vecTPCNClsFound2, vecTPCChi2NCl2, vecTPCSignal2, vecTPCNSigmaEl2, vecTPCNSigmaPi2, vecTPCNSigmaPr2);
   }
 
   Preslice<soa::Filtered<MyDielectronCandidates>> perEventPairs = aod::reducedpair::reducedeventId;
