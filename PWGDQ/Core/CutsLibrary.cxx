@@ -5143,9 +5143,9 @@ AnalysisCut* o2::aod::dqcuts::GetAnalysisCut(const char* cutName)
   }
 
   if (!nameStr.compare("jpsi_TPCPID_debug6_loose")) {
-    cut->AddCut(VarManager::kTPCnSigmaEl, -2.0, 3.0);
-    cut->AddCut(VarManager::kTPCnSigmaPi, 3.2, 999);
-    cut->AddCut(VarManager::kTPCnSigmaPr, 3.2, 999);
+    cut->AddCut(VarManager::kTPCnSigmaEl, -3.0, 3.0);
+    cut->AddCut(VarManager::kTPCnSigmaPi, 2.5, 999);
+    cut->AddCut(VarManager::kTPCnSigmaPr, 2.5, 999);
     return cut;
   }
 
