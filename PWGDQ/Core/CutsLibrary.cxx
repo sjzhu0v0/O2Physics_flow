@@ -1086,6 +1086,24 @@ AnalysisCompositeCut* o2::aod::dqcuts::GetCompositeCut(const char* cutName)
     return cut;
   }
 
+  if (!nameStr.compare("Jpsi_TPCPost_calib_debug6_pid1")) {
+    cut->AddCut(GetAnalysisCut("jpsi_trackCut_debug2"));
+    cut->AddCut(GetAnalysisCut("jpsi_TPCPID_debug6_pid1"));
+    return cut;
+  }
+
+  if (!nameStr.compare("Jpsi_TPCPost_calib_debug6_pid2")) {
+    cut->AddCut(GetAnalysisCut("jpsi_trackCut_debug2"));
+    cut->AddCut(GetAnalysisCut("jpsi_TPCPID_debug6_pid2"));
+    return cut;
+  }
+
+  if (!nameStr.compare("Jpsi_TPCPost_calib_debug6_pid3")) {
+    cut->AddCut(GetAnalysisCut("jpsi_trackCut_debug2"));
+    cut->AddCut(GetAnalysisCut("jpsi_TPCPID_debug6_pid3"));
+    return cut;
+  }
+
   if (!nameStr.compare("Jpsi_TPCPost_calib_debug6")) {
     cut->AddCut(GetAnalysisCut("jpsi_trackCut_debug2"));
     cut->AddCut(GetAnalysisCut("jpsi_TPCPID_debug6"));
@@ -5153,6 +5171,27 @@ AnalysisCut* o2::aod::dqcuts::GetAnalysisCut(const char* cutName)
     cut->AddCut(VarManager::kTPCnSigmaEl, -2.0, 3.0);
     cut->AddCut(VarManager::kTPCnSigmaPi, 3.0, 999);
     cut->AddCut(VarManager::kTPCnSigmaPr, 3.0, 999);
+    return cut;
+  }
+
+  if (!nameStr.compare("jpsi_TPCPID_debug6_pid1")) {
+    cut->AddCut(VarManager::kTPCnSigmaEl, -3.0, 3.0);
+    cut->AddCut(VarManager::kTPCnSigmaPi, 2.7, 999);
+    cut->AddCut(VarManager::kTPCnSigmaPr, 2.7, 999);
+    return cut;
+  }
+
+  if (!nameStr.compare("jpsi_TPCPID_debug6_pid2")) {
+    cut->AddCut(VarManager::kTPCnSigmaEl, -3.0, 3.0);
+    cut->AddCut(VarManager::kTPCnSigmaPi, 2.5, 999);
+    cut->AddCut(VarManager::kTPCnSigmaPr, 2.5, 999);
+    return cut;
+  }
+
+  if (!nameStr.compare("jpsi_TPCPID_debug6_pid3")) {
+    cut->AddCut(VarManager::kTPCnSigmaEl, -2.0, 3.0);
+    cut->AddCut(VarManager::kTPCnSigmaPi, 3.5, 999);
+    cut->AddCut(VarManager::kTPCnSigmaPr, 3.5, 999);
     return cut;
   }
 
