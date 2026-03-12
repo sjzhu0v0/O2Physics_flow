@@ -97,5 +97,5 @@ struct rctRawProducer {
 WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)
 {
   return WorkflowSpec{
-    adaptAnalysisTask<straevselsconverter5>(cfgc)};
+    adaptAnalysisTask<rctRawProducer>(cfgc)};
 }
