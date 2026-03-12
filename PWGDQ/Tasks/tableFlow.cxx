@@ -160,6 +160,7 @@ DECLARE_SOA_TABLE(FlowVecD, "AOD", "DQFLOWVECD", mult::MultTPC, mult::MultTrackl
 
 DECLARE_SOA_TABLE(FlowPairRR, "AOD", "DQFLOWPAIRRR", mult::MultTPC, mult::MultTracklets, mult::MultNTracksPV, evsel::Selection, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowPair::PT1, flowPair::Eta1, flowPair::Phi1, flowPair::PT2, flowPair::Eta2, flowPair::Phi2);
 DECLARE_SOA_TABLE(FlowPairPR, "AOD", "DQFLOWPAIRPR", mult::MultTPC, mult::MultTracklets, mult::MultNTracksPV, evsel::Selection, flowVec::MultFT0C, flowVec::MultVtxContri, flowVec::VtxZ, flowPair::PT, flowPair::Eta, flowPair::Phi, flowPair::Mass, flowPair::Sign, flowPair::PT1, flowPair::Eta1, flowPair::Phi1);
+DECLARE_SOA_TABLE(RctRawDQ, "AOD", "RCTRAWDQ", evsel::Rct);
 
 } // namespace o2::aod
 
@@ -168,7 +169,7 @@ using MyEvents = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended>;
 using MyEventsSelected = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::EventCuts>;
 using MyEventsHashSelected = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::EventCuts, aod::MixingHashes>;
 using MyEventsVtxCov = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsVtxCov>;
-using MyEventsVtxCovSelected = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsVtxCov, aod::EventCuts, aod::HadronicRates>;
+using MyEventsVtxCovSelected = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsVtxCov, aod::EventCuts, aod::HadronicRates, aod::RctRawDQ>;
 using MyEventsHashVtxCovSelected = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsVtxCov, aod::EventCuts, aod::MixingHashes, aod::HadronicRates>;
 using MyEventsVtxCovSelectedQvector = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsVtxCov, aod::EventCuts, aod::ReducedEventsQvector>;
 using MyEventsVtxCovSelectedQvectorExtraWithRefFlow = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsVtxCov, aod::EventCuts, aod::ReducedEventsQvector, aod::ReducedEventsQvectorExtra, aod::ReducedEventsRefFlow>;
@@ -232,6 +233,7 @@ struct AnalysisFlow {
   Configurable<int> fConfigBarrelTrackCutBitMask{"cfgBarrelTrackCutBitMask", 1, "bit mask of the track cuts"};
   Configurable<int> fConfigMixingDepthRR{"cfgMixingDepthRR", 5, "Event mixing pool depth rr"};
   Configurable<int> fConfigMixingDepthPR{"cfgMixingDepthPR", 5, "Event mixing pool depth pr"};
+  Configurable<std::string> fConfigRCTLabel{"cfgRCTLabel", "CBT", "RCT flag labels : CBT, CBT_hadronPID, CBT_electronPID, CBT_calo, CBT_muon, CBT_muon_glo"};
   Produces<aod::FlowVecs> qVectors;
   Produces<aod::FlowVecD> flowVectorsDetailed;
   Produces<aod::FlowPairRR> flowPairsRR;
@@ -260,9 +262,11 @@ struct AnalysisFlow {
   // float* fValuesHadron;
   HistogramManager* fHistMan;
   bool isWithDilepton = false;
+  RCTFlagsChecker rctChecker{"CBT"};
 
   void init(o2::framework::InitContext& context)
   {
+    rctChecker.init(fConfigRCT.fConfigRCTLabel);
     fCurrentRun = 0;
     // fValuesDilepton = new float[VarManager::kNVars];
     // fValuesHadron = new float[VarManager::kNVars];
@@ -495,6 +499,9 @@ struct AnalysisFlow {
 
   void processSEFlowPairPoiRef(soa::Filtered<MyEventsVtxCovSelected>::iterator const& event, MyBarrelTracksSelectedWithCov const& tracks, soa::Filtered<MyDielectronCandidates> const& dileptons)
   {
+    if (!(rctChecker(collision)) 
+        return;
+
     std::vector<int> trackGlobalIndexes;
     std::vector<int> daugDileptonGlobalIndexes;
     std::vector<float> vecPT;
