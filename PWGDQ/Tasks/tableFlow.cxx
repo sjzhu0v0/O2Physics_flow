@@ -502,7 +502,7 @@ struct AnalysisFlow {
 
   void processSEFlowPairPoiRef(soa::Filtered<MyEventsVtxCovSelected>::iterator const& event, MyBarrelTracksSelectedWithCov const& tracks, soa::Filtered<MyDielectronCandidates> const& dileptons)
   {
-    if (!(rctChecker(collision)))
+    if (!(rctChecker(event)))
         return;
 
     std::vector<int> trackGlobalIndexes;
