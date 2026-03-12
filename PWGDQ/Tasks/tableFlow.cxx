@@ -22,6 +22,7 @@
 #include "PWGDQ/DataModel/ReducedInfoTables.h"
 
 #include "Common/CCDB/EventSelectionParams.h"
+#include "Common/CCDB/RCTSelectionFlags.h"
 
 #include "CCDB/BasicCCDBManager.h"
 #include "DataFormatsParameters/GRPMagField.h"
@@ -266,7 +267,7 @@ struct AnalysisFlow {
 
   void init(o2::framework::InitContext& context)
   {
-    rctChecker.init(fConfigRCT.fConfigRCTLabel);
+    rctChecker.init(fConfigRCTLabel.value);
     fCurrentRun = 0;
     // fValuesDilepton = new float[VarManager::kNVars];
     // fValuesHadron = new float[VarManager::kNVars];
