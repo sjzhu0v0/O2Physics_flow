@@ -41,6 +41,15 @@
 #include <string>
 #include <vector>
 
+#include <type_traits>
+
+template<typename T, typename = void>
+struct has_rct_raw : std::false_type {};
+
+template<typename T>
+struct has_rct_raw<T, std::void_t<decltype(std::declval<T>().rct_raw())>> 
+    : std::true_type {};
+
 using std::cout;
 using std::endl;
 using std::string;
@@ -69,10 +78,12 @@ DECLARE_SOA_TABLE(BarrelTrackCuts, "AOD", "BARRELTRACKCUTS", dqanalysisflags::Is
 DECLARE_SOA_TABLE(MuonTrackCuts, "AOD", "DQANAMUONCUTS", dqanalysisflags::IsMuonSelected);
 DECLARE_SOA_TABLE(MCTrackInfo, "AOD", "MCTRACKINFO", collision::PosX, collision::PosY, collision::PosZ, evsel::Selection, collision::NumContrib, reducedevent::MCPosX, reducedevent::MCPosY, reducedevent::MCPosZ, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, reducedtrack::Sign, reducedtrack::DcaXY, reducedtrack::DcaZ, track::ITSClusterMap, dqanalysisflags::McPt, dqanalysisflags::McEta, dqanalysisflags::McPhi, mcparticle::PdgCode, mcparticle::Vx, mcparticle::Vy, mcparticle::Vz, mcparticle::Vt, reducedpair::McDecision);
 DECLARE_SOA_TABLE(MCTrackInfoTruth, "AOD", "MCTRKTRUTH", collision::PosX, collision::PosY, collision::PosZ, evsel::Selection, collision::NumContrib, reducedevent::MCPosX, reducedevent::MCPosY, reducedevent::MCPosZ, reducedtrack::Pt, reducedtrack::Eta, reducedtrack::Phi, mcparticle::PdgCode, mcparticle::Vx, mcparticle::Vy, mcparticle::Vz, mcparticle::Vt, reducedpair::McDecision);
+DECLARE_SOA_TABLE(RctRawDQ, "AOD", "RCTRAWDQ", evsel::Rct);
 } // namespace o2::aod
 
 // using MyEvents = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsMC>;
 using MyEvents = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedMCEventLabels>;
+using MyEventsRCT = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedMCEventLabels, aod::RctRawDQ>;
 using MyEventsSelected = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::EventCuts, aod::ReducedMCEventLabels>;
 // TODO: make secondary vertexing optional
 using MyEventsVtxCov = soa::Join<aod::ReducedEvents, aod::ReducedEventsExtended, aod::ReducedEventsVtxCov, aod::ReducedMCEventLabels>;
@@ -104,7 +115,9 @@ struct AnalysisEventSelection {
   OutputObj<THashList> fOutputList{"output"};
   Configurable<std::string> fConfigEventCuts{"cfgEventCuts", "eventStandard", "Event selection"};
   Configurable<bool> fConfigQA{"cfgQA", false, "If true, fill QA histograms"};
+  Configurable<std::string> fConfigRCTLabel{"cfgRCTLabel", "CBT", "RCT flag labels : CBT, CBT_hadronPID, CBT_electronPID, CBT_calo, CBT_muon, CBT_muon_glo"};
 
+  RCTFlagsChecker rctChecker{"CBT"};
   HistogramManager* fHistMan;
   AnalysisCompositeCut* fEventCut;
 
@@ -113,6 +126,7 @@ struct AnalysisEventSelection {
     if (context.mOptions.get<bool>("processDummy")) {
       return;
     }
+    rctChecker.init(fConfigRCTLabel.value);
 
     fEventCut = new AnalysisCompositeCut(true);
     TString eventCutStr = fConfigEventCuts.value;
@@ -146,6 +160,14 @@ struct AnalysisEventSelection {
     if (fConfigQA) {
       fHistMan->FillHistClass("Event_BeforeCuts", VarManager::fgValues); // automatically fill all the histograms in the class Event
     }
+    
+    if constexpr (has_rct_raw<TEvent>::value) {
+      if (!(rctChecker(event))) {
+        eventSel(0);
+        return;
+      }
+    }
+
     if (fEventCut->IsSelected(VarManager::fgValues)) {
       if (fConfigQA) {
         fHistMan->FillHistClass("Event_AfterCuts", VarManager::fgValues);
@@ -160,12 +182,18 @@ struct AnalysisEventSelection {
   {
     runSelection<gkEventFillMap, gkMCEventFillMap>(event, mcEvents);
   }
+
+  void processSkimmedRct(MyEventsRCT::iterator const& event, aod::ReducedMCEvents const& mcEvents)
+  {
+    runSelection<gkEventFillMap, gkMCEventFillMap>(event, mcEvents);
+  }
   void processDummy(MyEvents&)
   {
     // do nothing
   }
 
   PROCESS_SWITCH(AnalysisEventSelection, processSkimmed, "Run event selection on DQ skimmed events", false);
+  PROCESS_SWITCH(AnalysisEventSelection, processSkimmedRct, "Run event selection on DQ skimmed events", false);
   PROCESS_SWITCH(AnalysisEventSelection, processDummy, "Dummy process function", false);
 };
 
