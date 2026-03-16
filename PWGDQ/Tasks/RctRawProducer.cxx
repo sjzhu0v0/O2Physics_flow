@@ -32,28 +32,16 @@ using namespace o2::aod::rctsel;
 static const int32_t nBCsPerOrbit = o2::constants::lhc::LHCMaxBunches;
 
 // Converts Stra Event selections from 004 to 005
-struct rctRawQA {
-  Produces<aod::RctRawDQ> straEvSels_005;
-
-  Service<o2::ccdb::BasicCCDBManager> ccdb;
-
+struct RctRawQA {
   OutputObj<THashList> fOutputList{"outputQA"};
   HistogramRegistry registry{"registry"};
-  int lastRun = -1;
-  int64_t lastTF = -1;
-  uint32_t lastRCT = 0;
-  uint64_t sorTimestamp = 0; // default SOR timestamp
-  uint64_t eorTimestamp = 1; // default EOR timestamp
-  int64_t bcSOR = -1;        // global bc of the start of run
-  int64_t nBCsPerTF = -1;    // duration of TF in bcs, should be 128*3564 or 3
-  std::map<uint64_t, uint32_t>* mapRCT = nullptr;
   RCTFlagsChecker rctChecker{"CBT"};
   RCTFlagsChecker rctChecker_1{"CBT_hadronPID"};
   RCTFlagsChecker rctChecker_2{"CBT_electronPID"};
 
   TH1D* hRCT_flags;
 
-  void init(o2::framework::InitContext&) {
+  void init(o2::framework::InitContext& context) {
     rctChecker.init("CBT");
     rctChecker_1.init("CBT_hadronPID");
     rctChecker_2.init("CBT_electronPID");
@@ -76,7 +64,7 @@ struct rctRawQA {
   }
 };
 
-struct rctRawProducer {
+struct RctRawProducer {
   Produces<aod::RctRawDQ> straEvSels_005;
 
   Service<o2::ccdb::BasicCCDBManager> ccdb;
@@ -144,6 +132,6 @@ struct rctRawProducer {
 WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)
 {
   return WorkflowSpec{
-    adaptAnalysisTask<rctRawProducer>(cfgc),
-    adaptAnalysisTask<rctRawQA>(cfgc)};
+    adaptAnalysisTask<RctRawQA>(cfgc),
+    adaptAnalysisTask<RctRawProducer>(cfgc)};
 }
