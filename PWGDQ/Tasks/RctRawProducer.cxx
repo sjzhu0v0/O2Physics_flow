@@ -44,7 +44,7 @@ struct RctRawQA {
   void init(o2::framework::InitContext& context) {
     rctChecker.init("CBT");
     rctChecker_1.init("CBT_hadronPID");
-    rctChecker_2.init("CBT_electronPID");
+    rctChecker_2.init("CBT_electrnPID");
     hRCT_flags = new TH1D("RCT_flags", "", 4, -0.5, 3.5);
     fOutputList->Add(hRCT_flags);
   }
