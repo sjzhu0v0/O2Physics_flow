@@ -26,6 +26,7 @@ using namespace o2;
 
 using namespace o2::framework;
 using namespace o2::aod::evsel;
+using namespace o2::aod::rctsel;
 
 static const int32_t nBCsPerOrbit = o2::constants::lhc::LHCMaxBunches;
 
