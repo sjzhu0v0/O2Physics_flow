@@ -32,7 +32,7 @@ using namespace o2::aod::rctsel;
 static const int32_t nBCsPerOrbit = o2::constants::lhc::LHCMaxBunches;
 
 // Converts Stra Event selections from 004 to 005
-struct rctRawProducer {
+struct rctRawQA {
   Produces<aod::RctRawDQ> straEvSels_005;
 
   Service<o2::ccdb::BasicCCDBManager> ccdb;
@@ -144,5 +144,6 @@ struct rctRawProducer {
 WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)
 {
   return WorkflowSpec{
-    adaptAnalysisTask<rctRawProducer>(cfgc)};
+    adaptAnalysisTask<rctRawProducer>(cfgc),
+    adaptAnalysisTask<rctRawQA>(cfgc)};
 }
