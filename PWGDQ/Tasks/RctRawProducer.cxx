@@ -17,6 +17,7 @@
 #include "Framework/AnalysisDataModel.h"
 #include "Framework/AnalysisTask.h"
 #include "Framework/runDataProcessing.h"
+#include "THashList.h"
 
 namespace o2::aod {
 DECLARE_SOA_TABLE(RctRawDQ, "AOD", "RCTRAWDQ", evsel::Rct);
