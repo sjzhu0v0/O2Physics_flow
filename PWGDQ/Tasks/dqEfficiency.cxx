@@ -24,6 +24,7 @@
 #include "PWGDQ/DataModel/ReducedInfoTables.h"
 
 #include "CCDB/BasicCCDBManager.h"
+#include "Common/CCDB/RCTSelectionFlags.h"
 #include "DataFormatsParameters/GRPMagField.h"
 #include "DetectorsBase/GeometryManager.h"
 #include "Framework/AnalysisDataModel.h"
@@ -58,6 +59,7 @@ using namespace o2;
 using namespace o2::framework;
 using namespace o2::framework::expressions;
 using namespace o2::aod;
+using namespace o2::aod::rctsel;
 
 // Some definitions
 namespace o2::aod
