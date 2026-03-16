@@ -31,39 +31,6 @@ using namespace o2::aod::rctsel;
 
 static const int32_t nBCsPerOrbit = o2::constants::lhc::LHCMaxBunches;
 
-// Converts Stra Event selections from 004 to 005
-struct RctRawQA {
-  OutputObj<THashList> fOutputList{"outputQA"};
-  HistogramRegistry registry{"registry"};
-  RCTFlagsChecker rctChecker{"CBT"};
-  RCTFlagsChecker rctChecker_1{"CBT_hadronPID"};
-  RCTFlagsChecker rctChecker_2{"CBT_electronPID"};
-
-  TH1D* hRCT_flags;
-
-  void init(o2::framework::InitContext& context) {
-    rctChecker.init("CBT");
-    rctChecker_1.init("CBT_hadronPID");
-    rctChecker_2.init("CBT_electrnPID");
-    hRCT_flags = new TH1D("RCT_flags", "", 4, -0.5, 3.5);
-    fOutputList->Add(hRCT_flags);
-  }
-
-  // void process(soa::Join<aod::StraEvSels_004, aod::StraStamps> const& straEvSels_004)
-  void process(aod::RctRawDQ const& flags)
-  {
-    for (auto& values : flags) {
-      hRCT_flags->Fill(0);
-      if (rctChecker(values))
-        hRCT_flags->Fill(1);
-      if (rctChecker_1(values))
-        hRCT_flags->Fill(2);
-      if (rctChecker_2(values))
-        hRCT_flags->Fill(3);
-    }
-  }
-};
-
 struct RctRawProducer {
   Produces<aod::RctRawDQ> straEvSels_005;
 
@@ -132,6 +99,5 @@ struct RctRawProducer {
 WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)
 {
   return WorkflowSpec{
-    adaptAnalysisTask<RctRawQA>(cfgc),
     adaptAnalysisTask<RctRawProducer>(cfgc)};
 }
