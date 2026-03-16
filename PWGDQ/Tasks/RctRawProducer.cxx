@@ -12,6 +12,7 @@
 #include "PWGDQ/DataModel/ReducedInfoTables.h"
 
 #include "CCDB/BasicCCDBManager.h"
+#include "Common/CCDB/RCTSelectionFlags.h"
 #include "DataFormatsParameters/AggregatedRunInfo.h"
 #include "Framework/AnalysisDataModel.h"
 #include "Framework/AnalysisTask.h"
@@ -29,6 +30,48 @@ using namespace o2::aod::evsel;
 static const int32_t nBCsPerOrbit = o2::constants::lhc::LHCMaxBunches;
 
 // Converts Stra Event selections from 004 to 005
+struct rctRawProducer {
+  Produces<aod::RctRawDQ> straEvSels_005;
+
+  Service<o2::ccdb::BasicCCDBManager> ccdb;
+
+  OutputObj<THashList> fOutputList{"outputQA"};
+  HistogramRegistry registry{"registry"};
+  int lastRun = -1;
+  int64_t lastTF = -1;
+  uint32_t lastRCT = 0;
+  uint64_t sorTimestamp = 0; // default SOR timestamp
+  uint64_t eorTimestamp = 1; // default EOR timestamp
+  int64_t bcSOR = -1;        // global bc of the start of run
+  int64_t nBCsPerTF = -1;    // duration of TF in bcs, should be 128*3564 or 3
+  std::map<uint64_t, uint32_t>* mapRCT = nullptr;
+  RCTFlagsChecker rctChecker{"CBT"};
+  RCTFlagsChecker rctChecker_1{"CBT_hadronPID"};
+  RCTFlagsChecker rctChecker_2{"CBT_electronPID"};
+
+  TH1D* hRCT_flags;
+
+  void init(o2::framework::InitContext&) {
+    rctChecker.init(fConfigRCTLabel.value);
+    hRCT_flags = new TH1D("RCT_flags", "", 4, -0.5, 3.5);
+    fOutputList->Add(hRCT_flags);
+  }
+
+  // void process(soa::Join<aod::StraEvSels_004, aod::StraStamps> const& straEvSels_004)
+  void process(aod::RctRawDQ flags)
+  {
+    for (auto& values : flags) {
+      hRCT_flags->Fill(0);
+      if (rctChecker(values))
+        hRCT_flags->Fill(1);
+      if (rctChecker_1(values))
+        hRCT_flags->Fill(2);
+      if (rctChecker_2(values))
+        hRCT_flags->Fill(3);
+    }
+  }
+};
+
 struct rctRawProducer {
   Produces<aod::RctRawDQ> straEvSels_005;
 
