@@ -50,7 +50,7 @@ struct RctRawQA {
   }
 
   // void process(soa::Join<aod::StraEvSels_004, aod::StraStamps> const& straEvSels_004)
-  void process(aod::RctRawDQ flags)
+  void process(aod::RctRawDQ const& flags)
   {
     for (auto& values : flags) {
       hRCT_flags->Fill(0);
