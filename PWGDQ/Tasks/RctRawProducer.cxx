@@ -52,7 +52,9 @@ struct rctRawProducer {
   TH1D* hRCT_flags;
 
   void init(o2::framework::InitContext&) {
-    rctChecker.init(fConfigRCTLabel.value);
+    rctChecker.init("CBT");
+    rctChecker_1.init("CBT_hadronPID");
+    rctChecker_2.init("CBT_electronPID");
     hRCT_flags = new TH1D("RCT_flags", "", 4, -0.5, 3.5);
     fOutputList->Add(hRCT_flags);
   }
