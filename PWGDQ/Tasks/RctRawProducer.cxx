@@ -86,7 +86,7 @@ struct RctRawProducer {
       lastTF = thisTF;
     }
     // LOGP(debug, "rct={}",rct);
-    cout << "rct flag:" << rct << endl; 
+    std::cout << "rct flag:" << rct << std::endl; 
     return rct;
   }
 
