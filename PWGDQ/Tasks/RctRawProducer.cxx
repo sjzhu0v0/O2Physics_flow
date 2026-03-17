@@ -69,6 +69,7 @@ struct RctRawProducer {
         LOGP(info, "rct object missing... inserting dummy rct flags");
         mapRCT = new std::map<uint64_t, uint32_t>;
         mapRCT->insert(std::pair<uint64_t, uint32_t>(sorTimestamp, 0));
+        exit(1);
       }
     }
 
