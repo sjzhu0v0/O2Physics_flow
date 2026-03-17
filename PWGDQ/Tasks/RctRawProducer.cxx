@@ -84,6 +84,7 @@ struct RctRawProducer {
       lastRCT = rct;
       lastTF = thisTF;
     }
+    LOG(debug, "rct={}",rct)
     return rct;
   }
 
