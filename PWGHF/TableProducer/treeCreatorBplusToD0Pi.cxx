@@ -19,6 +19,7 @@
 
 #include "PWGHF/Core/DecayChannels.h"
 #include "PWGHF/Core/HfHelper.h"
+#include "PWGHF/DataModel/AliasTables.h"
 #include "PWGHF/DataModel/CandidateReconstructionTables.h"
 #include "PWGHF/DataModel/CandidateSelectionTables.h"
 
@@ -152,7 +153,7 @@ DECLARE_SOA_TABLE(HfCandBpFulls, "AOD", "HFCANDBPFULL",
                   full::Phi,
                   full::Y,
                   full::E,
-                  hf_cand_2prong::FlagMcMatchRec,
+                  hf_cand_mc_flag::FlagMcMatchRec,
                   full::D0M,
                   full::D0PtProng0,
                   full::D0PtProng1,
@@ -194,8 +195,8 @@ DECLARE_SOA_TABLE(HfCandBpFullPs, "AOD", "HFCANDBPFULLP",
                   full::Eta,
                   full::Phi,
                   full::Y,
-                  hf_cand_2prong::FlagMcMatchRec,
-                  hf_cand_2prong::OriginMcGen);
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::OriginMcGen);
 
 DECLARE_SOA_TABLE(HfCandBpLites, "AOD", "HFCANDBPLITE",
                   hf_cand::Chi2PCA,
@@ -218,8 +219,8 @@ DECLARE_SOA_TABLE(HfCandBpLites, "AOD", "HFCANDBPLITE",
                   full::Eta,
                   full::Phi,
                   full::Y,
-                  hf_cand_2prong::FlagMcMatchRec,
-                  hf_cand_2prong::OriginMcRec);
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::OriginMcRec);
 
 } // namespace o2::aod
 
@@ -238,15 +239,13 @@ struct HfTreeCreatorBplusToD0Pi {
   Configurable<float> downSampleBkgFactor{"downSampleBkgFactor", 1., "Fraction of background candidates to keep for ML trainings"};
   Configurable<float> ptMaxForDownSample{"ptMaxForDownSample", 10., "Maximum pt for the application of the downsampling factor"};
 
-  HfHelper hfHelper;
-
   using SelectedCandidatesMc = soa::Filtered<soa::Join<aod::HfCandBplus, aod::HfCandBplusMcRec, aod::HfSelBplusToD0Pi>>;
   using TracksWPid = soa::Join<aod::Tracks, aod::TracksPidPi, aod::TracksPidKa>;
 
   Filter filterSelectCandidates = aod::hf_sel_candidate_bplus::isSelBplusToD0Pi >= selectionFlagBplus;
 
-  Partition<SelectedCandidatesMc> recSig = nabs(aod::hf_cand_bplus::flagMcMatchRec) == static_cast<int8_t>(DecayChannelMain::BplusToD0Pi);
-  Partition<SelectedCandidatesMc> recBg = nabs(aod::hf_cand_bplus::flagMcMatchRec) != static_cast<int8_t>(DecayChannelMain::BplusToD0Pi);
+  Partition<SelectedCandidatesMc> recSig = nabs(aod::hf_cand_mc_flag::flagMcMatchRec) == static_cast<int8_t>(DecayChannelMain::BplusToD0Pi);
+  Partition<SelectedCandidatesMc> recBg = nabs(aod::hf_cand_mc_flag::flagMcMatchRec) != static_cast<int8_t>(DecayChannelMain::BplusToD0Pi);
 
   void init(InitContext const&)
   {
@@ -265,12 +264,12 @@ struct HfTreeCreatorBplusToD0Pi {
       runNumber);
   }
 
-  template <bool doMc = false, typename T, typename U>
+  template <bool DoMc = false, typename T, typename U>
   void fillCandidateTable(const T& candidate, const U& prong1)
   {
     int8_t flagMc = 0;
     int8_t originMc = 0;
-    if constexpr (doMc) {
+    if constexpr (DoMc) {
       flagMc = candidate.flagMcMatchRec();
       originMc = candidate.originMcRec();
     }
@@ -280,9 +279,9 @@ struct HfTreeCreatorBplusToD0Pi {
     auto d0Daughter1 = d0Cand.template prong1_as<TracksWPid>();
     auto invMassD0 = 0.;
     if (prong1.signed1Pt() > 0) {
-      invMassD0 = hfHelper.invMassD0barToKPi(d0Cand);
+      invMassD0 = HfHelper::invMassD0barToKPi(d0Cand);
     } else if (prong1.signed1Pt() < 0) {
-      invMassD0 = hfHelper.invMassD0ToPiK(d0Cand);
+      invMassD0 = HfHelper::invMassD0ToPiK(d0Cand);
     }
     if (fillCandidateLiteTable) {
       rowCandidateLite(
@@ -298,14 +297,14 @@ struct HfTreeCreatorBplusToD0Pi {
         prong1.tpcNSigmaPi(),
         prong1.tofNSigmaPi(),
         candidate.isSelBplusToD0Pi(),
-        hfHelper.invMassBplusToD0Pi(candidate),
+        HfHelper::invMassBplusToD0Pi(candidate),
         candidate.pt(),
         candidate.cpa(),
         candidate.cpaXY(),
         candidate.maxNormalisedDeltaIP(),
         candidate.eta(),
         candidate.phi(),
-        hfHelper.yBplus(candidate),
+        HfHelper::yBplus(candidate),
         flagMc,
         originMc);
     } else {
@@ -345,22 +344,22 @@ struct HfTreeCreatorBplusToD0Pi {
         prong1.tpcNSigmaPi(),
         prong1.tofNSigmaPi(),
         candidate.isSelBplusToD0Pi(),
-        hfHelper.invMassBplusToD0Pi(candidate),
+        HfHelper::invMassBplusToD0Pi(candidate),
         candidate.pt(),
         candidate.p(),
         candidate.cpa(),
         candidate.cpaXY(),
         candidate.maxNormalisedDeltaIP(),
-        hfHelper.ctBplus(candidate),
+        HfHelper::ctBplus(candidate),
         candidate.eta(),
         candidate.phi(),
-        hfHelper.yBplus(candidate),
-        hfHelper.eBplus(candidate),
+        HfHelper::yBplus(candidate),
+        HfHelper::eBplus(candidate),
         flagMc,
         invMassD0,
         d0Cand.ptProng0(),
         d0Cand.ptProng1(),
-        hfHelper.yD0(d0Cand),
+        HfHelper::yD0(d0Cand),
         d0Cand.eta(),
         d0Cand.cpa(),
         d0Cand.cpaXY(),
@@ -402,7 +401,7 @@ struct HfTreeCreatorBplusToD0Pi {
     }
     for (const auto& candidate : candidates) {
       if (fillOnlyBackground) {
-        float pseudoRndm = candidate.ptProng1() * 1000. - static_cast<int64_t>(candidate.ptProng1() * 1000);
+        float const pseudoRndm = candidate.ptProng1() * 1000. - static_cast<int64_t>(candidate.ptProng1() * 1000);
         if (candidate.pt() < ptMaxForDownSample && pseudoRndm >= downSampleBkgFactor) {
           continue;
         }
@@ -442,7 +441,7 @@ struct HfTreeCreatorBplusToD0Pi {
         rowCandidateLite.reserve(recBg.size());
       }
       for (const auto& candidate : recBg) {
-        float pseudoRndm = candidate.ptProng1() * 1000. - static_cast<int64_t>(candidate.ptProng1() * 1000);
+        float const pseudoRndm = candidate.ptProng1() * 1000. - static_cast<int64_t>(candidate.ptProng1() * 1000);
         if (candidate.pt() < ptMaxForDownSample && pseudoRndm >= downSampleBkgFactor) {
           continue;
         }

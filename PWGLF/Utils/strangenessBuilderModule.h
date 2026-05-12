@@ -13,32 +13,40 @@
 /// \brief strangeness builder module
 /// \author ALICE
 
-// simple checkers, but ensure 8 bit integers
-#define BITSET(var, nbit) ((var) |= (static_cast<uint8_t>(1) << static_cast<uint8_t>(nbit)))
-
 #ifndef PWGLF_UTILS_STRANGENESSBUILDERMODULE_H_
 #define PWGLF_UTILS_STRANGENESSBUILDERMODULE_H_
 
-#include "TableHelper.h"
-
-#include "PWGLF/DataModel/LFStrangenessTables.h"
+#include "PWGLF/DataModel/LFStrangenessTables.h" // IWYU pragma: keep
 #include "PWGLF/Utils/strangenessBuilderHelper.h"
 
 #include "Common/Core/TPCVDriftManager.h"
 
-#include "DataFormatsCalibration/MeanVertexObject.h"
-#include "DataFormatsParameters/GRPMagField.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/AnalysisHelpers.h"
-#include "Framework/Configurable.h"
-#include "Framework/HistogramRegistry.h"
-#include "Framework/HistogramSpec.h"
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/Configurable.h>
+#include <Framework/DeviceSpec.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/Logger.h>
+#include <Framework/RunningWorkflowInfo.h>
+#include <ReconstructionDataFormats/PID.h>
+#include <ReconstructionDataFormats/Track.h>
+#include <ReconstructionDataFormats/TrackParametrization.h>
+
+#include <TH1.h>
+#include <TMCProcess.h>
+#include <TPDGCode.h>
+#include <TString.h>
 
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
-#include <memory>
 #include <string>
+#include <vector>
+
+// simple checkers, but ensure 8 bit integers
+#define BITSET(var, nbit) ((var) |= (static_cast<uint8_t>(1) << static_cast<uint8_t>(nbit)))
 
 //__________________________________________
 // strangeness builder module
@@ -277,6 +285,9 @@ struct coreConfigurables : o2::framework::ConfigurableGroup {
   o2::framework::Configurable<bool> useV0BufferForCascades{"useV0BufferForCascades", false, "store array of V0s for cascades or not. False (default): save RAM, use more CPU; true: save CPU, use more RAM"};
 
   o2::framework::Configurable<int> mc_findableMode{"mc_findableMode", 0, "0: disabled; 1: add findable-but-not-found to existing V0s from AO2D; 2: reset V0s and generate only findable-but-not-found"};
+
+  // test the possibility of refitting with material corrections (DCA Fitter option)
+  o2::framework::Configurable<bool> refitWithMaterialCorrection{"refitWithMaterialCorrection", false, "do refit after material corrections were applied"};
 };
 
 // strangenessBuilder: V0 building options
@@ -528,7 +539,8 @@ class BuilderModule
 
     nEnabledTables = 0;
 
-    TString listOfRequestors[nTables];
+    constexpr int kTablesConst = nTables; // silence warning
+    TString listOfRequestors[kTablesConst];
     for (int i = 0; i < nTables; i++) {
       int f = baseOpts.enabledTables->get(tableNames[i].c_str(), "enable");
       if (f == 1) {
@@ -564,18 +576,18 @@ class BuilderModule
     }
 
     // setup bookkeeping histogram
-    auto h = histos.template add<TH1>("hTableBuildingStatistics", "hTableBuildingStatistics", o2::framework::kTH1D, {{nTablesConst, -0.5f, static_cast<float>(nTablesConst)}});
-    auto h2 = histos.template add<TH1>("hInputStatistics", "hInputStatistics", o2::framework::kTH1D, {{nTablesConst, -0.5f, static_cast<float>(nTablesConst)}});
+    auto h = histos.template add<TH1>("hTableBuildingStatistics", "hTableBuildingStatistics", o2::framework::HistType::kTH1D, {{nTablesConst, -0.5f, static_cast<float>(nTablesConst)}});
+    auto h2 = histos.template add<TH1>("hInputStatistics", "hInputStatistics", o2::framework::HistType::kTH1D, {{nTablesConst, -0.5f, static_cast<float>(nTablesConst)}});
     h2->SetTitle("Input table sizes");
 
     if (v0BuilderOpts.generatePhotonCandidates.value == true) {
-      auto hDeduplicationStatistics = histos.template add<TH1>("hDeduplicationStatistics", "hDeduplicationStatistics", o2::framework::kTH1D, {{2, -0.5f, 1.5f}});
+      auto hDeduplicationStatistics = histos.template add<TH1>("hDeduplicationStatistics", "hDeduplicationStatistics", o2::framework::HistType::kTH1D, {{2, -0.5f, 1.5f}});
       hDeduplicationStatistics->GetXaxis()->SetBinLabel(1, "AO2D V0s");
       hDeduplicationStatistics->GetXaxis()->SetBinLabel(2, "Deduplicated V0s");
     }
 
     if (preSelectOpts.preselectOnlyDesiredV0s.value == true) {
-      auto hPreselectionV0s = histos.template add<TH1>("hPreselectionV0s", "hPreselectionV0s", o2::framework::kTH1D, {{16, -0.5f, 15.5f}});
+      auto hPreselectionV0s = histos.template add<TH1>("hPreselectionV0s", "hPreselectionV0s", o2::framework::HistType::kTH1D, {{16, -0.5f, 15.5f}});
       hPreselectionV0s->GetXaxis()->SetBinLabel(1, "Not preselected");
       hPreselectionV0s->GetXaxis()->SetBinLabel(2, "#gamma");
       hPreselectionV0s->GetXaxis()->SetBinLabel(3, "K^{0}_{S}");
@@ -595,7 +607,7 @@ class BuilderModule
     }
 
     if (preSelectOpts.preselectOnlyDesiredCascades.value == true) {
-      auto hPreselectionCascades = histos.template add<TH1>("hPreselectionCascades", "hPreselectionCascades", o2::framework::kTH1D, {{16, -0.5f, 15.5f}});
+      auto hPreselectionCascades = histos.template add<TH1>("hPreselectionCascades", "hPreselectionCascades", o2::framework::HistType::kTH1D, {{16, -0.5f, 15.5f}});
       hPreselectionCascades->GetXaxis()->SetBinLabel(1, "Not preselected");
       hPreselectionCascades->GetXaxis()->SetBinLabel(2, "#Xi^{-}");
       hPreselectionCascades->GetXaxis()->SetBinLabel(3, "#Xi^{+}");
@@ -616,7 +628,7 @@ class BuilderModule
 
     if (baseOpts.mc_findableMode.value > 0) {
       // save statistics of findable candidate processing
-      auto hFindable = histos.template add<TH1>("hFindableStatistics", "hFindableStatistics", o2::framework::kTH1D, {{6, -0.5f, 5.5f}});
+      auto hFindable = histos.template add<TH1>("hFindableStatistics", "hFindableStatistics", o2::framework::HistType::kTH1D, {{6, -0.5f, 5.5f}});
       hFindable->SetTitle(Form("Findable mode: %i", static_cast<int>(baseOpts.mc_findableMode.value)));
       hFindable->GetXaxis()->SetBinLabel(1, "AO2D V0s");
       hFindable->GetXaxis()->SetBinLabel(2, "V0s to be built");
@@ -626,7 +638,7 @@ class BuilderModule
       hFindable->GetXaxis()->SetBinLabel(6, "Cascades with collId -1");
     }
 
-    auto hPrimaryV0s = histos.template add<TH1>("hPrimaryV0s", "hPrimaryV0s", o2::framework::kTH1D, {{2, -0.5f, 1.5f}});
+    auto hPrimaryV0s = histos.template add<TH1>("hPrimaryV0s", "hPrimaryV0s", o2::framework::HistType::kTH1D, {{2, -0.5f, 1.5f}});
     hPrimaryV0s->GetXaxis()->SetBinLabel(1, "All V0s");
     hPrimaryV0s->GetXaxis()->SetBinLabel(2, "Primary V0s");
 
@@ -697,6 +709,9 @@ class BuilderModule
     straHelper.cascadeselections.dcacascdau = cascadeBuilderOpts.dcacascdau;
     straHelper.cascadeselections.lambdaMassWindow = cascadeBuilderOpts.lambdaMassWindow;
     straHelper.cascadeselections.maxDaughterEta = cascadeBuilderOpts.maxDaughterEta;
+
+    // Set option to refit with material corrections
+    straHelper.fitter.setRefitWithMatCorr(baseOpts.refitWithMaterialCorrection.value);
   }
 
   // for sorting
@@ -713,10 +728,10 @@ class BuilderModule
     return idx;
   }
 
-  template <typename TCollisions, typename TCCDB>
-  bool initCCDB(TCCDB& ccdb, aod::BCsWithTimestamps const& bcs, TCollisions const& collisions)
+  template <typename TCollisions, typename TCCDB, typename TBCs>
+  bool initCCDB(TCCDB& ccdb, TBCs const& bcs, TCollisions const& collisions)
   {
-    auto bc = collisions.size() ? collisions.begin().template bc_as<aod::BCsWithTimestamps>() : bcs.begin();
+    auto bc = collisions.size() ? collisions.begin().template bc_as<TBCs>() : bcs.begin();
     if (!bcs.size()) {
       LOGF(warn, "No BC found, skipping this DF.");
       return false; // signal to skip this DF
@@ -889,6 +904,9 @@ class BuilderModule
 
             // handle TPC-only tracks properly (photon conversions)
             if (v0BuilderOpts.moveTPCOnlyTracks) {
+              if (collision.has_bc()) {
+                mVDriftMgr.update(collision.template bc_as<aod::BCsWithTimestamps>().timestamp());
+              }
               if (isPosTPCOnly) {
                 // Nota bene: positive is TPC-only -> this entire V0 merits treatment as photon candidate
                 posTrackPar.setPID(o2::track::PID::Electron);
@@ -908,9 +926,10 @@ class BuilderModule
             } // end TPC drift treatment
 
             // process candidate with helper, generate properties for consulting
-            // <false>: do not apply selections: do as much as possible to preserve
+            // first 'false' : do not apply selections: do as much as possible to preserve
+            // second 'false': do not calculate prong DCA to PV, unnecessary, costly if XIU = 83.1f
             // candidate at this level and do not select with topo selections
-            if (straHelper.buildV0Candidate<false>(v0tableGrouped[iV0].collisionIds[ic], collision.posX(), collision.posY(), collision.posZ(), pTrack, nTrack, posTrackPar, negTrackPar, true, false, true)) {
+            if (straHelper.buildV0Candidate<false, false>(v0tableGrouped[iV0].collisionIds[ic], collision.posX(), collision.posY(), collision.posZ(), pTrack, nTrack, posTrackPar, negTrackPar, true, false, true)) {
               // candidate built, check pointing angle
               if (straHelper.v0.pointingAngle < bestPointingAngle) {
                 bestPointingAngle = straHelper.v0.pointingAngle;
@@ -980,10 +999,10 @@ class BuilderModule
 
           bool trackIsInteresting = false;
           if (
-            (originParticle.pdgCode() == 310 && v0BuilderOpts.mc_addGeneratedK0Short.value > 0) ||
-            (originParticle.pdgCode() == 3122 && v0BuilderOpts.mc_addGeneratedLambda.value > 0) ||
-            (originParticle.pdgCode() == -3122 && v0BuilderOpts.mc_addGeneratedAntiLambda.value > 0) ||
-            (originParticle.pdgCode() == 22 && v0BuilderOpts.mc_addGeneratedGamma.value > 0)) {
+            (originParticle.pdgCode() == PDG_t::kK0Short && v0BuilderOpts.mc_addGeneratedK0Short.value > 0) ||
+            (originParticle.pdgCode() == PDG_t::kLambda0 && v0BuilderOpts.mc_addGeneratedLambda.value > 0) ||
+            (originParticle.pdgCode() == PDG_t::kLambda0Bar && v0BuilderOpts.mc_addGeneratedAntiLambda.value > 0) ||
+            (originParticle.pdgCode() == PDG_t::kGamma && v0BuilderOpts.mc_addGeneratedGamma.value > 0)) {
             trackIsInteresting = true;
           }
           if (!trackIsInteresting) {
@@ -1033,7 +1052,7 @@ class BuilderModule
                 currentV0Entry.pdgCode = positiveTrackIndex.pdgCode;
                 currentV0Entry.particleId = positiveTrackIndex.originId;
                 currentV0Entry.isCollinearV0 = false;
-                if (v0BuilderOpts.mc_addGeneratedGammaMakeCollinear.value && currentV0Entry.pdgCode == 22) {
+                if (v0BuilderOpts.mc_addGeneratedGammaMakeCollinear.value && currentV0Entry.pdgCode == PDG_t::kGamma) {
                   currentV0Entry.isCollinearV0 = true;
                 }
                 currentV0Entry.found = false;
@@ -1055,7 +1074,7 @@ class BuilderModule
               currentV0Entry.pdgCode = positiveTrackIndex.pdgCode;
               currentV0Entry.particleId = positiveTrackIndex.originId;
               currentV0Entry.isCollinearV0 = false;
-              if (v0BuilderOpts.mc_addGeneratedGammaMakeCollinear.value && currentV0Entry.pdgCode == 22) {
+              if (v0BuilderOpts.mc_addGeneratedGammaMakeCollinear.value && currentV0Entry.pdgCode == PDG_t::kGamma) {
                 currentV0Entry.isCollinearV0 = true;
               }
               currentV0Entry.found = false;
@@ -1131,10 +1150,10 @@ class BuilderModule
 
             bool trackIsInteresting = false;
             if (
-              (originParticle.pdgCode() == 3312 && cascadeBuilderOpts.mc_addGeneratedXiMinus.value > 0) ||
-              (originParticle.pdgCode() == -3312 && cascadeBuilderOpts.mc_addGeneratedXiPlus.value > 0) ||
-              (originParticle.pdgCode() == 3334 && cascadeBuilderOpts.mc_addGeneratedOmegaMinus.value > 0) ||
-              (originParticle.pdgCode() == -3334 && cascadeBuilderOpts.mc_addGeneratedOmegaPlus.value > 0)) {
+              (originParticle.pdgCode() == PDG_t::kXiMinus && cascadeBuilderOpts.mc_addGeneratedXiMinus.value > 0) ||
+              (originParticle.pdgCode() == PDG_t::kXiPlusBar && cascadeBuilderOpts.mc_addGeneratedXiPlus.value > 0) ||
+              (originParticle.pdgCode() == PDG_t::kOmegaMinus && cascadeBuilderOpts.mc_addGeneratedOmegaMinus.value > 0) ||
+              (originParticle.pdgCode() == PDG_t::kOmegaPlusBar && cascadeBuilderOpts.mc_addGeneratedOmegaPlus.value > 0)) {
               trackIsInteresting = true;
             }
             if (!trackIsInteresting) {
@@ -1154,7 +1173,7 @@ class BuilderModule
           for (size_t v0i = 0; v0i < v0List.size(); v0i++) {
             auto v0 = v0List[sorted_v0[v0i]];
 
-            if (std::abs(v0.pdgCode) != 3122) {
+            if (std::abs(v0.pdgCode) != PDG_t::kLambda0) {
               continue; // this V0 isn't a lambda, can't come from a cascade: skip
             }
             if (v0.particleId < 0) {
@@ -1176,7 +1195,7 @@ class BuilderModule
             }
             auto v0OriginParticle = mcParticles.rawIteratorAt(v0OriginParticleIndex);
 
-            if (std::abs(v0OriginParticle.pdgCode()) != 3312 && std::abs(v0OriginParticle.pdgCode()) != 3334) {
+            if (std::abs(v0OriginParticle.pdgCode()) != PDG_t::kXiMinus && std::abs(v0OriginParticle.pdgCode()) != PDG_t::kOmegaMinus) {
               continue; // this V0 does not come from any particle of interest, don't try
             }
             for (const auto& bachelorTrackIndex : bachelorTrackArray) {
@@ -1359,6 +1378,9 @@ class BuilderModule
         pvX = collision.posX();
         pvY = collision.posY();
         pvZ = collision.posZ();
+        if (v0BuilderOpts.generatePhotonCandidates && v0BuilderOpts.moveTPCOnlyTracks && collision.has_bc()) {
+          mVDriftMgr.update(collision.template bc_as<aod::BCsWithTimestamps>().timestamp());
+        }
       }
       auto const& posTrack = tracks.rawIteratorAt(v0.posTrackId);
       auto const& negTrack = tracks.rawIteratorAt(v0.negTrackId);
@@ -1375,7 +1397,8 @@ class BuilderModule
           negTrackPar.setPID(o2::track::PID::Electron);
 
           auto const& collision = collisions.rawIteratorAt(v0.collisionId);
-          if (!mVDriftMgr.moveTPCTrack<TBCs, TCollisions>(collision, posTrack, posTrackPar)) {
+          // if track cannot be uniquely identified with a collision or cannot be assigned to a collision at all (collisionId = -1), do not attempt to move the TPC track and move on
+          if (!posTrack.has_collision() || !mVDriftMgr.moveTPCTrack<TBCs, TCollisions>(collision, posTrack, posTrackPar)) {
             products.v0dataLink(-1, -1);
             continue;
           }
@@ -1388,7 +1411,8 @@ class BuilderModule
           negTrackPar.setPID(o2::track::PID::Electron);
 
           auto const& collision = collisions.rawIteratorAt(v0.collisionId);
-          if (!mVDriftMgr.moveTPCTrack<TBCs, TCollisions>(collision, negTrack, negTrackPar)) {
+          // if track cannot be uniquely identified with a collision or cannot be assigned to a collision at all (collisionId = -1), do not attempt to move the TPC track and move on
+          if (!negTrack.has_collision() || !mVDriftMgr.moveTPCTrack<TBCs, TCollisions>(collision, negTrack, negTrackPar)) {
             products.v0dataLink(-1, -1);
             continue;
           }
@@ -1625,7 +1649,7 @@ class BuilderModule
               //      code that is agnostic with respect to the joinability of
               //      V0Cores and V0MCCores (always dereference -> safe)
               if (baseOpts.mEnabledTables[kV0CoreMCLabels]) {
-                products.v0CoreMCLabels(iv0); // interlink index
+                products.v0CoreMCLabels(products.v0mccores.lastIndex()); // interlink index
                 histos.fill(HIST("hTableBuildingStatistics"), kV0CoreMCLabels);
               }
             }
@@ -1687,10 +1711,10 @@ class BuilderModule
             continue; // skip secondary MC V0s
 
           if (
-            (v0BuilderOpts.mc_addGeneratedK0Short && mcParticle.pdgCode() == 310) ||
-            (v0BuilderOpts.mc_addGeneratedLambda && mcParticle.pdgCode() == 3122) ||
-            (v0BuilderOpts.mc_addGeneratedAntiLambda && mcParticle.pdgCode() == -3122) ||
-            (v0BuilderOpts.mc_addGeneratedGamma && mcParticle.pdgCode() == 22)) {
+            (v0BuilderOpts.mc_addGeneratedK0Short && mcParticle.pdgCode() == PDG_t::kK0Short) ||
+            (v0BuilderOpts.mc_addGeneratedLambda && mcParticle.pdgCode() == PDG_t::kLambda0) ||
+            (v0BuilderOpts.mc_addGeneratedAntiLambda && mcParticle.pdgCode() == PDG_t::kLambda0Bar) ||
+            (v0BuilderOpts.mc_addGeneratedGamma && mcParticle.pdgCode() == PDG_t::kGamma)) {
             thisInfo.pdgCode = mcParticle.pdgCode();
             thisInfo.isPhysicalPrimary = mcParticle.isPhysicalPrimary();
             thisInfo.label = mcParticle.globalIndex();
@@ -1713,7 +1737,7 @@ class BuilderModule
               auto const& daughters = mcParticle.template daughters_as<aod::McParticles>();
 
               for (const auto& dau : daughters) {
-                if (dau.getProcess() != 4)
+                if (dau.getProcess() != TMCProcess::kPDecay)
                   continue;
 
                 if (dau.pdgCode() > 0) {
@@ -2131,13 +2155,13 @@ class BuilderModule
           bool bbTag = false;
           if (bachTrack.has_mcParticle()) {
             auto bachelorParticle = bachTrack.template mcParticle_as<aod::McParticles>();
-            if (bachelorParticle.pdgCode() == 211) { // pi+, look for antiproton in negative prong
+            if (bachelorParticle.pdgCode() == PDG_t::kPiPlus) { // pi+, look for antiproton in negative prong
               if (negTrack.has_mcParticle()) {
                 auto baryonParticle = negTrack.template mcParticle_as<aod::McParticles>();
-                if (baryonParticle.has_mothers() && bachelorParticle.has_mothers() && baryonParticle.pdgCode() == -2212) {
+                if (baryonParticle.has_mothers() && bachelorParticle.has_mothers() && baryonParticle.pdgCode() == PDG_t::kProtonBar) {
                   for (const auto& baryonMother : baryonParticle.template mothers_as<aod::McParticles>()) {
                     for (const auto& pionMother : bachelorParticle.template mothers_as<aod::McParticles>()) {
-                      if (baryonMother.globalIndex() == pionMother.globalIndex() && baryonMother.pdgCode() == -3122) {
+                      if (baryonMother.globalIndex() == pionMother.globalIndex() && baryonMother.pdgCode() == PDG_t::kLambda0Bar) {
                         bbTag = true;
                       }
                     }
@@ -2145,13 +2169,13 @@ class BuilderModule
                 }
               }
             } // end if-pion
-            if (bachelorParticle.pdgCode() == -211) { // pi-, look for proton in positive prong
+            if (bachelorParticle.pdgCode() == PDG_t::kPiMinus) { // pi-, look for proton in positive prong
               if (posTrack.has_mcParticle()) {
                 auto baryonParticle = posTrack.template mcParticle_as<aod::McParticles>();
-                if (baryonParticle.has_mothers() && bachelorParticle.has_mothers() && baryonParticle.pdgCode() == 2212) {
+                if (baryonParticle.has_mothers() && bachelorParticle.has_mothers() && baryonParticle.pdgCode() == PDG_t::kProton) {
                   for (const auto& baryonMother : baryonParticle.template mothers_as<aod::McParticles>()) {
                     for (const auto& pionMother : bachelorParticle.template mothers_as<aod::McParticles>()) {
-                      if (baryonMother.globalIndex() == pionMother.globalIndex() && baryonMother.pdgCode() == 3122) {
+                      if (baryonMother.globalIndex() == pionMother.globalIndex() && baryonMother.pdgCode() == PDG_t::kLambda0) {
                         bbTag = true;
                       }
                     }
@@ -2201,10 +2225,10 @@ class BuilderModule
               continue; // skip secondary MC cascades
 
             if (
-              (cascadeBuilderOpts.mc_addGeneratedXiMinus && mcParticle.pdgCode() == 3312) ||
-              (cascadeBuilderOpts.mc_addGeneratedXiPlus && mcParticle.pdgCode() == -3312) ||
-              (cascadeBuilderOpts.mc_addGeneratedOmegaMinus && mcParticle.pdgCode() == 3334) ||
-              (cascadeBuilderOpts.mc_addGeneratedOmegaPlus && mcParticle.pdgCode() == -3334)) {
+              (cascadeBuilderOpts.mc_addGeneratedXiMinus && mcParticle.pdgCode() == PDG_t::kXiMinus) ||
+              (cascadeBuilderOpts.mc_addGeneratedXiPlus && mcParticle.pdgCode() == PDG_t::kXiPlusBar) ||
+              (cascadeBuilderOpts.mc_addGeneratedOmegaMinus && mcParticle.pdgCode() == PDG_t::kOmegaMinus) ||
+              (cascadeBuilderOpts.mc_addGeneratedOmegaPlus && mcParticle.pdgCode() == PDG_t::kOmegaPlusBar)) {
               thisCascInfo.pdgCode = mcParticle.pdgCode();
               thisCascInfo.isPhysicalPrimary = mcParticle.isPhysicalPrimary();
 
@@ -2219,10 +2243,10 @@ class BuilderModule
               if (mcParticle.has_daughters()) {
                 auto const& daughters = mcParticle.template daughters_as<aod::McParticles>();
                 for (const auto& dau : daughters) {
-                  if (dau.getProcess() != 4) // check whether the daughter comes from a decay
+                  if (dau.getProcess() != TMCProcess::kPDecay) // check whether the daughter comes from a decay
                     continue;
 
-                  if (std::abs(dau.pdgCode()) == 211 || std::abs(dau.pdgCode()) == 321) {
+                  if (std::abs(dau.pdgCode()) == PDG_t::kPiPlus || std::abs(dau.pdgCode()) == PDG_t::kKPlus) {
                     thisCascInfo.pdgCodeBachelor = dau.pdgCode();
                     thisCascInfo.bachP[0] = dau.px();
                     thisCascInfo.bachP[1] = dau.py();
@@ -2232,11 +2256,11 @@ class BuilderModule
                     thisCascInfo.xyz[2] = dau.vz();
                     thisCascInfo.mcParticleBachelor = dau.globalIndex();
                   }
-                  if (std::abs(dau.pdgCode()) == 2212) {
+                  if (std::abs(dau.pdgCode()) == PDG_t::kProton) {
                     thisCascInfo.pdgCodeV0 = dau.pdgCode();
 
                     for (const auto& v0Dau : dau.template daughters_as<aod::McParticles>()) {
-                      if (v0Dau.getProcess() != 4)
+                      if (v0Dau.getProcess() != TMCProcess::kPDecay)
                         continue;
 
                       if (v0Dau.pdgCode() > 0) {
@@ -2394,12 +2418,14 @@ class BuilderModule
       return; // don't do if no request for cascades in place or findable mode used
     }
     int nCascades = 0;
+    std::vector<int> traCascIndices(cascadeList.size(), -1);
     // Loops over all V0s in the time frame
     histos.fill(HIST("hInputStatistics"), kStoredTraCascCores, cascadeTracks.size());
     for (const auto& cascadeTrack : cascadeTracks) {
       // Get tracks and generate candidate
-      if (!cascadeTrack.has_track())
+      if (!cascadeTrack.has_track()) {
         continue; // safety (should be fine but depends on future stratrack dev)
+      }
 
       auto const& strangeTrack = cascadeTrack.template track_as<TTracks>();
 
@@ -2424,8 +2450,6 @@ class BuilderModule
                                             baseOpts.mEnabledTables[kCascBBs],
                                             cascadeBuilderOpts.useCascadeMomentumAtPrimVtx,
                                             baseOpts.mEnabledTables[kCascCovs])) {
-        products.tracascdataLink(-1);
-        interlinks.cascadeToTraCascCores.push_back(-1);
         continue; // didn't work out, skip
       }
 
@@ -2465,15 +2489,13 @@ class BuilderModule
         histos.fill(HIST("hTableBuildingStatistics"), kStoredTraCascCores);
 
         // interlink always produced if base core table generated
-        products.tracascdataLink(products.tracascdata.lastIndex());
-        interlinks.traCascCoreToCascades.push_back(cascade.globalIndex());
-        interlinks.cascadeToTraCascCores.push_back(products.tracascdata.lastIndex());
+        traCascIndices[cascade.globalIndex()] = products.tracascdata.lastIndex();
       }
       if (baseOpts.mEnabledTables[kCascCovs]) {
-        std::array<float, 21> traCovMat = {0.};
+        std::array<float, o2::track::kLabCovMatSize> traCovMat = {0.};
         strangeTrackParCov.getCovXYZPxPyPzGlo(traCovMat);
-        float traCovMatArray[21];
-        for (int ii = 0; ii < 21; ii++) {
+        float traCovMatArray[o2::track::kLabCovMatSize];
+        for (int ii = 0; ii < o2::track::kLabCovMatSize; ii++) {
           traCovMatArray[ii] = traCovMat[ii];
         }
         products.tracasccovs(traCovMatArray);
@@ -2493,6 +2515,10 @@ class BuilderModule
         } // enabled tables check
       } // constexpr requires mcParticles check
     } // end loop over cascades
+
+    for (std::size_t icascade = 0; icascade < cascadeList.size(); icascade++) {
+      products.tracascdataLink(traCascIndices[icascade]);
+    }
     LOGF(debug, "Tracked cascades in DF: %i, tracked cascades built: %i", cascadeTracks.size(), nCascades);
   }
 
@@ -2506,7 +2532,7 @@ class BuilderModule
       auto const& motherList = part.template mothers_as<aod::McParticles>();
       if (motherList.size() == 1) {
         for (const auto& mother : motherList) {
-          if (std::abs(part.pdgCode()) == 13 && treatPiToMuDecays) {
+          if (std::abs(part.pdgCode()) == PDG_t::kMuonMinus && treatPiToMuDecays) {
             // muon decay, de-ref mother twice
             if (mother.has_mothers()) {
               auto grandMotherList = mother.template mothers_as<aod::McParticles>();

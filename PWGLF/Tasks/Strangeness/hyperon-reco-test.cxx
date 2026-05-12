@@ -9,30 +9,23 @@
 // granted to it by virtue of its status as an Intergovernmental Organization
 // or submit itself to any jurisdiction.
 
-#include <cmath>
-#include <vector>
-
-#include "Common/DataModel/EventSelection.h"
-#include "Common/DataModel/PIDResponse.h"
-#include "Common/DataModel/TrackSelectionTables.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/HistogramRegistry.h"
-#include "Framework/runDataProcessing.h"
-#include "ReconstructionDataFormats/Track.h"
-
-#include "CommonConstants/PhysicsConstants.h"
-#include "Common/Core/TrackSelection.h"
-#include "Common/Core/trackUtilities.h"
-#include "Common/DataModel/Centrality.h"
-#include "Framework/ASoAHelpers.h"
 #include "PWGLF/DataModel/LFStrangenessTables.h"
 
-#include "TMath.h"
+#include "Common/DataModel/EventSelection.h"
+#include "Common/DataModel/PIDResponseTPC.h"
 
-#include <TDatabasePDG.h>
-#include <TH2F.h>
-#include <TPDGCode.h>
+#include <CommonConstants/PhysicsConstants.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/runDataProcessing.h>
+
+#include <TMathBase.h>
+
+#include <cmath>
+#include <vector>
 
 using namespace std;
 using namespace o2;

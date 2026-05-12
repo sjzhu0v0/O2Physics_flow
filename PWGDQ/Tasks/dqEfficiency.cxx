@@ -23,36 +23,39 @@
 #include "PWGDQ/Core/VarManager.h"
 #include "PWGDQ/DataModel/ReducedInfoTables.h"
 
-#include "CCDB/BasicCCDBManager.h"
 #include "Common/CCDB/RCTSelectionFlags.h"
-#include "DataFormatsParameters/GRPMagField.h"
-#include "DetectorsBase/GeometryManager.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/runDataProcessing.h"
 
-#include <TH1F.h>
+#include <CCDB/BasicCCDBManager.h>
+#include <DataFormatsParameters/GRPMagField.h>
+#include <DetectorsBase/GeometryManager.h>
+#include <DetectorsBase/MatLayerCylSet.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/InitContext.h>
+#include <Framework/runDataProcessing.h>
+
 #include <THashList.h>
 #include <TMath.h>
 #include <TString.h>
 
+#include <RtypesCore.h>
+
+#include <cstdint>
 #include <cstdio>
-#include <iostream>
 #include <memory>
 #include <string>
-#include <vector>
-
 #include <type_traits>
+#include <utility>
+#include <vector>
 
 template<typename T, typename = void>
 struct has_rct_raw : std::false_type {};
 
 template<typename T>
-struct has_rct_raw<T, std::void_t<decltype(std::declval<T>().rct_raw())>> 
-    : std::true_type {};
+struct has_rct_raw<T, std::void_t<decltype(std::declval<T>().rct_raw())>> : std::true_type {};
 
-using std::cout;
-using std::endl;
 using std::string;
 
 using namespace o2;
@@ -947,7 +950,8 @@ struct AnalysisSameEventPairing {
                         t2.reducedMCTrack().pt(), t2.reducedMCTrack().eta(), t2.reducedMCTrack().phi(), t2.reducedMCTrack().e(),
                         t1.reducedMCTrack().vx(), t1.reducedMCTrack().vy(), t1.reducedMCTrack().vz(), t1.reducedMCTrack().vt(),
                         t2.reducedMCTrack().vx(), t2.reducedMCTrack().vy(), t2.reducedMCTrack().vz(), t2.reducedMCTrack().vt(),
-                        t1.isAmbiguous(), t2.isAmbiguous(), -999., -999., -999., -999., -999., -999., -999., -999., -999.,
+                        t1.isAmbiguous(), t2.isAmbiguous(), true, true,
+                        -999., -999., -999., -999., -999., -999., -999., -999., -999.,
                         -999., -999., -999., VarManager::fgValues[VarManager::kVertexingPz],
                         VarManager::fgValues[VarManager::kVertexingSV]);
         }

@@ -17,6 +17,7 @@
 
 #include "PWGHF/Core/DecayChannels.h"
 #include "PWGHF/Core/HfHelper.h"
+#include "PWGHF/DataModel/AliasTables.h"
 #include "PWGHF/DataModel/CandidateReconstructionTables.h"
 #include "PWGHF/DataModel/CandidateSelectionTables.h"
 #include "PWGHF/DataModel/DerivedTables.h"
@@ -71,6 +72,7 @@ struct HfDerivedDataCreatorBplusToD0Pi {
   // Candidates
   Produces<o2::aod::HfBplusPars> rowCandidatePar;
   Produces<o2::aod::HfBplusParD0s> rowCandidateParD0;
+  Produces<o2::aod::HfBplusParD0Es> rowCandidateParD0E;
   Produces<o2::aod::HfBplusParEs> rowCandidateParE;
   Produces<o2::aod::HfBplusSels> rowCandidateSel;
   Produces<o2::aod::HfBplusMls> rowCandidateMl;
@@ -82,6 +84,7 @@ struct HfDerivedDataCreatorBplusToD0Pi {
   HfConfigurableDerivedData confDerData;
   Configurable<bool> fillCandidatePar{"fillCandidatePar", true, "Fill candidate parameters"};
   Configurable<bool> fillCandidateParD0{"fillCandidateParD0", true, "Fill D0 candidate parameters"};
+  Configurable<bool> fillCandidateParD0E{"fillCandidateParD0E", true, "Fill additional D0 candidate parameters"};
   Configurable<bool> fillCandidateParE{"fillCandidateParE", true, "Fill candidate extended parameters"};
   Configurable<bool> fillCandidateSel{"fillCandidateSel", true, "Fill candidate selection flags"};
   Configurable<bool> fillCandidateMl{"fillCandidateMl", true, "Fill candidate selection ML scores"};
@@ -92,7 +95,6 @@ struct HfDerivedDataCreatorBplusToD0Pi {
   Configurable<float> downSampleBkgFactor{"downSampleBkgFactor", 1., "Fraction of background candidates to keep for ML trainings"};
   Configurable<float> ptMaxForDownSample{"ptMaxForDownSample", 10., "Maximum pt for the application of the downsampling factor"};
 
-  HfHelper hfHelper;
   SliceCache cache;
   static constexpr double Mass{o2::constants::physics::MassBPlus};
 
@@ -108,7 +110,7 @@ struct HfDerivedDataCreatorBplusToD0Pi {
   using THfCandDaughtersMl = soa::Join<aod::HfCand2ProngWPid, aod::HfMlD0>;
 
   Filter filterSelectCandidates = (aod::hf_sel_candidate_bplus::isSelBplusToD0Pi & static_cast<int>(BIT(aod::SelectionStep::RecoMl - 1))) != 0;
-  Filter filterMcGenMatching = nabs(aod::hf_cand_bplus::flagMcMatchGen) == static_cast<int8_t>(DecayChannelMain::BplusToD0Pi);
+  Filter filterMcGenMatching = nabs(aod::hf_cand_mc_flag::flagMcMatchGen) == static_cast<int8_t>(DecayChannelMain::BplusToD0Pi);
 
   Preslice<SelectedCandidates> candidatesPerCollision = aod::hf_cand::collisionId;
   Preslice<SelectedCandidatesMc> candidatesMcPerCollision = aod::hf_cand::collisionId;
@@ -122,10 +124,10 @@ struct HfDerivedDataCreatorBplusToD0Pi {
   Partition<SelectedCandidatesMl> candidatesMlAll = aod::hf_sel_candidate_bplus::isSelBplusToD0Pi >= 0;
   Partition<SelectedCandidatesMcMl> candidatesMcMlAll = aod::hf_sel_candidate_bplus::isSelBplusToD0Pi >= 0;
   // partitions for signal and background
-  Partition<SelectedCandidatesMc> candidatesMcSig = nabs(aod::hf_cand_bplus::flagMcMatchRec) == static_cast<int8_t>(DecayChannelMain::BplusToD0Pi);
-  Partition<SelectedCandidatesMc> candidatesMcBkg = nabs(aod::hf_cand_bplus::flagMcMatchRec) != static_cast<int8_t>(DecayChannelMain::BplusToD0Pi);
-  Partition<SelectedCandidatesMcMl> candidatesMcMlSig = nabs(aod::hf_cand_bplus::flagMcMatchRec) == static_cast<int8_t>(DecayChannelMain::BplusToD0Pi);
-  Partition<SelectedCandidatesMcMl> candidatesMcMlBkg = nabs(aod::hf_cand_bplus::flagMcMatchRec) != static_cast<int8_t>(DecayChannelMain::BplusToD0Pi);
+  Partition<SelectedCandidatesMc> candidatesMcSig = nabs(aod::hf_cand_mc_flag::flagMcMatchRec) == static_cast<int8_t>(DecayChannelMain::BplusToD0Pi);
+  Partition<SelectedCandidatesMc> candidatesMcBkg = nabs(aod::hf_cand_mc_flag::flagMcMatchRec) != static_cast<int8_t>(DecayChannelMain::BplusToD0Pi);
+  Partition<SelectedCandidatesMcMl> candidatesMcMlSig = nabs(aod::hf_cand_mc_flag::flagMcMatchRec) == static_cast<int8_t>(DecayChannelMain::BplusToD0Pi);
+  Partition<SelectedCandidatesMcMl> candidatesMcMlBkg = nabs(aod::hf_cand_mc_flag::flagMcMatchRec) != static_cast<int8_t>(DecayChannelMain::BplusToD0Pi);
 
   void init(InitContext const&)
   {
@@ -197,6 +199,32 @@ struct HfDerivedDataCreatorBplusToD0Pi {
         sigmas[HfProngSpecies::Kaon][HfProngSpecies::Kaon][1],
         sigmas[HfProngSpecies::Kaon][HfProngSpecies::Kaon][2]);
     }
+    if (fillCandidateParD0E) {
+      float invMassD0 = 0.;
+      if (candFlag == 0) {
+        invMassD0 = HfHelper::invMassD0ToPiK(prongCharm);
+      } else if (candFlag == 1) {
+        invMassD0 = HfHelper::invMassD0barToKPi(prongCharm);
+      }
+      rowCandidateParD0E(
+        prongCharm.chi2PCA(),
+        prongCharm.nProngsContributorsPV(),
+        invMassD0,
+        prongCharm.maxNormalisedDeltaIP(),
+        prongCharm.decayLengthXY(),
+        prongCharm.decayLengthNormalised(),
+        prongCharm.decayLengthXYNormalised(),
+        prongCharm.impactParameterNormalised0(),
+        prongCharm.impactParameterNormalised1(),
+        prongCharm.pxProng0(),
+        prongCharm.pyProng0(),
+        prongCharm.pzProng0(),
+        prongCharm.pxProng1(),
+        prongCharm.pyProng1(),
+        prongCharm.pzProng1(),
+        prongCharm.ptProng0(),
+        prongCharm.ptProng1());
+    }
     if (fillCandidateParE) {
       rowCandidateParE(
         candidate.xSecondaryVertex(),
@@ -209,8 +237,12 @@ struct HfDerivedDataCreatorBplusToD0Pi {
         candidate.pxProng1(),
         candidate.pyProng1(),
         candidate.pzProng1(),
+        RecoDecay::p(candidate.pxProng0(), candidate.pyProng0(), candidate.pzProng0()),
+        candidate.pxProng0(),
+        candidate.pyProng0(),
+        candidate.pzProng0(),
         candidate.errorImpactParameter1(),
-        hfHelper.cosThetaStarBplus(candidate),
+        HfHelper::cosThetaStarBplus(candidate),
         ct);
     }
     if (fillCandidateSel) {
@@ -239,7 +271,7 @@ struct HfDerivedDataCreatorBplusToD0Pi {
     }
   }
 
-  template <bool isMl, bool isMc, bool onlyBkg, bool onlySig, typename CollType, typename CandType, typename CandCharmType>
+  template <bool IsMl, bool IsMc, bool OnlyBkg, bool OnlySig, typename CollType, typename CandType, typename CandCharmType>
   void processCandidates(CollType const& collisions,
                          Partition<CandType>& candidates,
                          CandCharmType const&,
@@ -247,7 +279,7 @@ struct HfDerivedDataCreatorBplusToD0Pi {
                          aod::BCs const&)
   {
     // Fill collision properties
-    if constexpr (isMc) {
+    if constexpr (IsMc) {
       if (confDerData.fillMcRCollId) {
         rowsCommon.matchedCollisions.clear();
       }
@@ -261,7 +293,7 @@ struct HfDerivedDataCreatorBplusToD0Pi {
       LOGF(debug, "Rec. collision %d has %d candidates", thisCollId, sizeTableCand);
       // Skip collisions without HF candidates (and without HF particles in matched MC collisions if saving indices of reconstructed collisions matched to MC collisions)
       bool mcCollisionHasMcParticles{false};
-      if constexpr (isMc) {
+      if constexpr (IsMc) {
         mcCollisionHasMcParticles = confDerData.fillMcRCollId && collision.has_mcCollision() && rowsCommon.hasMcParticles[collision.mcCollisionId()];
         LOGF(debug, "Rec. collision %d has MC collision %d with MC particles? %s", thisCollId, collision.mcCollisionId(), mcCollisionHasMcParticles ? "yes" : "no");
       }
@@ -270,42 +302,43 @@ struct HfDerivedDataCreatorBplusToD0Pi {
         continue;
       }
       LOGF(debug, "Filling rec. collision %d at derived index %d", thisCollId, rowsCommon.rowCollBase.lastIndex() + 1);
-      rowsCommon.fillTablesCollision<isMc>(collision);
+      rowsCommon.fillTablesCollision<IsMc>(collision);
 
       // Fill candidate properties
       rowsCommon.reserveTablesCandidates(sizeTableCand);
       reserveTable(rowCandidatePar, fillCandidatePar, sizeTableCand);
       reserveTable(rowCandidateParD0, fillCandidateParD0, sizeTableCand);
       reserveTable(rowCandidateParE, fillCandidateParE, sizeTableCand);
+      reserveTable(rowCandidateParD0E, fillCandidateParD0E, sizeTableCand);
       reserveTable(rowCandidateSel, fillCandidateSel, sizeTableCand);
       reserveTable(rowCandidateMl, fillCandidateMl, sizeTableCand);
       reserveTable(rowCandidateMlD0, fillCandidateMlD0, sizeTableCand);
       reserveTable(rowCandidateId, fillCandidateId, sizeTableCand);
-      if constexpr (isMc) {
+      if constexpr (IsMc) {
         reserveTable(rowCandidateMc, fillCandidateMc, sizeTableCand);
       }
       int8_t flagMcRec = 0, origin = 0;
       for (const auto& candidate : candidatesThisColl) {
-        if constexpr (isMl) {
+        if constexpr (IsMl) {
           if (!TESTBIT(candidate.isSelBplusToD0Pi(), aod::SelectionStep::RecoMl)) {
             continue;
           }
         }
-        if constexpr (isMc) {
+        if constexpr (IsMc) {
           flagMcRec = candidate.flagMcMatchRec();
           origin = candidate.originMcRec();
-          if constexpr (onlyBkg) {
+          if constexpr (OnlyBkg) {
             if (std::abs(flagMcRec) == DecayChannelMain::BplusToD0Pi) {
               continue;
             }
             if (downSampleBkgFactor < 1.) {
-              float pseudoRndm = candidate.ptProng0() * 1000. - static_cast<int64_t>(candidate.ptProng0() * 1000);
+              float const pseudoRndm = candidate.ptProng0() * 1000. - static_cast<int64_t>(candidate.ptProng0() * 1000);
               if (candidate.pt() < ptMaxForDownSample && pseudoRndm >= downSampleBkgFactor) {
                 continue;
               }
             }
           }
-          if constexpr (onlySig) {
+          if constexpr (OnlySig) {
             if (std::abs(flagMcRec) != DecayChannelMain::BplusToD0Pi) {
               continue;
             }
@@ -313,18 +346,18 @@ struct HfDerivedDataCreatorBplusToD0Pi {
         }
         auto prongCharm = candidate.template prong0_as<CandCharmType>();
         auto prongBachelor = candidate.template prong1_as<TracksWPid>();
-        double ct = hfHelper.ctBplus(candidate);
-        double y = hfHelper.yBplus(candidate);
-        float massBplusToD0Pi = hfHelper.invMassBplusToD0Pi(candidate);
+        double const ct = HfHelper::ctBplus(candidate);
+        double const y = HfHelper::yBplus(candidate);
+        float const massBplusToD0Pi = HfHelper::invMassBplusToD0Pi(candidate);
         float mlScoreBplusToD0Pi{-1.f};
         std::vector<float> mlScoresD0;
-        bool isD0 = prongBachelor.sign() < 0;
+        bool const isD0 = prongBachelor.sign() < 0;
         if (isD0) { // is D0
           std::copy(prongCharm.mlProbD0().begin(), prongCharm.mlProbD0().end(), std::back_inserter(mlScoresD0));
         } else { // is D0bar
           std::copy(prongCharm.mlProbD0bar().begin(), prongCharm.mlProbD0bar().end(), std::back_inserter(mlScoresD0));
         }
-        if constexpr (isMl) {
+        if constexpr (IsMl) {
           mlScoreBplusToD0Pi = candidate.mlProbBplusToD0Pi();
         }
         // flag = 0 for D0 pi-, flag = 1 for D0bar pi+

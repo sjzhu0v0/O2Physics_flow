@@ -13,19 +13,25 @@
 /// \author Anisa Khatun, anisa.khatun@cern.ch
 /// \since  04.08.2023
 
-#include "Framework/runDataProcessing.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/AnalysisDataModel.h"
-#include "ReconstructionDataFormats/BCRange.h"
-#include "CommonConstants/PhysicsConstants.h"
-#include "Common/DataModel/FT0Corrected.h"
 #include "Common/DataModel/EventSelection.h"
+#include "Common/DataModel/PIDResponseTOF.h"
+#include "Common/DataModel/PIDResponseTPC.h"
 #include "Common/DataModel/TrackSelectionTables.h"
-#include "Common/DataModel/PIDResponse.h"
-#include "CommonConstants/LHCConstants.h"
 
-#include "Framework/StaticFor.h"
-#include "TLorentzVector.h"
+#include <CommonConstants/LHCConstants.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/runDataProcessing.h>
+
+#include <TH1.h>
+#include <TH2.h>
+
+#include <cstddef>
+#include <cstdint>
 
 using namespace o2;
 using namespace o2::framework;

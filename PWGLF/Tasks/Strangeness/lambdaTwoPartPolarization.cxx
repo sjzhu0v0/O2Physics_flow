@@ -13,41 +13,40 @@
 
 #include "PWGLF/DataModel/LFStrangenessTables.h"
 
-#include "Common/Core/TrackSelection.h"
-#include "Common/Core/trackUtilities.h"
+#include "Common/CCDB/EventSelectionParams.h"
 #include "Common/DataModel/Centrality.h"
 #include "Common/DataModel/EventSelection.h"
 #include "Common/DataModel/Multiplicity.h"
-#include "Common/DataModel/PIDResponse.h"
+#include "Common/DataModel/PIDResponseTPC.h"
 #include "Common/DataModel/TrackSelectionTables.h"
 
-#include "CCDB/BasicCCDBManager.h"
-#include "CCDB/CcdbApi.h"
-#include "CommonConstants/PhysicsConstants.h"
-#include "DataFormatsParameters/GRPMagField.h"
-#include "DataFormatsParameters/GRPObject.h"
-#include "Framework/ASoAHelpers.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/HistogramRegistry.h"
-#include "Framework/O2DatabasePDGPlugin.h"
-#include "Framework/StaticFor.h"
-#include "Framework/StepTHn.h"
-#include "Framework/runDataProcessing.h"
-#include "ReconstructionDataFormats/Track.h"
+#include <CCDB/BasicCCDBManager.h>
+#include <CCDB/CcdbApi.h>
+#include <CommonConstants/MathConstants.h>
+#include <CommonConstants/PhysicsConstants.h>
+#include <Framework/ASoAHelpers.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/BinningPolicy.h>
+#include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/OutputObjHeader.h>
+#include <Framework/runDataProcessing.h>
 
-#include "Math/GenVector/Boost.h"
-#include "Math/Vector3D.h"
-#include "Math/Vector4D.h"
-#include "TF1.h"
-#include "TLorentzVector.h"
-#include "TRandom3.h"
-#include "TVector3.h"
-#include <TMath.h>
+#include <Math/GenVector/Boost.h>
+#include <Math/Vector4D.h> // IWYU pragma: keep (do not replace with Math/Vector4Dfwd.h)
+#include <Math/Vector4Dfwd.h>
+#include <TF1.h>
+#include <TProfile2D.h>
+#include <TVector2.h>
 
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <string>
 #include <vector>
@@ -164,6 +163,7 @@ struct lambdaTwoPartPolarization {
     }
 
     histos.add("Ana/Signal", "", {HistType::kTHnSparseF, {ptAxis, ptAxis, detaAxis, dphiAxis, centAxis, cosSigAxis}});
+    histos.add("Ana/SignalCos2", "", {HistType::kTHnSparseF, {ptAxis, ptAxis, detaAxis, dphiAxis, centAxis, cosSigAxis}});
     histos.add("Ana/Acceptance", "", {HistType::kTHnSparseF, {ptAxis, centAxis, RapAxis, cosAccAxis}});
 
     fMultPVCutLow = new TF1("fMultPVCutLow", "[0]+[1]*x+[2]*x*x+[3]*x*x*x - 2.5*([4]+[5]*x+[6]*x*x+[7]*x*x*x+[8]*x*x*x*x)", 0, 100);
@@ -374,6 +374,7 @@ struct lambdaTwoPartPolarization {
         }
 
         histos.fill(HIST("Ana/Signal"), v01.pt(), v02.pt(), v01.yLambda() - v02.yLambda(), dphi, centrality, costhetastar1 * costhetastar2 * weight);
+        histos.fill(HIST("Ana/SignalCos2"), v01.pt(), v02.pt(), v01.yLambda() - v02.yLambda(), dphi, centrality, costhetastar1 * costhetastar2 * std::cos(2.0 * dphi) * weight);
       }
     }
   }

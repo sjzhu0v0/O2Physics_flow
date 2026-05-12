@@ -18,53 +18,46 @@
 ///         (with or without corrections) and save the results in a dedicated table.
 ///
 
-// C++/ROOT includes.
-#include <TComplex.h>
-#include <TH1F.h>
-#include <TMath.h>
-
-#include <chrono>
-#include <cstdio>
-#include <string>
-#include <vector>
-
-// o2Physics includes.
 #include "PWGLF/DataModel/EPCalibrationTables.h"
 
-#include "Common/Core/TrackSelection.h"
-#include "Common/Core/trackUtilities.h"
+#include "Common/CCDB/EventSelectionParams.h"
+#include "Common/CCDB/TriggerAliases.h"
 #include "Common/DataModel/Centrality.h"
 #include "Common/DataModel/EventSelection.h"
 #include "Common/DataModel/FT0Corrected.h"
 #include "Common/DataModel/Multiplicity.h"
-#include "Common/DataModel/PIDResponse.h"
 #include "Common/DataModel/TrackSelectionTables.h"
 
-#include "CommonConstants/PhysicsConstants.h"
-#include "FT0Base/Geometry.h"
-#include "FV0Base/Geometry.h"
-#include "Framework/ASoAHelpers.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/HistogramRegistry.h"
-#include "Framework/StepTHn.h"
-#include "Framework/runDataProcessing.h"
-#include "ReconstructionDataFormats/Track.h"
+#include <CCDB/BasicCCDBManager.h>
+#include <CCDB/CcdbApi.h>
+#include <DetectorsCommonDataFormats/AlignParam.h>
+#include <FT0Base/Geometry.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/OutputObjHeader.h>
+#include <Framework/runDataProcessing.h>
 
-#include "TF1.h"
+#include <TF1.h>
+#include <TH2.h>
+#include <TMath.h>
+#include <TMathBase.h>
+#include <TProfile.h>
+#include <TProfile3D.h>
 
-// #include "Common/Core/EventPlaneHelper.h"
-// #include "Common/DataModel/Qvectors.h"
-
-// o2 includes.
-#include "CCDB/BasicCCDBManager.h"
-#include "CCDB/CcdbApi.h"
-#include "DetectorsCommonDataFormats/AlignParam.h"
+#include <chrono>
+#include <cstdint>
+#include <cstdio>
+#include <string>
+#include <vector>
 
 using namespace o2;
 using namespace o2::framework;
 using namespace o2::framework::expressions;
-using std::array;
 
 struct epvector {
   Produces<aod::EPCalibrationTables> epcalibrationtable;
@@ -107,6 +100,7 @@ struct epvector {
   Configurable<bool> useITSFrameCut{"useITSFrameCut", true, "Reject ITS RO Frame border events"};
   Configurable<bool> usePileupCut{"usePileupCut", false, "Reject same bunch pileup"};
   Configurable<bool> useITSLayerCut{"useITSLayerCut", false, "Require good ITS layers"};
+  Configurable<bool> useGoodZvtx{"useGoodZvtx", false, "Require good vertex from FT0 and PV"};
   Configurable<std::string> ConfGainPath{"ConfGainPath", "Users/s/skundu/My/Object/test100", "Path to gain calibration"};
   Configurable<std::string> ConfRecentere{"ConfRecentere", "Users/s/skundu/My/Object/Finaltest2/recenereall", "Path for recentere"};
   Configurable<std::string> ConfShift{"ConfShift", "Users/s/skundu/My/Object/Finaltest2/recenereall", "Path for Shift"};
@@ -309,7 +303,7 @@ struct epvector {
     auto qyTPCL = 0.0;
     auto qxTPCR = 0.0;
     auto qyTPCR = 0.0;
-    if (coll.sel8() && centrality < cfgCutCentrality && TMath::Abs(vz) < cfgCutVertex && coll.has_foundFT0() && (!useEventSelection || eventSelected(coll, centrality)) && (!useTimeFrameCut || coll.selection_bit(aod::evsel::kNoTimeFrameBorder)) && (!useITSFrameCut || coll.selection_bit(aod::evsel::kNoITSROFrameBorder)) && (!usePileupCut || coll.selection_bit(aod::evsel::kNoSameBunchPileup)) && (!useITSLayerCut || coll.selection_bit(o2::aod::evsel::kIsGoodITSLayersAll))) {
+    if (coll.sel8() && centrality < cfgCutCentrality && TMath::Abs(vz) < cfgCutVertex && coll.has_foundFT0() && (!useEventSelection || eventSelected(coll, centrality)) && (!useTimeFrameCut || coll.selection_bit(aod::evsel::kNoTimeFrameBorder)) && (!useITSFrameCut || coll.selection_bit(aod::evsel::kNoITSROFrameBorder)) && (!usePileupCut || coll.selection_bit(aod::evsel::kNoSameBunchPileup)) && (!useITSLayerCut || coll.selection_bit(o2::aod::evsel::kIsGoodITSLayersAll)) && (!useGoodZvtx || coll.selection_bit(o2::aod::evsel::kIsGoodZvtxFT0vsPV))) {
       triggerevent = true;
       if (useGainCallib && (currentRunNumber != lastRunNumber)) {
         gainprofile = ccdb->getForTimeStamp<TProfile>(ConfGainPath.value, bc.timestamp());

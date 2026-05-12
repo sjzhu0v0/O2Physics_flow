@@ -9,17 +9,29 @@
 // granted to it by virtue of its status as an Intergovernmental Organization
 // or submit itself to any jurisdiction.
 //
-#include <vector>
-#include "Framework/runDataProcessing.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/AnalysisDataModel.h"
-#include <iostream>
 #include "PWGUD/DataModel/UDTables.h"
-#include <TString.h>
-#include "TLorentzVector.h"
-#include "Common/DataModel/PIDResponse.h"
 
-using std::array;
+#include <CommonConstants/PhysicsConstants.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/OutputObjHeader.h>
+#include <Framework/runDataProcessing.h>
+
+#include <TH1.h>
+#include <TLorentzVector.h>
+#include <TMath.h>
+#include <TString.h>
+#include <TVector3.h>
+
+#include <RtypesCore.h>
+
+#include <cmath>
+#include <cstddef>
+#include <vector>
+
 using namespace std;
 using namespace o2;
 using namespace o2::aod;
@@ -648,7 +660,7 @@ struct ExclusivePhi {
         }
       }
     } // Kaon Band
-  }   // end of process
+  } // end of process
 
 }; // end of struct
 

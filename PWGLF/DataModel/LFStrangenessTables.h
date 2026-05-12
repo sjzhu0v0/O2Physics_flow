@@ -19,7 +19,6 @@
 #include "Common/Core/RecoDecay.h"
 #include "Common/DataModel/Centrality.h"
 #include "Common/DataModel/EventSelection.h"
-#include "Common/DataModel/McCollisionExtra.h" // IWYU pragma: keep (FIXME: not used, remove asap)
 #include "Common/DataModel/Multiplicity.h"
 #include "Common/DataModel/Qvectors.h"
 
@@ -82,6 +81,11 @@ DECLARE_SOA_TABLE_VERSIONED(StraCents_001, "AOD", "STRACENTS", 1, //! centrality
                             cent::CentFT0C, cent::CentFV0A,
                             cent::CentFT0CVariant1, cent::CentMFT,
                             cent::CentNGlobal);
+DECLARE_SOA_TABLE_VERSIONED(StraCents_002, "AOD", "STRACENTS", 2, //! centrality percentiles in Run 3
+                            cent::CentFT0M, cent::CentFT0A,
+                            cent::CentFT0C, cent::CentFV0A,
+                            cent::CentFT0CVariant1, cent::CentFT0CVariant2,
+                            cent::CentMFT, cent::CentNGlobal, cent::CentNTPV);
 
 DECLARE_SOA_TABLE(StraCentsRun2, "AOD", "STRACENTSRUN2", //! centrality percentiles in Run 2
                   cent::CentRun2V0M, cent::CentRun2V0A,
@@ -274,6 +278,16 @@ DECLARE_SOA_TABLE_VERSIONED(StraEvSels_005, "AOD", "STRAEVSELS", 5,         //! 
                             // stracollision::EnergyCommonZNC<mult::MultZNC>,
                             stracollision::IsUPC<udcollision::GapSide>);
 
+DECLARE_SOA_TABLE(StraEvSelExtras, "AOD", "STRAEVSELEXTRAS", //! debug information
+                  udzdc::TimeZNA,                            // UPC info: re-assigned ZN-A time, in case of SG event, from the most active bc
+                  udzdc::TimeZNC,                            // UPC info: re-assigned ZN-C time, in case of SG event, from the most active bc
+                  udcollision::TimeFDDA,                     // Average A-side time (ns)
+                  udcollision::TimeFDDC,                     // Average C-side time (ns)
+                  udcollision::TimeFV0A,                     // Average A-side time (ns)
+                  udcollision::TimeFT0A,                     // Average A-side time (ns)
+                  udcollision::TimeFT0C,                     // Average C-side time (ns)
+                  udcollision::TriggerMaskFT0);              // 8 trigger bits: OrA, OrC, Semi-central, Central, Vertex, IsActiveA, IsActiveC, IsFlangeEvent
+
 DECLARE_SOA_TABLE(StraEvSelsRun2, "AOD", "STRAEVSELSRUN2",    //! debug information
                   evsel::Sel8, evsel::Sel7, evsel::Selection, //! event selection: sel8
                   mult::MultFT0A, mult::MultFT0C,             // FIT detectors
@@ -315,11 +329,11 @@ DECLARE_SOA_TABLE(StraEvTimes, "AOD", "STRAEVTIMES", //! event time (FT0, TOF)
                   stracollision::EventTime);
 
 using StraRawCents = StraRawCents_004;
-using StraCents = StraCents_001;
+using StraCents = StraCents_002;
 using StraEvSels = StraEvSels_005;
 using StraStamps = StraStamps_001;
 using StraCollision = StraCollisions::iterator;
-using StraCent = StraCents_001::iterator;
+using StraCent = StraCents::iterator;
 
 namespace stramccollision
 {
@@ -718,21 +732,21 @@ DECLARE_SOA_DYNAMIC_COLUMN(MLambda, mLambda, //! mass under lambda hypothesis
                            [](int v0type, float pxpos, float pypos, float pzpos, float pxneg, float pyneg, float pzneg) -> float {
                              if ((v0type & (0x1 << o2::dataformats::V0Index::kPhotonOnly)) != 0) {
                                return 0.0f; // provide mass only if NOT a photon with TPC-only tracks (special handling)
-                             };
+                             }
                              return RecoDecay::m(std::array{std::array{pxpos, pypos, pzpos}, std::array{pxneg, pyneg, pzneg}}, std::array{o2::constants::physics::MassProton, o2::constants::physics::MassPionCharged});
                            });
 DECLARE_SOA_DYNAMIC_COLUMN(MAntiLambda, mAntiLambda, //! mass under antilambda hypothesis
                            [](int v0type, float pxpos, float pypos, float pzpos, float pxneg, float pyneg, float pzneg) -> float {
                              if ((v0type & (0x1 << o2::dataformats::V0Index::kPhotonOnly)) != 0) {
                                return 0.0f; // provide mass only if NOT a photon with TPC-only tracks (special handling)
-                             };
+                             }
                              return RecoDecay::m(std::array{std::array{pxpos, pypos, pzpos}, std::array{pxneg, pyneg, pzneg}}, std::array{o2::constants::physics::MassPionCharged, o2::constants::physics::MassProton});
                            });
 DECLARE_SOA_DYNAMIC_COLUMN(MK0Short, mK0Short, //! mass under K0short hypothesis
                            [](int v0type, float pxpos, float pypos, float pzpos, float pxneg, float pyneg, float pzneg) -> float {
                              if ((v0type & (0x1 << o2::dataformats::V0Index::kPhotonOnly)) != 0) {
                                return 0.0f; // provide mass only if NOT a photon with TPC-only tracks (special handling)
-                             };
+                             }
                              return RecoDecay::m(std::array{std::array{pxpos, pypos, pzpos}, std::array{pxneg, pyneg, pzneg}}, std::array{o2::constants::physics::MassPionCharged, o2::constants::physics::MassPionCharged});
                            });
 DECLARE_SOA_DYNAMIC_COLUMN(MLambda_unchecked, mLambda_unchecked, //! mass under lambda hypothesis without v0 type check (will include TPC only and potentially duplicates! use with care)
@@ -1422,6 +1436,68 @@ DECLARE_SOA_DYNAMIC_COLUMN(Phi, phi, //! Cascade phi in the range [0, 2pi)
                            [](float px, float py) -> float { return RecoDecay::phi(px, py); });
 DECLARE_SOA_DYNAMIC_COLUMN(Eta, eta, //! Cascade pseudorapidity
                            [](float px, float py, float pz) -> float { return RecoDecay::eta(std::array{px, py, pz}); });
+
+// Armenteros-Podolanski variables
+DECLARE_SOA_DYNAMIC_COLUMN(Alpha, alpha, //! Armenteros Alpha
+                           [](float pxpos, float pypos, float pzpos, float pxneg, float pyneg, float pzneg, float pxbach, float pybach, float pzbach, int sign) {
+                             const float pxv0 = pxpos + pxneg;
+                             const float pyv0 = pypos + pyneg;
+                             const float pzv0 = pzpos + pzneg;
+
+                             // No need to divide by momentum of the cascade (as in the v0data namespace) since the ratio of lQl is evaluated
+                             const float lQlBach = RecoDecay::dotProd(std::array{pxbach, pybach, pzbach}, std::array{pxv0 + pxbach, pyv0 + pybach, pzv0 + pzbach});
+                             const float lQlV0 = RecoDecay::dotProd(std::array{pxv0, pyv0, pzv0}, std::array{pxv0 + pxbach, pyv0 + pybach, pzv0 + pzbach});
+                             float alpha = (lQlBach - lQlV0) / (lQlV0 + lQlBach); // alphacascade
+                             if (sign < 0) {
+                               alpha = -alpha;
+                             }
+                             return alpha;
+                           });
+
+DECLARE_SOA_DYNAMIC_COLUMN(QtArm, qtarm, //! Armenteros Qt
+                           [](float pxpos, float pypos, float pzpos, float pxneg, float pyneg, float pzneg, float pxbach, float pybach, float pzbach) {
+                             const float pxv0 = pxpos + pxneg;
+                             const float pyv0 = pypos + pyneg;
+                             const float pzv0 = pzpos + pzneg;
+
+                             const float momTot2 = RecoDecay::p2(pxv0 + pxbach, pyv0 + pybach, pzv0 + pzbach);
+                             const float dp = RecoDecay::dotProd(std::array{pxbach, pybach, pzbach}, std::array{pxv0 + pxbach, pyv0 + pybach, pzv0 + pzbach});
+                             return std::sqrt(RecoDecay::p2(pxbach, pybach, pzbach) - dp * dp / momTot2); // qtarm
+                           });
+
+// Psi pair angle: angle between the plane defined by the v0 and bachelor momenta and the xy plane
+DECLARE_SOA_DYNAMIC_COLUMN(PsiPair, psipair, //! psi pair angle
+                           [](float pxpos, float pypos, float pzpos, float pxneg, float pyneg, float pzneg, float pxbach, float pybach, float pzbach, int sign) {
+                             auto clipToPM1 = [](float x) { return x < -1.f ? -1.f : (x > 1.f ? 1.f : x); };
+                             const float pxv0 = pxpos + pxneg;
+                             const float pyv0 = pypos + pyneg;
+                             const float pzv0 = pzpos + pzneg;
+
+                             const float ptot2 = RecoDecay::p2(pxbach, pybach, pzbach) * RecoDecay::p2(pxv0, pyv0, pzv0);
+                             const float argcos = RecoDecay::dotProd(std::array{pxbach, pybach, pzbach}, std::array{pxv0, pyv0, pzv0}) / std::sqrt(ptot2);
+                             const float thetaV0 = std::atan2(RecoDecay::sqrtSumOfSquares(pxv0, pyv0), pzv0);
+                             const float thetaBach = std::atan2(RecoDecay::sqrtSumOfSquares(pxbach, pybach), pzbach);
+                             float argsin = (thetaV0 - thetaBach) / std::acos(clipToPM1(argcos));
+                             if (sign < 0) {
+                               argsin = -argsin;
+                             }
+                             return std::asin(clipToPM1(argsin));
+                           });
+
+DECLARE_SOA_DYNAMIC_COLUMN(V0Alpha, v0Alpha, //! Armenteros Alpha
+                           [](float pxpos, float pypos, float pzpos, float pxneg, float pyneg, float pzneg) {
+                             // No need to divide by momentum of the v0 (as in the v0data namespace) since the ratio of lQl is evaluated
+                             const float lQlPos = RecoDecay::dotProd(std::array{pxpos, pypos, pzpos}, std::array{pxneg + pxpos, pyneg + pypos, pzneg + pzpos});
+                             const float lQlNeg = RecoDecay::dotProd(std::array{pxneg, pyneg, pzneg}, std::array{pxneg + pxpos, pyneg + pypos, pzneg + pzpos});
+                             return (lQlPos - lQlNeg) / (lQlPos + lQlNeg);
+                           });
+
+DECLARE_SOA_DYNAMIC_COLUMN(V0QtArm, v0Qtarm, //! Armenteros Qt
+                           [](float pxpos, float pypos, float pzpos, float pxneg, float pyneg, float pzneg) {
+                             const float momTot2 = RecoDecay::p2(pxpos + pxneg, pypos + pyneg, pzpos + pzneg);
+                             const float dp = RecoDecay::dotProd(std::array{pxneg, pyneg, pzneg}, std::array{pxpos + pxneg, pypos + pyneg, pzpos + pzneg});
+                             return std::sqrt(RecoDecay::p2(pxneg, pyneg, pzneg) - dp * dp / momTot2); // qtarm
+                           });
 } // namespace cascdata
 
 //______________________________________________________
@@ -1498,7 +1574,14 @@ DECLARE_SOA_TABLE(StoredCascCores, "AOD", "CASCCORE", //! core information about
                   cascdata::PositiveEta<cascdata::PxPos, cascdata::PyPos, cascdata::PzPos>,
                   cascdata::PositivePhi<cascdata::PxPos, cascdata::PyPos>,
                   cascdata::BachelorEta<cascdata::PxBach, cascdata::PyBach, cascdata::PzBach>,
-                  cascdata::BachelorPhi<cascdata::PxBach, cascdata::PyBach>);
+                  cascdata::BachelorPhi<cascdata::PxBach, cascdata::PyBach>,
+
+                  // Armenteros-Podolanski and psi-pair
+                  cascdata::Alpha<cascdata::PxPos, cascdata::PyPos, cascdata::PzPos, cascdata::PxNeg, cascdata::PyNeg, cascdata::PzNeg, cascdata::PxBach, cascdata::PyBach, cascdata::PzBach, cascdata::Sign>,
+                  cascdata::QtArm<cascdata::PxPos, cascdata::PyPos, cascdata::PzPos, cascdata::PxNeg, cascdata::PyNeg, cascdata::PzNeg, cascdata::PxBach, cascdata::PyBach, cascdata::PzBach>,
+                  cascdata::PsiPair<cascdata::PxPos, cascdata::PyPos, cascdata::PzPos, cascdata::PxNeg, cascdata::PyNeg, cascdata::PzNeg, cascdata::PxBach, cascdata::PyBach, cascdata::PzBach, cascdata::Sign>,
+                  cascdata::V0Alpha<cascdata::PxPos, cascdata::PyPos, cascdata::PzPos, cascdata::PxNeg, cascdata::PyNeg, cascdata::PzNeg>,
+                  cascdata::V0QtArm<cascdata::PxPos, cascdata::PyPos, cascdata::PzPos, cascdata::PxNeg, cascdata::PyNeg, cascdata::PzNeg>);
 
 DECLARE_SOA_TABLE(StoredKFCascCores, "AOD", "KFCASCCORE", //!
                   cascdata::Sign, cascdata::MXi, cascdata::MOmega,

@@ -11,54 +11,49 @@
 
 /// \author Junlee Kim (jikim1290@gmail.com)
 
-#include <cmath>
-#include <array>
-#include <cstdlib>
-#include <chrono>
-#include <string>
-#include <vector>
-
-#include "TLorentzVector.h"
-#include "TRandom3.h"
-#include "TF1.h"
-#include "TVector2.h"
-#include "Math/Vector3D.h"
-#include "Math/Vector4D.h"
-#include "Math/GenVector/Boost.h"
-#include <TMath.h>
-
-#include "Framework/runDataProcessing.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/HistogramRegistry.h"
-#include "Framework/StepTHn.h"
-#include "Framework/O2DatabasePDGPlugin.h"
-#include "Framework/ASoAHelpers.h"
-#include "Framework/StaticFor.h"
-
-#include "Common/DataModel/PIDResponse.h"
-#include "Common/DataModel/Multiplicity.h"
-#include "Common/DataModel/Centrality.h"
-#include "Common/DataModel/TrackSelectionTables.h"
-#include "Common/DataModel/EventSelection.h"
-#include "Common/DataModel/Qvectors.h"
-#include "Common/DataModel/PIDResponseITS.h"
-
-#include "Common/Core/trackUtilities.h"
-#include "Common/Core/TrackSelection.h"
-
-#include "CommonConstants/PhysicsConstants.h"
-
-#include "ReconstructionDataFormats/Track.h"
-
-#include "DataFormatsParameters/GRPObject.h"
-#include "DataFormatsParameters/GRPMagField.h"
-
-#include "CCDB/CcdbApi.h"
-#include "CCDB/BasicCCDBManager.h"
-
 #include "PWGLF/DataModel/LFStrangenessTables.h"
 #include "PWGMM/Mult/DataModel/Index.h" // for Particles2Tracks table
+
+#include "Common/CCDB/EventSelectionParams.h"
+#include "Common/DataModel/Centrality.h"
+#include "Common/DataModel/EventSelection.h"
+#include "Common/DataModel/Multiplicity.h"
+#include "Common/DataModel/PIDResponseTPC.h"
+#include "Common/DataModel/Qvectors.h"
+#include "Common/DataModel/TrackSelectionTables.h"
+
+#include <CCDB/BasicCCDBManager.h>
+#include <CCDB/CcdbApi.h>
+#include <CommonConstants/MathConstants.h>
+#include <CommonConstants/PhysicsConstants.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/OutputObjHeader.h>
+#include <Framework/runDataProcessing.h>
+
+#include <Math/GenVector/Boost.h>
+#include <Math/Vector4D.h> // IWYU pragma: keep (do not replace with Math/Vector4Dfwd.h)
+#include <Math/Vector4Dfwd.h>
+#include <TF1.h>
+#include <TMath.h>
+#include <TMathBase.h>
+#include <TProfile2D.h>
+#include <TProfile3D.h>
+#include <TRandom3.h>
+#include <TString.h>
+#include <TVector2.h>
+
+#include <chrono>
+#include <cmath>
+#include <cstdint>
+#include <cstdlib>
+#include <string>
+#include <vector>
 
 using namespace o2;
 using namespace o2::framework;
@@ -68,7 +63,7 @@ using namespace o2::constants::physics;
 
 struct lambdapolarization {
   //  using EventCandidates = soa::Filtered<soa::Join<aod::Collisions, aod::EvSels, aod::FT0Mults, aod::FV0Mults, aod::TPCMults, aod::CentFV0As, aod::CentFT0Ms, aod::CentFT0Cs, aod::CentFT0As, aod::Mults>>;
-  using EventCandidates = soa::Join<aod::Collisions, aod::EvSels, aod::FT0Mults, aod::FV0Mults, aod::TPCMults, aod::CentFV0As, aod::CentFT0Ms, aod::CentFT0Cs, aod::CentFT0As, aod::Mults, aod::Qvectors>;
+  using EventCandidates = soa::Join<aod::Collisions, aod::EvSels, aod::FT0Mults, aod::FV0Mults, aod::TPCMults, aod::CentFV0As, aod::CentFT0Ms, aod::CentFT0Cs, aod::CentFT0As, aod::Mults, aod::Qvectors, aod::CentFT0CVariant2s>;
   using TrackCandidates = soa::Join<aod::Tracks, aod::TracksExtra, aod::TracksDCA, aod::TrackSelection, aod::pidTPCFullPi, aod::pidTPCFullPr>;
   using V0TrackCandidate = aod::V0Datas;
 
@@ -89,6 +84,7 @@ struct lambdapolarization {
 
   Configurable<float> cfgCentSel{"cfgCentSel", 80., "Centrality selection"};
   Configurable<int> cfgCentEst{"cfgCentEst", 1, "Centrality estimator, 1: FT0C, 2: FT0M"};
+  Configurable<bool> cfgCentEstFT0CVariant2{"cfgCentEstFT0CVariant2", false, "flag to replace the estimator with centFT0CVariant2"};
 
   Configurable<bool> cfgPVSel{"cfgPVSel", false, "Additional PV selection flag for syst"};
   Configurable<float> cfgPV{"cfgPV", 8.0, "Additional PV selection range for syst"};
@@ -923,6 +919,9 @@ struct lambdapolarization {
   {
     if (cfgCentEst == 1) {
       centrality = collision.centFT0C();
+      if (cfgCentEstFT0CVariant2) {
+        centrality = collision.centFT0CVariant2();
+      }
     } else if (cfgCentEst == 2) {
       centrality = collision.centFT0M();
     }

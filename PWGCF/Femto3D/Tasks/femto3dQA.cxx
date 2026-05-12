@@ -13,26 +13,32 @@
 /// \author Sofia Tomassini, Gleb Romanenko, Nicolò Jacazio
 /// \since 31 May 2023
 
-#include <vector>
+#include "PWGCF/Femto3D/Core/femto3dPairTask.h"
+#include "PWGCF/Femto3D/DataModel/PIDutils.h"
+#include "PWGCF/Femto3D/DataModel/singletrackselector.h"
+
+#include "Common/DataModel/PIDResponseITS.h"
+
+#include <Framework/ASoA.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/Expressions.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/OutputObjHeader.h>
+#include <Framework/runDataProcessing.h>
+
+#include <TH2.h>
+#include <TString.h>
+
+#include <cstdint>
 #include <memory>
 #include <utility>
+#include <vector>
 
-#include "Framework/runDataProcessing.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/HistogramRegistry.h"
-#include <TParameter.h>
-#include <TH1F.h>
-
-#include "Framework/ASoA.h"
-#include "MathUtils/Utils.h"
-#include "Framework/DataTypes.h"
-#include "Common/DataModel/Multiplicity.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/Expressions.h"
-
-#include "Framework/StaticFor.h"
-#include "PWGCF/Femto3D/DataModel/singletrackselector.h"
-#include "PWGCF/Femto3D/Core/femto3dPairTask.h"
+#include <math.h>
 
 using namespace o2;
 using namespace o2::soa;
@@ -90,7 +96,6 @@ struct QAHistograms {
   std::shared_ptr<TH2> TPChisto;
   std::shared_ptr<TH2> TOFhisto;
 
-  Filter signFilter = o2::aod::singletrackselector::sign == _sign;
   Filter pFilter = o2::aod::singletrackselector::p > _min_P&& o2::aod::singletrackselector::p < _max_P;
   Filter etaFilter = nabs(o2::aod::singletrackselector::eta) < _eta;
 
@@ -198,7 +203,8 @@ struct QAHistograms {
     }
 
     for (const auto& track : tracks) {
-
+      if (track.sign() != _sign)
+        continue;
       if (_removeSameBunchPileup && !track.template singleCollSel_as<ColsType>().isNoSameBunchPileup())
         continue;
       if (_requestGoodZvtxFT0vsPV && !track.template singleCollSel_as<ColsType>().isGoodZvtxFT0vsPV())

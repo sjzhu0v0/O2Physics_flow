@@ -22,23 +22,22 @@
 
 #include "Common/CCDB/TriggerAliases.h"
 
-#include "Framework/ASoA.h"
-#include "Framework/AnalysisTask.h"
 #include <CommonConstants/MathConstants.h>
+#include <Framework/ASoA.h>
+#include <Framework/AnalysisTask.h>
 #include <Framework/Configurable.h>
 #include <Framework/HistogramRegistry.h>
 #include <Framework/HistogramSpec.h>
 #include <Framework/InitContext.h>
 #include <Framework/runDataProcessing.h>
 
-#include "TTree.h"
 #include <TH2.h>
 #include <TH3.h>
 #include <THn.h>
 #include <TString.h>
+#include <TTree.h>
 
 #include <fastjet/JetDefinition.hh>
-#include <fastjet/PseudoJet.hh>
 
 #include <algorithm>
 #include <array>
@@ -109,9 +108,6 @@ struct JetTriggerQA {
   Configurable<float> cfgVertexCut{"cfgVertexCut", 10.0f, "Accepted z-vertex range"};
   Configurable<std::string> mClusterDefinition{"clusterDefinition", "kV3Default", "cluster definition to be selected, e.g. V3Default"};
 
-  std::vector<fastjet::PseudoJet> jetConstituents;
-  std::vector<fastjet::PseudoJet> jetClusterConstituents;
-  std::vector<fastjet::PseudoJet> jetReclustered;
   JetFinder jetReclusterer;
 
   void init(InitContext&)
@@ -450,7 +446,7 @@ struct JetTriggerQA {
     registry.fill(HIST("hTriggerCorrelation"), mainTrigger, assocTrigger);
   }
 
-  std::pair<double, double> fillGammaQA(const selectedClusters& clusters, std::bitset<EMCALHardwareTrigger::TRG_NTriggers> hwtrg, const std::bitset<TriggerType_t::kNTriggers>& triggerstatus)
+  std::pair<double, double> fillGammaQA(const selectedClusters& clusters, const std::bitset<EMCALHardwareTrigger::TRG_NTriggers>& hwtrg, const std::bitset<TriggerType_t::kNTriggers>& triggerstatus)
   {
     auto isTrigger = [&triggerstatus](TriggerType_t triggertype) -> bool {
       return triggerstatus.test(triggertype);
@@ -461,8 +457,6 @@ struct JetTriggerQA {
 
     struct ClusterData {
       float mTriggerObservable;
-      float mEta;
-      float mPhi;
       bool mEMCALcluster;
     };
     std::vector<ClusterData> analysedClusters;
@@ -476,7 +470,7 @@ struct JetTriggerQA {
       }
       bool emcalCluster = isClusterInEmcal(cluster);
       double clusterObservable = (f_GammaObservable == 0) ? cluster.energy() : cluster.energy() / std::cosh(cluster.eta());
-      analysedClusters.push_back({static_cast<float>(clusterObservable), cluster.eta(), cluster.phi(), emcalCluster});
+      analysedClusters.push_back({static_cast<float>(clusterObservable), emcalCluster});
 
       if (emcalCluster && (clusterObservable > maxClusterObservableEMCAL)) {
         maxClusterObservableEMCAL = clusterObservable;
@@ -889,8 +883,7 @@ struct JetTriggerQA {
         registry.get<THn>(HIST("jetRMaxPtEtaPhiNoFiducial"))->Fill(jetR, jetPt, jetEta, jetPhi);
         if (maxJet.r() == std::round(f_jetR * 100)) {
           for (const auto& jet : jets) {
-            if (!b_doLightOutput)
-              registry.fill(HIST("hJetRMaxPtJetPtNoFiducial"), jet.r() * 1e-2, jetPt, jet.pt());
+            registry.fill(HIST("hJetRMaxPtJetPtNoFiducial"), jet.r() * 1e-2, jetPt, jet.pt());
           } // for jets
         } // if maxJet.r() == std::round(f_jetR * 100)
       } // for maxjet no fiducial

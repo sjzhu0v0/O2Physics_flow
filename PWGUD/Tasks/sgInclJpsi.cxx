@@ -13,22 +13,31 @@
 // \author Sasha Bylinkin, alexander.bylinkin@gmail.com
 // \since  April 2023
 
-#include "Framework/runDataProcessing.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/O2DatabasePDGPlugin.h"
-#include <iostream>
-#include "PWGUD/DataModel/UDTables.h"
 #include "PWGUD/Core/SGSelector.h"
-#include "Common/DataModel/PIDResponse.h"
 #include "PWGUD/Core/SGTrackSelector.h"
-#include <TString.h>
-#include "TLorentzVector.h"
+#include "PWGUD/DataModel/UDTables.h"
+
+#include <CommonConstants/PhysicsConstants.h>
+#include <Framework/ASoAHelpers.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/O2DatabasePDGPlugin.h>
+#include <Framework/runDataProcessing.h>
+
+#include <TLorentzVector.h>
+
+#include <vector>
+
 using namespace std;
 using namespace o2;
 using namespace o2::aod;
 using namespace o2::framework;
 using namespace o2::framework::expressions;
+
 struct SGInclJpsi {
   SGSelector sgSelector;
   Service<o2::framework::O2DatabasePDG> pdg;
@@ -297,7 +306,7 @@ struct SGInclJpsi {
             registry.fill(HIST("sss_Ntr_mm_invm_3"), tracks.size(), v01.M(), -1);
             registry.fill(HIST("sss_mm_pt_invm_3"), v01.Pt(), v01.M(), -1);
           }
-      }
+        }
       }
       if (selectionPIDElec(t0, use_tof, nsigmatpc_cut, nsigmatof_cut) && selectionPIDElec(t1, use_tof, nsigmatpc_cut, nsigmatof_cut)) {
         // Apply pion hypothesis and create pairs

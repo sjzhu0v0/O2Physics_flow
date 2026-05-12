@@ -11,7 +11,7 @@
 
 o2physics_add_dpl_workflow(v0cascades-qa
     SOURCES v0cascadesqa.cxx
-    PUBLIC_LINK_LIBRARIES O2Physics::AnalysisCore
+    PUBLIC_LINK_LIBRARIES O2Physics::AnalysisCore O2Physics::AnalysisCCDB
     COMPONENT_NAME Analysis)
 
 o2physics_add_dpl_workflow(track-checks
@@ -138,4 +138,14 @@ o2physics_add_dpl_workflow(its-tpc-matching-vzeros
 o2physics_add_dpl_workflow(v0assoqa
     SOURCES v0assoqa.cxx
     PUBLIC_LINK_LIBRARIES O2Physics::AnalysisCore O2::DCAFitter KFParticle::KFParticle O2Physics::TPCDriftManager
+    COMPONENT_NAME Analysis)
+
+o2physics_add_dpl_workflow(systematics-mapping
+    SOURCES systematicsMapping.cxx
+    PUBLIC_LINK_LIBRARIES O2Physics::AnalysisCore
+    COMPONENT_NAME Analysis)
+
+o2physics_add_dpl_workflow(hypertriton3body-qa
+    SOURCES hypertriton3bodyQa.cxx
+    PUBLIC_LINK_LIBRARIES O2Physics::AnalysisCore O2::TOFBase
     COMPONENT_NAME Analysis)

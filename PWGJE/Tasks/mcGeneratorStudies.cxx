@@ -19,18 +19,18 @@
 #include "Common/CCDB/TriggerAliases.h"
 #include "Common/DataModel/EventSelection.h"
 
-#include "EMCALBase/Geometry.h"
-#include "Framework/ASoA.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/HistogramRegistry.h"
+#include <EMCALBase/Geometry.h>
 #include <EMCALBase/GeometryBase.h>
+#include <Framework/ASoA.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisTask.h>
 #include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
 #include <Framework/HistogramSpec.h>
 #include <Framework/InitContext.h>
 #include <Framework/runDataProcessing.h>
 
-#include "TDatabasePDG.h"
+#include <TDatabasePDG.h>
 #include <TH1.h>
 #include <TString.h>
 
@@ -248,7 +248,7 @@ struct MCGeneratorStudies {
       int iCellID = -1;
       try {
         iCellID = emcal::Geometry::GetInstance()->GetAbsCellIdFromEtaPhi(mcParticles.iteratorAt(daughterId).eta(), mcParticles.iteratorAt(daughterId).phi());
-      } catch (emcal::InvalidPositionException& e) {
+      } catch (const emcal::InvalidPositionException& e) {
         iCellID = -1;
       }
       if (iCellID == -1)

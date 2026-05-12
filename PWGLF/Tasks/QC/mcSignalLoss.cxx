@@ -24,25 +24,30 @@
 //
 // Build hypertriton candidates from V0s and tracks
 
-#include <vector>
-
-#include "Framework/runDataProcessing.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/ASoAHelpers.h"
-#include "ReconstructionDataFormats/Track.h"
-#include "Common/Core/RecoDecay.h"
-#include "Common/Core/trackUtilities.h"
-#include "Common/DataModel/EventSelection.h"
-#include "Common/DataModel/TrackSelectionTables.h"
-#include "DataFormatsTPC/BetheBlochAleph.h"
-#include "Common/Core/PID/PIDTOF.h"
-#include "Common/TableProducer/PID/pidTOFBase.h"
-#include "Framework/HistogramRegistry.h"
-#include "Common/Core/PID/TPCPIDResponse.h"
-#include "Common/DataModel/PIDResponse.h"
-#include "Framework/O2DatabasePDGPlugin.h"
 #include "PWGLF/Utils/inelGt.h"
+
+#include "Common/CCDB/EventSelectionParams.h"
+#include "Common/DataModel/EventSelection.h"
+
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/O2DatabasePDGPlugin.h>
+#include <Framework/OutputObjHeader.h>
+#include <Framework/runDataProcessing.h>
+
+#include <TH1.h>
+#include <TH2.h>
+#include <TH3.h>
+
+#include <array>
+#include <cmath>
+#include <cstdlib>
+#include <vector>
 
 using namespace o2;
 using namespace o2::framework;

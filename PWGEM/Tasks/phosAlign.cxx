@@ -9,35 +9,39 @@
 // granted to it by virtue of its status as an Intergovernmental Organization
 // or submit itself to any jurisdiction.
 
-#include <climits>
-#include <cstdlib>
-#include <map>
-#include <memory>
-#include <vector>
+#include "Common/CCDB/TriggerAliases.h"
 #include "Common/Core/trackUtilities.h"
-#include "Common/Core/TrackSelection.h"
-#include "Common/Core/TrackSelectionDefaults.h"
 #include "Common/DataModel/CaloClusters.h"
 #include "Common/DataModel/EventSelection.h"
-#include "Common/DataModel/Centrality.h"
-#include "Common/DataModel/PIDResponse.h"
+#include "Common/DataModel/PIDResponseTPC.h"
 #include "Common/DataModel/TrackSelectionTables.h"
-#include "ReconstructionDataFormats/TrackParametrization.h"
 
-#include "Framework/ConfigParamSpec.h"
-#include "Framework/runDataProcessing.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/ASoA.h"
-#include "Framework/ASoAHelpers.h"
-#include "Framework/HistogramRegistry.h"
+#include <CCDB/BasicCCDBManager.h>
+#include <CommonUtils/NameConf.h>
+#include <DataFormatsParameters/GRPMagField.h>
+#include <DetectorsBase/Propagator.h>
+#include <Framework/ASoA.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/runDataProcessing.h>
+#include <PHOSBase/Geometry.h>
+#include <ReconstructionDataFormats/TrackParametrization.h>
 
-#include "PHOSBase/Geometry.h"
-#include "DataFormatsParameters/GRPMagField.h"
-#include "CommonDataFormat/InteractionRecord.h"
-#include "CCDB/BasicCCDBManager.h"
-#include "DataFormatsParameters/GRPLHCIFData.h"
-#include "DetectorsBase/Propagator.h"
+#include <TMath.h>
+#include <TMathBase.h>
+
+#include <algorithm>
+#include <climits>
+#include <cmath>
+#include <cstdint>
+#include <cstdlib>
+#include <memory>
+#include <vector>
 
 /// \struct PHOS pi0 analysis
 /// \brief Monitoring task for PHOS related quantities

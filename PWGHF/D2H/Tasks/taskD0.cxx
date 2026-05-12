@@ -14,19 +14,27 @@
 ///
 /// \author Gian Michele Innocenti <gian.michele.innocenti@cern.ch>, CERN
 /// \author Vít Kučera <vit.kucera@cern.ch>, CERN
+/// \author Minjung Kim <minjung.kim@cern.ch>, CERN
 
 #include "PWGHF/Core/CentralityEstimation.h"
 #include "PWGHF/Core/DecayChannels.h"
 #include "PWGHF/Core/HfHelper.h"
 #include "PWGHF/Core/SelectorCuts.h"
+#include "PWGHF/DataModel/AliasTables.h"
 #include "PWGHF/DataModel/CandidateReconstructionTables.h"
 #include "PWGHF/DataModel/CandidateSelectionTables.h"
+#include "PWGHF/DataModel/TrackIndexSkimmingTables.h"
 #include "PWGHF/Utils/utilsEvSelHf.h"
+#include "PWGHF/Utils/utilsUpcHf.h"
+#include "PWGUD/Core/UPCHelpers.h"
 
+#include "Common/CCDB/ctpRateFetcher.h"
 #include "Common/Core/RecoDecay.h"
 #include "Common/DataModel/Centrality.h"
 #include "Common/DataModel/EventSelection.h"
+#include "Common/DataModel/TrackSelectionTables.h"
 
+#include <CCDB/BasicCCDBManager.h>
 #include <CommonConstants/MathConstants.h>
 #include <CommonConstants/PhysicsConstants.h>
 #include <Framework/ASoA.h>
@@ -42,9 +50,13 @@
 
 #include <THnSparse.h>
 
+#include <Rtypes.h>
+
 #include <algorithm> // std::min
 #include <array>
+#include <cstdint>
 #include <numeric>
+#include <string>
 #include <vector>
 
 using namespace o2;
@@ -53,6 +65,8 @@ using namespace o2::framework;
 using namespace o2::framework::expressions;
 using namespace o2::hf_centrality;
 using namespace o2::hf_occupancy;
+using namespace o2::hf_evsel;
+using namespace o2::analysis::hf_upc;
 
 /// D0 analysis task
 namespace
@@ -79,29 +93,44 @@ struct HfTaskD0 {
   Configurable<int> centEstimator{"centEstimator", 0, "Centrality estimation (None: 0, FT0C: 2, FT0M: 3)"};
   Configurable<int> occEstimator{"occEstimator", 0, "Occupancy estimation (None: 0, ITS: 1, FT0C: 2)"};
   Configurable<bool> storeCentrality{"storeCentrality", false, "Flag to store centrality information"};
-  Configurable<bool> storeOccupancy{"storeOccupancy", false, "Flag to store occupancy information"};
+  Configurable<bool> storeOccupancyAndIR{"storeOccupancyAndIR", false, "Flag to store occupancy information and interaction rate"};
   Configurable<bool> storeTrackQuality{"storeTrackQuality", false, "Flag to store track quality information"};
+  Configurable<bool> storeZdcEnergy{"storeZdcEnergy", false, "Flag to store ZDC energy info"};
+  Configurable<bool> storeZdcTime{"storeZdcTime", false, "Flag to store ZDC time info"};
+  Configurable<bool> storeEtaProngs{"storeEtaProngs", false, "Flag to store eta of the prongs"};
   // ML inference
   Configurable<bool> applyMl{"applyMl", false, "Flag to apply ML selections"};
+  Configurable<std::string> ccdbUrl{"ccdbUrl", "http://alice-ccdb.cern.ch", "url of the ccdb repository"};
+  Configurable<std::string> irSource{"irSource", "ZNC hadronic", "Estimator of the interaction rate (Recommended: pp --> T0VTX, Pb-Pb --> ZNC hadronic)"};
 
-  HfHelper hfHelper;
+  HfEventSelection hfEvSel;         // event selection and monitoring
+  HfUpcGapThresholds upcThresholds; // UPC gap determination thresholds
+  ctpRateFetcher mRateFetcher;
 
   SliceCache cache;
-  using D0Candidates = soa::Join<aod::HfCand2Prong, aod::HfSelD0>;
-  using D0CandidatesMc = soa::Join<D0Candidates, aod::HfCand2ProngMcRec>;
-  using D0CandidatesKF = soa::Join<D0Candidates, aod::HfCand2ProngKF>;
-  using D0CandidatesMcKF = soa::Join<D0CandidatesKF, aod::HfCand2ProngMcRec>;
+  Service<o2::ccdb::BasicCCDBManager> ccdb{};
 
-  using D0CandidatesMl = soa::Join<D0Candidates, aod::HfMlD0>;
-  using D0CandidatesMlMc = soa::Join<D0CandidatesMl, aod::HfCand2ProngMcRec>;
-  using D0CandidatesMlKF = soa::Join<D0CandidatesMl, aod::HfCand2ProngKF>;
-  using D0CandidatesMlMcKF = soa::Join<D0CandidatesMlKF, aod::HfCand2ProngMcRec>;
+  using D0Candidates = soa::Filtered<soa::Join<aod::HfCand2Prong, aod::HfSelD0>>;
+  using D0CandidatesMc = soa::Filtered<soa::Join<aod::HfCand2Prong, aod::HfSelD0, aod::HfCand2ProngMcRec>>;
+  using D0CandidatesKF = soa::Filtered<soa::Join<aod::HfCand2Prong, aod::HfSelD0, aod::HfCand2ProngKF>>;
+  using D0CandidatesMcKF = soa::Filtered<soa::Join<aod::HfCand2Prong, aod::HfSelD0, aod::HfCand2ProngKF, aod::HfCand2ProngMcRec>>;
+
+  using D0CandidatesMl = soa::Filtered<soa::Join<aod::HfCand2Prong, aod::HfSelD0, aod::HfMlD0>>;
+  using D0CandidatesMlMc = soa::Filtered<soa::Join<aod::HfCand2Prong, aod::HfSelD0, aod::HfMlD0, aod::HfCand2ProngMcRec>>;
+  using D0CandidatesMlKF = soa::Filtered<soa::Join<aod::HfCand2Prong, aod::HfSelD0, aod::HfMlD0, aod::HfCand2ProngKF>>;
+  using D0CandidatesMlMcKF = soa::Filtered<soa::Join<aod::HfCand2Prong, aod::HfSelD0, aod::HfMlD0, aod::HfCand2ProngKF, aod::HfCand2ProngMcRec>>;
 
   using Collisions = soa::Join<aod::Collisions, aod::EvSels>;
   using CollisionsCent = soa::Join<aod::Collisions, aod::EvSels, aod::CentFT0Ms, aod::CentFT0Cs>;
   using CollisionsWithMcLabels = soa::Join<aod::Collisions, aod::McCollisionLabels, aod::EvSels>;
   using CollisionsWithMcLabelsCent = soa::Join<aod::Collisions, aod::McCollisionLabels, aod::EvSels, aod::CentFT0Ms, aod::CentFT0Cs>;
   using TracksSelQuality = soa::Join<aod::TracksExtra, aod::TracksWMc>;
+  using TracksWPid = soa::Join<o2::aod::FullTracks, aod::TracksDCA, o2::aod::TrackSelection, aod::TracksPidPi, aod::PidTpcTofFullPi, aod::TracksPidKa, aod::PidTpcTofFullKa, aod::TracksPidPr, aod::PidTpcTofFullPr>;
+  // using TracksWithExtra = o2::soa::Join<o2::aod::FullTracks, o2::aod::TrackSelection>;
+  Filter filterD0Flag = (o2::aod::hf_track_index::hfflag & static_cast<uint8_t>(BIT(aod::hf_cand_2prong::DecayType::D0ToPiK))) != static_cast<uint8_t>(0);
+  Preslice<TracksWPid> perCol = aod::track::collisionId;
+  Preslice<aod::HfCand2Prong> candD0PerCollision = aod::hf_cand::collisionId;
+
   PresliceUnsorted<CollisionsWithMcLabels> colPerMcCollision = aod::mccollisionlabel::mcCollisionId;
   PresliceUnsorted<CollisionsWithMcLabelsCent> colPerMcCollisionCent = aod::mccollisionlabel::mcCollisionId;
 
@@ -132,6 +161,14 @@ struct HfTaskD0 {
   ConfigurableAxis thnConfigAxisOccupancy{"thnConfigAxisOccupancy", {14, 0, 14000}, "axis for centrality"};
   ConfigurableAxis thnConfigAxisMinItsNCls{"thnConfigAxisMinItsNCls", {5, 3, 8}, "axis for minimum ITS NCls of candidate prongs"};
   ConfigurableAxis thnConfigAxisMinTpcNCrossedRows{"thnConfigAxisMinTpcNCrossedRows", {10, 70, 180}, "axis for minimum TPC NCls crossed rows of candidate prongs"};
+  ConfigurableAxis thnConfigAxisIR{"thnConfigAxisIR", {5000, 0, 500}, "Interaction rate (kHz)"};
+  ConfigurableAxis thnConfigAxisGapType{"thnConfigAxisGapType", {7, -1.5, 5.5}, "axis for UPC gap type (see TrueGap enum in o2::aod::sgselector)"};
+  ConfigurableAxis thnConfigAxisFT0{"thnConfigAxisFT0", {1001, -1.5, 999.5}, "axis for FT0 amplitude (a.u.)"};
+  ConfigurableAxis thnConfigAxisFV0A{"thnConfigAxisFV0A", {2001, -1.5, 1999.5}, "axis for FV0-A amplitude (a.u.)"};
+  ConfigurableAxis thnConfigAxisFDD{"thnConfigAxisFDD", {200, 0., 4000.}, "axis for FDD amplitude (a.u.)"};
+  ConfigurableAxis thnConfigAxisZN{"thnConfigAxisZN", {510, -1.5, 49.5}, "axis for ZN energy (a.u.)"};
+  ConfigurableAxis thnConfigAxisTimeZN{"thnConfigAxisTimeZN", {700, -35., 35.}, "axis for ZN energy (a.u.)"};
+  ConfigurableAxis thnConfigAxisEtaProng{"thnConfigAxisEtaProng", {200, -1., 1.}, "axis for eta of D0 prongs"};
 
   HistogramRegistry registry{
     "registry",
@@ -211,15 +248,18 @@ struct HfTaskD0 {
 
   void init(InitContext&)
   {
-    std::array<bool, 12> doprocess{doprocessDataWithDCAFitterN, doprocessDataWithDCAFitterNCent, doprocessDataWithKFParticle, doprocessMcWithDCAFitterN, doprocessMcWithDCAFitterNCent, doprocessMcWithKFParticle, doprocessDataWithDCAFitterNMl, doprocessDataWithDCAFitterNMlCent, doprocessDataWithKFParticleMl, doprocessMcWithDCAFitterNMl, doprocessMcWithDCAFitterNMlCent, doprocessMcWithKFParticleMl};
+    std::array<bool, 14> doprocess{doprocessDataWithDCAFitterN, doprocessDataWithDCAFitterNCent, doprocessDataWithKFParticle, doprocessMcWithDCAFitterN, doprocessMcWithDCAFitterNCent, doprocessMcWithKFParticle, doprocessDataWithDCAFitterNMl, doprocessDataWithDCAFitterNMlCent, doprocessDataWithKFParticleMl, doprocessMcWithDCAFitterNMl, doprocessMcWithDCAFitterNMlCent, doprocessMcWithKFParticleMl, doprocessDataWithDCAFitterNWithUpc, doprocessDataWithDCAFitterNMlWithUpc};
     if ((std::accumulate(doprocess.begin(), doprocess.end(), 0)) == 0) {
       LOGP(fatal, "At least one process function should be enabled at a time.");
     }
     if ((doprocessDataWithDCAFitterN || doprocessDataWithDCAFitterNCent || doprocessMcWithDCAFitterN || doprocessMcWithDCAFitterNCent || doprocessDataWithDCAFitterNMl || doprocessDataWithDCAFitterNMlCent || doprocessMcWithDCAFitterNMl || doprocessMcWithDCAFitterNMlCent) && (doprocessDataWithKFParticle || doprocessMcWithKFParticle || doprocessDataWithKFParticleMl || doprocessMcWithKFParticleMl)) {
       LOGP(fatal, "DCAFitterN and KFParticle can not be enabled at a time.");
     }
-    if ((storeCentrality || storeOccupancy) && !(doprocessDataWithDCAFitterNCent || doprocessMcWithDCAFitterNCent || doprocessDataWithDCAFitterNMlCent || doprocessMcWithDCAFitterNMlCent)) {
-      LOGP(fatal, "Can't enable the storeCentrality and storeOccupancu without cent process");
+    if ((storeCentrality || storeOccupancyAndIR) && !(doprocessDataWithDCAFitterNCent || doprocessMcWithDCAFitterNCent || doprocessDataWithDCAFitterNMlCent || doprocessMcWithDCAFitterNMlCent || doprocessDataWithDCAFitterNWithUpc || doprocessDataWithDCAFitterNMlWithUpc)) {
+      LOGP(fatal, "Can't enable the storeCentrality and storeOccupancy without cent process or UPC process");
+    }
+    if ((storeZdcEnergy || storeZdcTime) && !(doprocessDataWithDCAFitterNWithUpc || doprocessDataWithDCAFitterNMlWithUpc)) {
+      LOGP(fatal, "Can't enable the storeZdcEnergy and storeZdcTime without UPC process");
     }
     auto vbins = (std::vector<double>)binsPt;
     registry.add("hMass", "2-prong candidates;inv. mass (#pi K) (GeV/#it{c}^{2});entries", {HistType::kTH2F, {{500, 0., 5.}, {vbins, "#it{p}_{T} (GeV/#it{c})"}}});
@@ -273,6 +313,18 @@ struct HfTaskD0 {
     const AxisSpec thnAxisOccupancy{thnConfigAxisOccupancy, "Occupancy"};
     const AxisSpec thnAxisMinItsNCls{thnConfigAxisMinItsNCls, "Minimum ITS cluster found"};
     const AxisSpec thnAxisMinTpcNCrossedRows{thnConfigAxisMinTpcNCrossedRows, "Minimum TPC crossed rows"};
+    const AxisSpec thnAxisIR{thnConfigAxisIR, "Interaction rate"};
+    const AxisSpec thnAxisGapType{thnConfigAxisGapType, "Gap type"};
+    const AxisSpec thnAxisFT0A{thnConfigAxisFT0, "FT0-A amplitude"};
+    const AxisSpec thnAxisFT0C{thnConfigAxisFT0, "FT0-C amplitude"};
+    const AxisSpec thnAxisFV0A{thnConfigAxisFV0A, "FV0-A amplitude"};
+    const AxisSpec thnAxisFDDA{thnConfigAxisFDD, "FDD-A amplitude"};
+    const AxisSpec thnAxisFDDC{thnConfigAxisFDD, "FDD-C amplitude"};
+    const AxisSpec thnAxisEnergyZNA{thnConfigAxisZN, "ZNA energy"};
+    const AxisSpec thnAxisEnergyZNC{thnConfigAxisZN, "ZNC energy"};
+    const AxisSpec thnAxisTimeZNA{thnConfigAxisTimeZN, "ZNA Time"};
+    const AxisSpec thnAxisTimeZNC{thnConfigAxisTimeZN, "ZNC Time"};
+    const AxisSpec thnAxisEtaProngs{thnConfigAxisEtaProng, "Eta of prongs"};
 
     if (doprocessMcWithDCAFitterN || doprocessMcWithDCAFitterNCent || doprocessMcWithKFParticle || doprocessMcWithDCAFitterNMl || doprocessMcWithDCAFitterNMlCent || doprocessMcWithKFParticleMl) {
       std::vector<AxisSpec> axesAcc = {thnAxisGenPtD, thnAxisGenPtB, thnAxisY, thnAxisOrigin, thnAxisNumPvContr};
@@ -280,7 +332,8 @@ struct HfTaskD0 {
       if (storeCentrality) {
         axesAcc.push_back(thnAxisCent);
       }
-      if (storeOccupancy) {
+      // interaction rate only store in Data and MC Reco. Level
+      if (storeOccupancyAndIR) {
         axesAcc.push_back(thnAxisOccupancy);
       }
 
@@ -297,8 +350,9 @@ struct HfTaskD0 {
     if (storeCentrality) {
       axes.push_back(thnAxisCent);
     }
-    if (storeOccupancy) {
+    if (storeOccupancyAndIR) {
       axes.push_back(thnAxisOccupancy);
+      axes.push_back(thnAxisIR);
     }
     if (storeTrackQuality) {
       axes.push_back(thnAxisMinItsNCls);
@@ -309,38 +363,154 @@ struct HfTaskD0 {
       const AxisSpec thnAxisNonPromptScore{thnConfigAxisNonPromptScore, "BDT score non-prompt."};
       const AxisSpec thnAxisPromptScore{thnConfigAxisPromptScore, "BDT score prompt."};
 
-      axes.insert(axes.begin(), thnAxisPromptScore);
-      axes.insert(axes.begin(), thnAxisNonPromptScore);
-      axes.insert(axes.begin(), thnAxisBkgScore);
+      // Insert ML scores after pt (position 2) to match taskDplus structure: [mass, pt, mlScores, ...]
+      if (doprocessDataWithDCAFitterNMlWithUpc) {
+        axes.insert(axes.begin() + 2, thnAxisPromptScore);
+        axes.insert(axes.begin() + 2, thnAxisNonPromptScore);
+        axes.insert(axes.begin() + 2, thnAxisBkgScore);
+      } else {
+        axes.insert(axes.begin(), thnAxisPromptScore);
+        axes.insert(axes.begin(), thnAxisNonPromptScore);
+        axes.insert(axes.begin(), thnAxisBkgScore);
+      }
+    }
+    if (doprocessDataWithDCAFitterNMlWithUpc || doprocessDataWithDCAFitterNWithUpc) {
+      axes.push_back(thnAxisGapType);
+      axes.push_back(thnAxisFT0A);
+      axes.push_back(thnAxisFT0C);
+      axes.push_back(thnAxisFV0A);
+      axes.push_back(thnAxisFDDA);
+      axes.push_back(thnAxisFDDC);
+      axes.push_back(thnAxisNumPvContr);
+      if (storeZdcEnergy) {
+        axes.push_back(thnAxisEnergyZNA);
+        axes.push_back(thnAxisEnergyZNC);
+      }
+      if (storeZdcTime) {
+        axes.push_back(thnAxisTimeZNA);
+        axes.push_back(thnAxisTimeZNC);
+      }
+      if (storeEtaProngs) {
+        axes.push_back(thnAxisEtaProngs);
+        axes.push_back(thnAxisEtaProngs);
+      }
+    }
 
+    if (applyMl) {
       registry.add("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type", "Thn for D0 candidates", HistType::kTHnSparseD, axes);
       registry.get<THnSparse>(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"))->Sumw2();
     } else {
       registry.add("hMassVsPtVsPtBVsYVsOriginVsD0Type", "Thn for D0 candidates", HistType::kTHnSparseD, axes);
       registry.get<THnSparse>(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"))->Sumw2();
     }
+
+    registry.add("Data/fitInfo/ampFT0A_vs_ampFT0C", "FT0-A vs FT0-C amplitude;FT0-A amplitude (a.u.);FT0-C amplitude (a.u.)", {HistType::kTH2F, {{2500, 0., 250}, {2500, 0., 250}}});
+    registry.add("Data/zdc/energyZNA_vs_energyZNC", "ZNA vs ZNC common energy;E_{ZNA}^{common} (a.u.);E_{ZNC}^{common} (a.u.)", {HistType::kTH2F, {{1000, 0., 20000}, {1000, 0., 20000}}});
+    registry.add("Data/zdc/timeZNA_vs_timeZNC", "ZNA vs ZNC time;ZNA Time;ZNC time", {HistType::kTH2F, {{200, -10., 10.}, {200, -10., 10.}}});
+    registry.add("Data/hUpcGapAfterSelection", "UPC gap type after selection;Gap type;Counts", {HistType::kTH1F, {{7, -1.5, 5.5}}});
+    registry.add("Data/hGapVsEtaTrack0", "UPC gap vs Eta;Gap type;Eta", {HistType::kTH2F, {{7, -1.5, 5.5}, {50, -1., 1.}}});
+    registry.add("Data/hGapVsEtaTrack1", "UPC gap vs Eta;Gap type;Eta", {HistType::kTH2F, {{7, -1.5, 5.5}, {50, -1., 1.}}});
+    registry.add("QAtracks/hEtaTrackVsGap", "", {HistType::kTH2F, {{7, -1.5, 5.5}, {100, -1.8, 1.8}}});
+    registry.add("QAtracks/hPtTrackVsGap", "", {HistType::kTH2F, {{7, -1.5, 5.5}, {100, 0, 50}}});
+
+    registry.add("Data/hTPCnSigProng0Pion_GapA", "Gap A Prong 0;P (GeV/c) ;TPC nSigma Pion", {HistType::kTH2F, {{100, 0, 50}, {120, -6., 6.}}});
+    registry.add("Data/hTPCnSigProng1Kaon_GapA", "Gap A Prong 1;P (GeV/c) ;TPC nSigma Kaon", {HistType::kTH2F, {{100, 0, 50}, {120, -6., 6.}}});
+    registry.add("Data/hTPCnSigProng0Kaon_GapA", "Gap A Prong 0;P (GeV/c) ;TPC nSigma Pion", {HistType::kTH2F, {{100, 0, 50}, {120, -6., 6.}}});
+    registry.add("Data/hTPCnSigProng1Pion_GapA", "Gap A Prong 1;P (GeV/c) ;TPC nSigma Kaon", {HistType::kTH2F, {{100, 0, 50}, {120, -6., 6.}}});
+    registry.add("Data/hTPCnSigProng0Pion_GapC", "Gap C Prong 0;P (GeV/c) ;TPC nSigma Pion", {HistType::kTH2F, {{100, 0, 50}, {120, -6., 6.}}});
+    registry.add("Data/hTPCnSigProng1Kaon_GapC", "Gap C Prong 1;P (GeV/c) ;TPC nSigma Kaon", {HistType::kTH2F, {{100, 0, 50}, {120, -6., 6.}}});
+    registry.add("Data/hTPCnSigProng0Kaon_GapC", "Gap C Prong 0;P (GeV/c) ;TPC nSigma Pion", {HistType::kTH2F, {{100, 0, 50}, {120, -6., 6.}}});
+    registry.add("Data/hTPCnSigProng1Pion_GapC", "Gap C Prong 1;P (GeV/c) ;TPC nSigma Kaon", {HistType::kTH2F, {{100, 0, 50}, {120, -6., 6.}}});
+
+    registry.add("Data/hTOFnSigProng0Pion_GapA", "Gap A Prong 0;P (GeV/c) ;TOF nSigma Pion", {HistType::kTH2F, {{100, 0, 50}, {120, -6., 6.}}});
+    registry.add("Data/hTOFnSigProng1Kaon_GapA", "Gap A Prong 1;P (GeV/c) ;TOF nSigma Kaon", {HistType::kTH2F, {{100, 0, 50}, {120, -6., 6.}}});
+    registry.add("Data/hTOFnSigProng0Kaon_GapA", "Gap A Prong 0;P (GeV/c) ;TOF nSigma Pion", {HistType::kTH2F, {{100, 0, 50}, {120, -6., 6.}}});
+    registry.add("Data/hTOFnSigProng1Pion_GapA", "Gap A Prong 1;P (GeV/c) ;TOF nSigma Kaon", {HistType::kTH2F, {{100, 0, 50}, {120, -6., 6.}}});
+    registry.add("Data/hTOFnSigProng0Pion_GapC", "Gap C Prong 0;P (GeV/c) ;TOF nSigma Pion", {HistType::kTH2F, {{100, 0, 50}, {120, -6., 6.}}});
+    registry.add("Data/hTOFnSigProng1Kaon_GapC", "Gap C Prong 1;P (GeV/c) ;TOF nSigma Kaon", {HistType::kTH2F, {{100, 0, 50}, {120, -6., 6.}}});
+    registry.add("Data/hTOFnSigProng0Kaon_GapC", "Gap C Prong 0;P (GeV/c) ;TOF nSigma Pion", {HistType::kTH2F, {{100, 0, 50}, {120, -6., 6.}}});
+    registry.add("Data/hTOFnSigProng1Pion_GapC", "Gap C Prong 1;P (GeV/c) ;TOF nSigma Kaon", {HistType::kTH2F, {{100, 0, 50}, {120, -6., 6.}}});
+
+    registry.add("Data/hTpcTofnSigProng0Pion_GapA", "Gap A Prong 0;P (GeV/c) ;TpcTof nSigma Pion", {HistType::kTH2F, {{100, 0, 50}, {50, 0., 10.}}});
+    registry.add("Data/hTpcTofnSigProng1Kaon_GapA", "Gap A Prong 1;P (GeV/c) ;TpcTof nSigma Kaon", {HistType::kTH2F, {{100, 0, 50}, {50, 0., 10.}}});
+    registry.add("Data/hTpcTofnSigProng0Kaon_GapA", "Gap A Prong 0;P (GeV/c) ;TpcTof nSigma Pion", {HistType::kTH2F, {{100, 0, 50}, {50, 0., 10.}}});
+    registry.add("Data/hTpcTofnSigProng1Pion_GapA", "Gap A Prong 1;P (GeV/c) ;TpcTof nSigma Kaon", {HistType::kTH2F, {{100, 0, 50}, {50, 0., 10.}}});
+    registry.add("Data/hTpcTofnSigProng0Pion_GapC", "Gap C Prong 0;P (GeV/c) ;TpcTof nSigma Pion", {HistType::kTH2F, {{100, 0, 50}, {50, 0., 10.}}});
+    registry.add("Data/hTpcTofnSigProng1Kaon_GapC", "Gap C Prong 1;P (GeV/c) ;TpcTof nSigma Kaon", {HistType::kTH2F, {{100, 0, 50}, {50, 0., 10.}}});
+    registry.add("Data/hTpcTofnSigProng0Kaon_GapC", "Gap C Prong 0;P (GeV/c) ;TpcTof nSigma Pion", {HistType::kTH2F, {{100, 0, 50}, {50, 0., 10.}}});
+    registry.add("Data/hTpcTofnSigProng1Pion_GapC", "Gap C Prong 1;P (GeV/c) ;TpcTof nSigma Kaon", {HistType::kTH2F, {{100, 0, 50}, {50, 0., 10.}}});
+    registry.add("Data/hGapVsRap", "UPC gap vs Eta;Gap type;Eta", {HistType::kTH2F, {{7, -1.5, 5.5}, {50, -1., 1.}}});
+    // QA histograms for Event level info
+    registry.add("QAevents/hPVcontrVsGap", " ;Gap ; N PV contributors", {HistType::kTH2F, {{7, -1.5, 5.5}, {800, 0., 200.}}});
+    registry.add("QAevents/ampFT0AVsC_GapA", "FT0-A vs FT0-C amplitude;FT0-A amplitude (a.u.);FT0-C amplitude (a.u.) Gap A", {HistType::kTH2F, {{2500, 0., 250}, {2500, 0., 250}}});
+    registry.add("QAevents/ampFT0AVsC_GapC", "FT0-A vs FT0-C amplitude;FT0-A amplitude (a.u.);FT0-C amplitude (a.u.) Gap C", {HistType::kTH2F, {{2500, 0., 250}, {2500, 0., 250}}});
+    registry.add("QAevents/energyZNAvsC_GapA", "ZNA vs ZNC common energy;E_{ZNA}^{common} (a.u.);E_{ZNC}^{common} (a.u.) Gap A", {HistType::kTH2F, {{1000, 0., 20000}, {1000, 0., 20000}}});
+    registry.add("QAevents/energyZNAvsC_GapC", "ZNA vs ZNC common energy;E_{ZNA}^{common} (a.u.);E_{ZNC}^{common} (a.u.) Gap A", {HistType::kTH2F, {{1000, 0., 20000}, {1000, 0., 20000}}});
+    registry.add("QAevents/timeZNAvsC_GapA", "ZNA vs ZNC time;ZNA Time;ZNC time Gap A", {HistType::kTH2F, {{200, -10., 10.}, {200, -10., 10.}}});
+    registry.add("QAevents/timeZNAvsC_GapC", "ZNA vs ZNC time;ZNA Time;ZNC time Gap C", {HistType::kTH2F, {{200, -10., 10.}, {200, -10., 10.}}});
+    // QA histograms for tracks
+    // A side gap
+    registry.add("QAtracks/hTPCnSigmaPi_GapA", "Gap A;P (GeV/c) ;TPC nSigma Pi", {HistType::kTH2F, {{360, 0, 36}, {120, -6., 6.}}});
+    registry.add("QAtracks/hTPCnSigmaKa_GapA", "Gap A;P (GeV/c) ;TPC nSigma Ka", {HistType::kTH2F, {{360, 0, 36}, {120, -6., 6.}}});
+    registry.add("QAtracks/hTPCnSigmaPr_GapA", "Gap A;P (GeV/c) ;TPC nSigma Pr", {HistType::kTH2F, {{360, 0, 36}, {120, -6., 6.}}});
+    registry.add("QAtracks/hTOFnSigmaPi_GapA", "Gap A;P (GeV/c) ;TOF nSigma Pi", {HistType::kTH2F, {{360, 0, 36}, {120, -6., 6.}}});
+    registry.add("QAtracks/hTOFnSigmaKa_GapA", "Gap A;P (GeV/c) ;TOF nSigma Ka", {HistType::kTH2F, {{360, 0, 36}, {120, -6., 6.}}});
+    registry.add("QAtracks/hTOFnSigmaPr_GapA", "Gap A;P (GeV/c) ;TOF nSigma Pr", {HistType::kTH2F, {{360, 0, 36}, {120, -6., 6.}}});
+    registry.add("QAtracks/hTPCTOFnSigmaPi_GapA", "Gap A;P (GeV/c) ;TPCTOF nSigma Pi", {HistType::kTH2F, {{360, 0, 36}, {120, 0., 6.}}});
+    registry.add("QAtracks/hTPCTOFnSigmaKa_GapA", "Gap A;P (GeV/c) ;TPCTOF nSigma Ka", {HistType::kTH2F, {{360, 0, 36}, {120, 0., 6.}}});
+    registry.add("QAtracks/hTPCTOFnSigmaPr_GapA", "Gap A;P (GeV/c) ;TPCTOF nSigma Pr", {HistType::kTH2F, {{360, 0, 36}, {120, 0., 6.}}});
+
+    registry.add("QAtracks/hTPCNCls_GapA", "Gap A; TPC Cls", {HistType::kTH1F, {{160, 0., 160.}}});
+    registry.add("QAtracks/hTPCChi2_GapA", "Gap A; TPC chi2", {HistType::kTH1F, {{24, 0., 6.}}});
+    registry.add("QAtracks/hITSNCls_GapA", "Gap A; TPC Cls", {HistType::kTH1F, {{8, -1., 7.}}});
+    registry.add("QAtracks/hDCAxy_GapA", "Gap A; DCA xy", {HistType::kTH1F, {{400, -2, 2.}}});
+    registry.add("QAtracks/hDCAz_GapA", "Gap A; DCA z", {HistType::kTH1F, {{400, -4, 4.}}});
+
+    // C side gap
+    registry.add("QAtracks/hTPCnSigmaPi_GapC", "Gap C;P (GeV/c) ;TPC nSigma Pi", {HistType::kTH2F, {{360, 0, 36}, {120, -6., 6.}}});
+    registry.add("QAtracks/hTPCnSigmaKa_GapC", "Gap C;P (GeV/c) ;TPC nSigma Ka", {HistType::kTH2F, {{360, 0, 36}, {120, -6., 6.}}});
+    registry.add("QAtracks/hTPCnSigmaPr_GapC", "Gap C;P (GeV/c) ;TPC nSigma Pr", {HistType::kTH2F, {{360, 0, 36}, {120, -6., 6.}}});
+    registry.add("QAtracks/hTOFnSigmaPi_GapC", "Gap C;P (GeV/c) ;TOF nSigma Pi", {HistType::kTH2F, {{360, 0, 36}, {120, -6., 6.}}});
+    registry.add("QAtracks/hTOFnSigmaKa_GapC", "Gap C;P (GeV/c) ;TOF nSigma Ka", {HistType::kTH2F, {{360, 0, 36}, {120, -6., 6.}}});
+    registry.add("QAtracks/hTOFnSigmaPr_GapC", "Gap C;P (GeV/c) ;TOF nSigma Pr", {HistType::kTH2F, {{360, 0, 36}, {120, -6., 6.}}});
+    registry.add("QAtracks/hTPCTOFnSigmaPi_GapC", "Gap C;P (GeV/c) ;TPCTOF nSigma Pi", {HistType::kTH2F, {{360, 0, 36}, {120, 0, 6.}}});
+    registry.add("QAtracks/hTPCTOFnSigmaKa_GapC", "Gap C;P (GeV/c) ;TPCTOF nSigma Ka", {HistType::kTH2F, {{360, 0, 36}, {120, 0., 6.}}});
+    registry.add("QAtracks/hTPCTOFnSigmaPr_GapC", "Gap C;P (GeV/c) ;TPCTOF nSigma Pr", {HistType::kTH2F, {{360, 0, 36}, {120, 0., 6.}}});
+
+    registry.add("QAtracks/hTPCNCls_GapC", "Gap C; TPC Cls", {HistType::kTH1F, {{160, 0., 160.}}});
+    registry.add("QAtracks/hTPCChi2_GapC", "Gap C; TPC chi2", {HistType::kTH1F, {{24, 0., 6.}}});
+    registry.add("QAtracks/hITSNCls_GapC", "Gap C; TPC Cls", {HistType::kTH1F, {{8, -1., 7.}}});
+    registry.add("QAtracks/hDCAxy_GapC", "Gap C; DCA xy", {HistType::kTH1F, {{400, -2, 2.}}});
+    registry.add("QAtracks/hDCAz_GapC", "Gap C; DCA z", {HistType::kTH1F, {{400, -4, 4.}}});
+
+    hfEvSel.addHistograms(registry);
+
+    ccdb->setURL(ccdbUrl);
+    ccdb->setCaching(true);
+    ccdb->setLocalObjectValidityChecking();
   }
 
-  template <int reconstructionType, bool applyMl, typename CandType, typename CollType>
+  template <int ReconstructionType, bool ApplyMl, typename CandType, typename CollType, typename BCsType>
   void processData(CandType const& candidates,
                    CollType const&,
-                   aod::TracksWExtra const&)
+                   aod::TracksWExtra const&,
+                   BCsType const&)
   {
     for (const auto& candidate : candidates) {
       if (!(candidate.hfflag() & 1 << aod::hf_cand_2prong::DecayType::D0ToPiK)) {
         continue;
       }
-      if (yCandRecoMax >= 0. && std::abs(hfHelper.yD0(candidate)) > yCandRecoMax) {
+      if (yCandRecoMax >= 0. && std::abs(HfHelper::yD0(candidate)) > yCandRecoMax) {
         continue;
       }
 
-      float massD0, massD0bar;
-      if constexpr (reconstructionType == aod::hf_cand::VertexerType::KfParticle) {
+      float massD0{0.f}, massD0bar{0.f};
+      if constexpr (ReconstructionType == aod::hf_cand::VertexerType::KfParticle) {
         massD0 = candidate.kfGeoMassD0();
         massD0bar = candidate.kfGeoMassD0bar();
       } else {
-        massD0 = hfHelper.invMassD0ToPiK(candidate);
-        massD0bar = hfHelper.invMassD0barToKPi(candidate);
+        massD0 = HfHelper::invMassD0ToPiK(candidate);
+        massD0bar = HfHelper::invMassD0barToKPi(candidate);
       }
       auto ptCandidate = candidate.pt();
 
@@ -368,8 +538,8 @@ struct HfTaskD0 {
       registry.fill(HIST("hd0ErrProng0"), candidate.errorImpactParameter0(), ptCandidate);
       registry.fill(HIST("hd0ErrProng1"), candidate.errorImpactParameter1(), ptCandidate);
       registry.fill(HIST("hd0d0"), candidate.impactParameterProduct(), ptCandidate);
-      registry.fill(HIST("hCTS"), hfHelper.cosThetaStarD0(candidate), ptCandidate);
-      registry.fill(HIST("hCt"), hfHelper.ctD0(candidate), ptCandidate);
+      registry.fill(HIST("hCTS"), HfHelper::cosThetaStarD0(candidate), ptCandidate);
+      registry.fill(HIST("hCt"), HfHelper::ctD0(candidate), ptCandidate);
       registry.fill(HIST("hCPA"), candidate.cpa(), ptCandidate);
       registry.fill(HIST("hEta"), candidate.eta(), ptCandidate);
       registry.fill(HIST("hSelectionStatus"), candidate.isSelD0() + (candidate.isSelD0bar() * 2), ptCandidate);
@@ -378,195 +548,457 @@ struct HfTaskD0 {
       registry.fill(HIST("hd0Prong0FinerBinning"), candidate.impactParameter0(), ptCandidate);
       registry.fill(HIST("hd0Prong1FinerBinning"), candidate.impactParameter1(), ptCandidate);
       registry.fill(HIST("hd0d0FinerBinning"), candidate.impactParameterProduct(), ptCandidate);
-      registry.fill(HIST("hCTSFinerBinning"), hfHelper.cosThetaStarD0(candidate), ptCandidate);
-      registry.fill(HIST("hCtFinerBinning"), hfHelper.ctD0(candidate), ptCandidate);
+      registry.fill(HIST("hCTSFinerBinning"), HfHelper::cosThetaStarD0(candidate), ptCandidate);
+      registry.fill(HIST("hCtFinerBinning"), HfHelper::ctD0(candidate), ptCandidate);
       registry.fill(HIST("hCPAFinerBinning"), candidate.cpa(), ptCandidate);
       registry.fill(HIST("hCPAXYFinerBinning"), candidate.cpaXY(), ptCandidate);
 
       float cent{-1.f};
       float occ{-1.f};
-      if (storeCentrality || storeOccupancy) {
+      float ir{-1.f};
+      if (storeCentrality || storeOccupancyAndIR) {
         auto collision = candidate.template collision_as<CollType>();
         if (storeCentrality && centEstimator != CentralityEstimator::None) {
           cent = getCentralityColl(collision, centEstimator);
         }
-        if (storeOccupancy && occEstimator != OccupancyEstimator::None) {
+        if (storeOccupancyAndIR && occEstimator != OccupancyEstimator::None) {
           occ = o2::hf_occupancy::getOccupancyColl(collision, occEstimator);
+          auto bc = collision.template foundBC_as<BCsType>();
+          ir = mRateFetcher.fetch(ccdb.service, bc.timestamp(), bc.runNumber(), irSource, true) * 1.e-3; // kHz
         }
       }
 
       auto trackPos = candidate.template prong0_as<o2::aod::TracksWExtra>(); // positive daughter
       auto trackNeg = candidate.template prong1_as<o2::aod::TracksWExtra>(); // negative daughter
-      int minItsClustersOfProngs = std::min(trackPos.itsNCls(), trackNeg.itsNCls());
-      int minTpcCrossedRowsOfProngs = std::min(trackPos.tpcNClsCrossedRows(), trackNeg.tpcNClsCrossedRows());
-      if constexpr (applyMl) {
-        if (storeCentrality && storeOccupancy) {
+      int const minItsClustersOfProngs = std::min(trackPos.itsNCls(), trackNeg.itsNCls());
+      int const minTpcCrossedRowsOfProngs = std::min(trackPos.tpcNClsCrossedRows(), trackNeg.tpcNClsCrossedRows());
+      if constexpr (ApplyMl) {
+        if (storeCentrality && storeOccupancyAndIR) {
           if (candidate.isSelD0() >= selectionFlagD0) {
-            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, hfHelper.yD0(candidate), SigD0, cent, occ);
-            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, hfHelper.yD0(candidate), candidate.isSelD0bar() ? ReflectedD0 : PureSigD0, cent, occ);
+            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, HfHelper::yD0(candidate), SigD0, cent, occ, ir);
+            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, HfHelper::yD0(candidate), candidate.isSelD0bar() ? ReflectedD0 : PureSigD0, cent, occ, ir);
           }
           if (candidate.isSelD0bar() >= selectionFlagD0bar) {
-            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, hfHelper.yD0(candidate), SigD0bar, cent, occ);
-            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, hfHelper.yD0(candidate), candidate.isSelD0() ? ReflectedD0bar : PureSigD0bar, cent, occ);
+            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, HfHelper::yD0(candidate), SigD0bar, cent, occ, ir);
+            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, HfHelper::yD0(candidate), candidate.isSelD0() ? ReflectedD0bar : PureSigD0bar, cent, occ, ir);
           }
-        } else if (storeCentrality && !storeOccupancy) {
+        } else if (storeCentrality && !storeOccupancyAndIR) {
           if (candidate.isSelD0() >= selectionFlagD0) {
-            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, hfHelper.yD0(candidate), SigD0, cent);
-            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, hfHelper.yD0(candidate), candidate.isSelD0bar() ? ReflectedD0 : PureSigD0, cent);
+            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, HfHelper::yD0(candidate), SigD0, cent);
+            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, HfHelper::yD0(candidate), candidate.isSelD0bar() ? ReflectedD0 : PureSigD0, cent);
           }
           if (candidate.isSelD0bar() >= selectionFlagD0bar) {
-            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, hfHelper.yD0(candidate), SigD0bar, cent);
-            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, hfHelper.yD0(candidate), candidate.isSelD0() ? ReflectedD0bar : PureSigD0bar, cent);
+            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, HfHelper::yD0(candidate), SigD0bar, cent);
+            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, HfHelper::yD0(candidate), candidate.isSelD0() ? ReflectedD0bar : PureSigD0bar, cent);
           }
-        } else if (!storeCentrality && storeOccupancy) {
+        } else if (!storeCentrality && storeOccupancyAndIR) {
           if (candidate.isSelD0() >= selectionFlagD0) {
-            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, hfHelper.yD0(candidate), SigD0, occ);
-            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, hfHelper.yD0(candidate), candidate.isSelD0bar() ? ReflectedD0 : PureSigD0, occ);
+            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, HfHelper::yD0(candidate), SigD0, occ, ir);
+            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, HfHelper::yD0(candidate), candidate.isSelD0bar() ? ReflectedD0 : PureSigD0, occ, ir);
           }
           if (candidate.isSelD0bar() >= selectionFlagD0bar) {
-            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, hfHelper.yD0(candidate), SigD0bar, occ);
-            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, hfHelper.yD0(candidate), candidate.isSelD0() ? ReflectedD0bar : PureSigD0bar, occ);
+            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, HfHelper::yD0(candidate), SigD0bar, occ, ir);
+            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, HfHelper::yD0(candidate), candidate.isSelD0() ? ReflectedD0bar : PureSigD0bar, occ, ir);
           }
         } else if (storeTrackQuality) {
           if (candidate.isSelD0() >= selectionFlagD0) {
-            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, hfHelper.yD0(candidate), SigD0, minItsClustersOfProngs, minTpcCrossedRowsOfProngs);
-            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, hfHelper.yD0(candidate), candidate.isSelD0bar() ? ReflectedD0 : PureSigD0, minItsClustersOfProngs, minTpcCrossedRowsOfProngs);
+            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, HfHelper::yD0(candidate), SigD0, minItsClustersOfProngs, minTpcCrossedRowsOfProngs);
+            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, HfHelper::yD0(candidate), candidate.isSelD0bar() ? ReflectedD0 : PureSigD0, minItsClustersOfProngs, minTpcCrossedRowsOfProngs);
           }
           if (candidate.isSelD0bar() >= selectionFlagD0bar) {
-            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, hfHelper.yD0(candidate), SigD0bar, minItsClustersOfProngs, minTpcCrossedRowsOfProngs);
-            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, hfHelper.yD0(candidate), candidate.isSelD0() ? ReflectedD0bar : PureSigD0bar, minItsClustersOfProngs, minTpcCrossedRowsOfProngs);
+            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, HfHelper::yD0(candidate), SigD0bar, minItsClustersOfProngs, minTpcCrossedRowsOfProngs);
+            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, HfHelper::yD0(candidate), candidate.isSelD0() ? ReflectedD0bar : PureSigD0bar, minItsClustersOfProngs, minTpcCrossedRowsOfProngs);
           }
         } else {
           if (candidate.isSelD0() >= selectionFlagD0) {
-            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, hfHelper.yD0(candidate), SigD0);
-            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, hfHelper.yD0(candidate), candidate.isSelD0bar() ? ReflectedD0 : PureSigD0);
+            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, HfHelper::yD0(candidate), SigD0);
+            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, HfHelper::yD0(candidate), candidate.isSelD0bar() ? ReflectedD0 : PureSigD0);
           }
           if (candidate.isSelD0bar() >= selectionFlagD0bar) {
-            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, hfHelper.yD0(candidate), SigD0bar);
-            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, hfHelper.yD0(candidate), candidate.isSelD0() ? ReflectedD0bar : PureSigD0bar);
+            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, HfHelper::yD0(candidate), SigD0bar);
+            registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, HfHelper::yD0(candidate), candidate.isSelD0() ? ReflectedD0bar : PureSigD0bar);
           }
         }
       } else {
-        if (storeCentrality && storeOccupancy) {
+        if (storeCentrality && storeOccupancyAndIR) {
           if (candidate.isSelD0() >= selectionFlagD0) {
-            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, hfHelper.yD0(candidate), SigD0, cent, occ);
-            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, hfHelper.yD0(candidate), candidate.isSelD0bar() ? ReflectedD0 : PureSigD0, cent, occ);
+            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, HfHelper::yD0(candidate), SigD0, cent, occ, ir);
+            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, HfHelper::yD0(candidate), candidate.isSelD0bar() ? ReflectedD0 : PureSigD0, cent, occ, ir);
           }
           if (candidate.isSelD0bar() >= selectionFlagD0bar) {
-            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, hfHelper.yD0(candidate), SigD0bar, cent, occ);
-            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, hfHelper.yD0(candidate), candidate.isSelD0() ? ReflectedD0bar : PureSigD0bar, cent, occ);
+            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, HfHelper::yD0(candidate), SigD0bar, cent, occ, ir);
+            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, HfHelper::yD0(candidate), candidate.isSelD0() ? ReflectedD0bar : PureSigD0bar, cent, occ, ir);
           }
-        } else if (storeCentrality && !storeOccupancy) {
+        } else if (storeCentrality && !storeOccupancyAndIR) {
           if (candidate.isSelD0() >= selectionFlagD0) {
-            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, hfHelper.yD0(candidate), SigD0, cent);
-            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, hfHelper.yD0(candidate), candidate.isSelD0bar() ? ReflectedD0 : PureSigD0, cent);
+            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, HfHelper::yD0(candidate), SigD0, cent);
+            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, HfHelper::yD0(candidate), candidate.isSelD0bar() ? ReflectedD0 : PureSigD0, cent);
           }
           if (candidate.isSelD0bar() >= selectionFlagD0bar) {
-            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, hfHelper.yD0(candidate), SigD0bar, cent);
-            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, hfHelper.yD0(candidate), candidate.isSelD0() ? ReflectedD0bar : PureSigD0bar, cent);
+            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, HfHelper::yD0(candidate), SigD0bar, cent);
+            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, HfHelper::yD0(candidate), candidate.isSelD0() ? ReflectedD0bar : PureSigD0bar, cent);
           }
-        } else if (!storeCentrality && storeOccupancy) {
+        } else if (!storeCentrality && storeOccupancyAndIR) {
           if (candidate.isSelD0() >= selectionFlagD0) {
-            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, hfHelper.yD0(candidate), SigD0, occ);
-            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, hfHelper.yD0(candidate), candidate.isSelD0bar() ? ReflectedD0 : PureSigD0, occ);
+            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, HfHelper::yD0(candidate), SigD0, occ, ir);
+            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, HfHelper::yD0(candidate), candidate.isSelD0bar() ? ReflectedD0 : PureSigD0, occ, ir);
           }
           if (candidate.isSelD0bar() >= selectionFlagD0bar) {
-            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, hfHelper.yD0(candidate), SigD0bar, occ);
-            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, hfHelper.yD0(candidate), candidate.isSelD0() ? ReflectedD0bar : PureSigD0bar, occ);
+            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, HfHelper::yD0(candidate), SigD0bar, occ, ir);
+            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, HfHelper::yD0(candidate), candidate.isSelD0() ? ReflectedD0bar : PureSigD0bar, occ, ir);
           }
         } else if (storeTrackQuality) {
           if (candidate.isSelD0() >= selectionFlagD0) {
-            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, hfHelper.yD0(candidate), SigD0, minItsClustersOfProngs, minTpcCrossedRowsOfProngs);
-            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, hfHelper.yD0(candidate), candidate.isSelD0bar() ? ReflectedD0 : PureSigD0, minItsClustersOfProngs, minTpcCrossedRowsOfProngs);
+            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, HfHelper::yD0(candidate), SigD0, minItsClustersOfProngs, minTpcCrossedRowsOfProngs);
+            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, HfHelper::yD0(candidate), candidate.isSelD0bar() ? ReflectedD0 : PureSigD0, minItsClustersOfProngs, minTpcCrossedRowsOfProngs);
           }
           if (candidate.isSelD0bar() >= selectionFlagD0bar) {
-            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, hfHelper.yD0(candidate), SigD0bar);
-            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, hfHelper.yD0(candidate), candidate.isSelD0() ? ReflectedD0bar : PureSigD0bar);
+            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, HfHelper::yD0(candidate), SigD0bar);
+            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, HfHelper::yD0(candidate), candidate.isSelD0() ? ReflectedD0bar : PureSigD0bar);
           }
         } else {
           if (candidate.isSelD0() >= selectionFlagD0) {
-            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, hfHelper.yD0(candidate), SigD0);
-            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, hfHelper.yD0(candidate), candidate.isSelD0bar() ? ReflectedD0 : PureSigD0);
+            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, HfHelper::yD0(candidate), SigD0);
+            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, HfHelper::yD0(candidate), candidate.isSelD0bar() ? ReflectedD0 : PureSigD0);
           }
           if (candidate.isSelD0bar() >= selectionFlagD0bar) {
-            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, hfHelper.yD0(candidate), SigD0bar);
-            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, hfHelper.yD0(candidate), candidate.isSelD0() ? ReflectedD0bar : PureSigD0bar);
+            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, HfHelper::yD0(candidate), SigD0bar);
+            registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, HfHelper::yD0(candidate), candidate.isSelD0() ? ReflectedD0bar : PureSigD0bar);
           }
         }
       }
     }
   }
-  void processDataWithDCAFitterN(D0Candidates const&, Collisions const& collisions, aod::TracksWExtra const& tracks)
+
+  template <bool FillMl, typename CollType, typename CandType, typename BCsType>
+  void runAnalysisPerCollisionDataWithUpc(CollType const& collisions,
+                                          CandType const& candidates,
+                                          BCsType const& bcs,
+                                          aod::FT0s const& ft0s,
+                                          aod::FV0As const& fv0as,
+                                          aod::FDDs const& fdds,
+                                          TracksWPid const& tracks)
   {
-    processData<aod::hf_cand::VertexerType::DCAFitter, false>(selectedD0Candidates, collisions, tracks);
+    for (const auto& collision : collisions) {
+      float centrality{-1.f};
+      const auto rejectionMask = hfEvSel.getHfCollisionRejectionMaskWithUpc<true, CentralityEstimator::None, BCsType>(collision, centrality, ccdb, registry, bcs);
+      if (rejectionMask != 0) {
+        continue;
+      }
+      const auto& bc = collision.template bc_as<BCsType>();
+
+      // Determine gap type using SGSelector with BC range checking
+      const auto gapResult = hf_upc::determineGapType(collision, bcs, upcThresholds);
+      const int gap = gapResult.value;
+      const auto numPvContributors = collision.numContrib();
+
+      // Use the BC with FIT activity if available from SGSelector
+      auto bcForUPC = bc;
+      if (gapResult.bc) {
+        bcForUPC = *(gapResult.bc);
+      }
+      // Get FIT information from the UPC BC
+      upchelpers::FITInfo fitInfo{};
+      udhelpers::getFITinfo(fitInfo, bcForUPC, bcs, ft0s, fv0as, fdds);
+
+      // Get ZDC energies if available (extract once and reuse)
+      const bool hasZdc = bcForUPC.has_zdc();
+      float zdcEnergyZNA = -1.f;
+      float zdcEnergyZNC = -1.f;
+      float zdcTimeZNA = -999.f;
+      float zdcTimeZNC = -999.f;
+
+      if (hasZdc) {
+        const auto& zdc = bcForUPC.zdc();
+        zdcEnergyZNA = zdc.energyCommonZNA();
+        zdcEnergyZNC = zdc.energyCommonZNC();
+        zdcTimeZNA = zdc.timeZNA();
+        zdcTimeZNC = zdc.timeZNC();
+        registry.fill(HIST("Data/zdc/energyZNA_vs_energyZNC"), zdcEnergyZNA, zdcEnergyZNC);
+        registry.fill(HIST("Data/zdc/timeZNA_vs_timeZNC"), zdcTimeZNA, zdcTimeZNC);
+      }
+      registry.fill(HIST("Data/fitInfo/ampFT0A_vs_ampFT0C"), fitInfo.ampFT0A, fitInfo.ampFT0C);
+      registry.fill(HIST("Data/hUpcGapAfterSelection"), gap);
+      registry.fill(HIST("QAevents/hPVcontrVsGap"), gap, collision.numContrib());
+
+      if (gap == 0) {
+        registry.fill(HIST("QAevents/ampFT0AVsC_GapA"), fitInfo.ampFT0A, fitInfo.ampFT0C);
+        registry.fill(HIST("QAevents/energyZNAvsC_GapA"), zdcEnergyZNA, zdcEnergyZNC);
+        registry.fill(HIST("QAevents/timeZNAvsC_GapA"), zdcTimeZNA, zdcTimeZNC);
+      }
+
+      if (gap == 1) {
+        registry.fill(HIST("QAevents/ampFT0AVsC_GapC"), fitInfo.ampFT0A, fitInfo.ampFT0C);
+        registry.fill(HIST("QAevents/energyZNAvsC_GapC"), zdcEnergyZNA, zdcEnergyZNC);
+        registry.fill(HIST("QAevents/timeZNAvsC_GapC"), zdcTimeZNA, zdcTimeZNC);
+      }
+
+      const auto thisCollId = collision.globalIndex();
+      const auto& groupedD0Candidates = candidates.sliceBy(candD0PerCollision, thisCollId);
+
+      // Calculate occupancy and interaction rate if needed
+      float occ{-1.f};
+      float ir{-1.f};
+      if (storeOccupancyAndIR && occEstimator != OccupancyEstimator::None) {
+        occ = o2::hf_occupancy::getOccupancyColl(collision, occEstimator);
+        ir = mRateFetcher.fetch(ccdb.service, bc.timestamp(), bc.runNumber(), irSource, true) * 1.e-3; // kHz
+      }
+
+      auto tracksample = tracks.sliceBy(perCol, collision.globalIndex());
+      if (collision.numContrib() > 1) {
+        for (const auto& track : tracksample) {
+          if (!track.isGlobalTrack()) {
+            continue;
+          }
+          registry.fill(HIST("QAtracks/hEtaTrackVsGap"), gap, track.eta());
+          registry.fill(HIST("QAtracks/hPtTrackVsGap"), gap, track.pt());
+
+          if (gap == 0) { // QA for Gap A
+            registry.fill(HIST("QAtracks/hTPCnSigmaPi_GapA"), track.p(), track.tpcNSigmaPi());
+            registry.fill(HIST("QAtracks/hTPCnSigmaKa_GapA"), track.p(), track.tpcNSigmaKa());
+            registry.fill(HIST("QAtracks/hTPCnSigmaPr_GapA"), track.p(), track.tpcNSigmaPr());
+            registry.fill(HIST("QAtracks/hTOFnSigmaPi_GapA"), track.p(), track.tofNSigmaPi());
+            registry.fill(HIST("QAtracks/hTOFnSigmaKa_GapA"), track.p(), track.tofNSigmaKa());
+            registry.fill(HIST("QAtracks/hTOFnSigmaPr_GapA"), track.p(), track.tofNSigmaPr());
+            registry.fill(HIST("QAtracks/hTPCTOFnSigmaPi_GapA"), track.p(), track.tpcTofNSigmaPi());
+            registry.fill(HIST("QAtracks/hTPCTOFnSigmaKa_GapA"), track.p(), track.tpcTofNSigmaKa());
+            registry.fill(HIST("QAtracks/hTPCTOFnSigmaPr_GapA"), track.p(), track.tpcTofNSigmaPr());
+            registry.fill(HIST("QAtracks/hTPCNCls_GapA"), track.tpcNClsFound());
+            registry.fill(HIST("QAtracks/hTPCChi2_GapA"), track.tpcChi2NCl());
+            registry.fill(HIST("QAtracks/hITSNCls_GapA"), track.itsNCls());
+            registry.fill(HIST("QAtracks/hDCAxy_GapA"), track.dcaXY());
+            registry.fill(HIST("QAtracks/hDCAz_GapA"), track.dcaZ());
+          }
+          if (gap == 1) { // QA for Gap C
+            registry.fill(HIST("QAtracks/hTPCnSigmaPi_GapC"), track.p(), track.tpcNSigmaPi());
+            registry.fill(HIST("QAtracks/hTPCnSigmaKa_GapC"), track.p(), track.tpcNSigmaKa());
+            registry.fill(HIST("QAtracks/hTPCnSigmaPr_GapC"), track.p(), track.tpcNSigmaPr());
+            registry.fill(HIST("QAtracks/hTOFnSigmaPi_GapC"), track.p(), track.tofNSigmaPi());
+            registry.fill(HIST("QAtracks/hTOFnSigmaKa_GapC"), track.p(), track.tofNSigmaKa());
+            registry.fill(HIST("QAtracks/hTOFnSigmaPr_GapC"), track.p(), track.tofNSigmaPr());
+            registry.fill(HIST("QAtracks/hTPCTOFnSigmaPi_GapC"), track.p(), track.tpcTofNSigmaPi());
+            registry.fill(HIST("QAtracks/hTPCTOFnSigmaKa_GapC"), track.p(), track.tpcTofNSigmaKa());
+            registry.fill(HIST("QAtracks/hTPCTOFnSigmaPr_GapC"), track.p(), track.tpcTofNSigmaPr());
+            registry.fill(HIST("QAtracks/hTPCNCls_GapC"), track.tpcNClsFound());
+            registry.fill(HIST("QAtracks/hTPCChi2_GapC"), track.tpcChi2NCl());
+            registry.fill(HIST("QAtracks/hITSNCls_GapC"), track.itsNCls());
+            registry.fill(HIST("QAtracks/hDCAxy_GapC"), track.dcaXY());
+            registry.fill(HIST("QAtracks/hDCAz_GapC"), track.dcaZ());
+          }
+        }
+      }
+
+      for (const auto& candidate : groupedD0Candidates) {
+        if (yCandRecoMax >= 0. && std::abs(HfHelper::yD0(candidate)) > yCandRecoMax) {
+          continue;
+        }
+
+        const float massD0 = HfHelper::invMassD0ToPiK(candidate);
+        const float massD0bar = HfHelper::invMassD0barToKPi(candidate);
+        const auto ptCandidate = candidate.pt();
+
+        auto track0 = candidate.template prong0_as<TracksWPid>();
+        auto track1 = candidate.template prong1_as<TracksWPid>();
+
+        registry.fill(HIST("Data/hGapVsEtaTrack0"), gap, track0.eta());
+        registry.fill(HIST("Data/hGapVsEtaTrack1"), gap, track1.eta());
+        registry.fill(HIST("Data/hGapVsRap"), gap, HfHelper::yD0(candidate));
+
+        if (gap == 0 && candidate.isSelD0() >= selectionFlagD0) { // A side // D0 --> K-Pi+
+          registry.fill(HIST("Data/hTPCnSigProng0Pion_GapA"), track0.p(), track0.tpcNSigmaPi());
+          registry.fill(HIST("Data/hTPCnSigProng1Kaon_GapA"), track1.p(), track1.tpcNSigmaKa());
+          registry.fill(HIST("Data/hTOFnSigProng0Pion_GapA"), track0.p(), track0.tofNSigmaPi());
+          registry.fill(HIST("Data/hTOFnSigProng1Kaon_GapA"), track1.p(), track1.tofNSigmaKa());
+          registry.fill(HIST("Data/hTpcTofnSigProng0Pion_GapA"), track0.p(), track0.tpcTofNSigmaPi());
+          registry.fill(HIST("Data/hTpcTofnSigProng1Kaon_GapA"), track1.p(), track1.tpcTofNSigmaKa());
+        }
+
+        if (gap == 0 && candidate.isSelD0bar() >= selectionFlagD0) { // A side // D0-bar --> K+Pi-
+          registry.fill(HIST("Data/hTPCnSigProng0Kaon_GapA"), track0.p(), track0.tpcNSigmaKa());
+          registry.fill(HIST("Data/hTPCnSigProng1Pion_GapA"), track1.p(), track1.tpcNSigmaPi());
+          registry.fill(HIST("Data/hTOFnSigProng0Kaon_GapA"), track0.p(), track0.tofNSigmaKa());
+          registry.fill(HIST("Data/hTOFnSigProng1Pion_GapA"), track1.p(), track1.tofNSigmaPi());
+          registry.fill(HIST("Data/hTpcTofnSigProng0Kaon_GapA"), track0.p(), track0.tpcTofNSigmaKa());
+          registry.fill(HIST("Data/hTpcTofnSigProng1Pion_GapA"), track1.p(), track1.tpcTofNSigmaPi());
+        }
+
+        if (gap == 1 && candidate.isSelD0() >= selectionFlagD0) { // C side // D0 --> K-Pi+
+          registry.fill(HIST("Data/hTPCnSigProng0Pion_GapC"), track0.p(), track0.tpcNSigmaPi());
+          registry.fill(HIST("Data/hTPCnSigProng1Kaon_GapC"), track1.p(), track1.tpcNSigmaKa());
+          registry.fill(HIST("Data/hTOFnSigProng0Pion_GapC"), track0.p(), track0.tofNSigmaPi());
+          registry.fill(HIST("Data/hTOFnSigProng1Kaon_GapC"), track1.p(), track1.tofNSigmaKa());
+          registry.fill(HIST("Data/hTpcTofnSigProng0Pion_GapC"), track0.p(), track0.tpcTofNSigmaPi());
+          registry.fill(HIST("Data/hTpcTofnSigProng1Kaon_GapC"), track1.p(), track1.tpcTofNSigmaKa());
+        }
+
+        if (gap == 1 && candidate.isSelD0bar() >= selectionFlagD0) { // C side // D0-bar --> K+Pi-
+          registry.fill(HIST("Data/hTPCnSigProng0Kaon_GapC"), track0.p(), track0.tpcNSigmaKa());
+          registry.fill(HIST("Data/hTPCnSigProng1Pion_GapC"), track1.p(), track1.tpcNSigmaPi());
+          registry.fill(HIST("Data/hTOFnSigProng0Kaon_GapC"), track0.p(), track0.tofNSigmaKa());
+          registry.fill(HIST("Data/hTOFnSigProng1Pion_GapC"), track1.p(), track1.tofNSigmaPi());
+          registry.fill(HIST("Data/hTpcTofnSigProng0Kaon_GapC"), track0.p(), track0.tpcTofNSigmaKa());
+          registry.fill(HIST("Data/hTpcTofnSigProng1Pion_GapC"), track1.p(), track1.tpcTofNSigmaPi());
+        }
+
+        if (candidate.isSelD0() >= selectionFlagD0) {
+          registry.fill(HIST("hMass"), massD0, ptCandidate);
+          registry.fill(HIST("hMassFinerBinning"), massD0, ptCandidate);
+          registry.fill(HIST("hMassVsPhi"), massD0, ptCandidate, candidate.phi());
+        }
+        if (candidate.isSelD0bar() >= selectionFlagD0bar) {
+          registry.fill(HIST("hMass"), massD0bar, ptCandidate);
+          registry.fill(HIST("hMassFinerBinning"), massD0bar, ptCandidate);
+          registry.fill(HIST("hMassVsPhi"), massD0bar, ptCandidate, candidate.phi());
+        }
+
+        // Fill THnSparse with structure matching histogram axes: [mass, pt, (mlScores if FillMl), rapidity, d0Type, (cent if storeCentrality), (occ, ir if storeOccupancyAndIR), gapType, FT0A, FT0C, FV0A, FDDA, FDDC, ZNA, ZNC]
+        auto fillTHnData = [&](float mass, int d0Type) {
+          // Pre-calculate vector size to avoid reallocations
+          constexpr int NAxesBase = 11;                       // mass, pt, rapidity, d0Type, gapType, FT0A, FT0C, FV0A, FDDA, FDDC, ZNA, ZNC, nPVcontr
+          constexpr int NAxesMl = FillMl ? 3 : 0;             // 3 ML scores if FillMl
+          int const nAxesCent = storeCentrality ? 1 : 0;      // centrality if storeCentrality
+          int const nAxesOccIR = storeOccupancyAndIR ? 2 : 0; // occupancy and IR if storeOccupancyAndIR
+          int const nAxesZdcEnergy = storeZdcEnergy ? 2 : 0;  // ZDC energy if storeZdcEnergy
+          int const nAxesZdcTime = storeZdcTime ? 2 : 0;      // ZDC time if storeZdctime
+          int const nAxesEtaProngs = storeEtaProngs ? 2 : 0;  // Eta distributions of prong
+          int const nAxesTotal = NAxesBase + NAxesMl + nAxesCent + nAxesOccIR + nAxesZdcEnergy + nAxesZdcTime + nAxesEtaProngs;
+
+          std::vector<double> valuesToFill;
+          valuesToFill.reserve(nAxesTotal);
+
+          // Fill values in order matching histogram axes
+          valuesToFill.push_back(static_cast<double>(mass));
+          valuesToFill.push_back(static_cast<double>(ptCandidate));
+          if constexpr (FillMl) {
+            auto const& mlScores = candidate.mlProbD0();
+            if (mlScores.size() == NAxesMl) {
+              valuesToFill.push_back(mlScores[0]);
+              valuesToFill.push_back(mlScores[1]);
+              valuesToFill.push_back(mlScores[2]);
+            }
+          }
+          valuesToFill.push_back(static_cast<double>(HfHelper::yD0(candidate)));
+          valuesToFill.push_back(static_cast<double>(d0Type));
+          if (storeCentrality) {
+            valuesToFill.push_back(centrality);
+          }
+          if (storeOccupancyAndIR) {
+            valuesToFill.push_back(occ);
+            valuesToFill.push_back(ir);
+          }
+          valuesToFill.push_back(static_cast<double>(gap));
+          valuesToFill.push_back(static_cast<double>(fitInfo.ampFT0A));
+          valuesToFill.push_back(static_cast<double>(fitInfo.ampFT0C));
+          valuesToFill.push_back(static_cast<double>(fitInfo.ampFV0A));
+          valuesToFill.push_back(static_cast<double>(fitInfo.ampFDDA));
+          valuesToFill.push_back(static_cast<double>(fitInfo.ampFDDC));
+          valuesToFill.push_back(static_cast<double>(numPvContributors));
+          if (storeZdcEnergy) {
+            valuesToFill.push_back(static_cast<double>(zdcEnergyZNA));
+            valuesToFill.push_back(static_cast<double>(zdcEnergyZNC));
+          }
+          if (storeZdcTime) {
+            valuesToFill.push_back(static_cast<double>(zdcTimeZNA));
+            valuesToFill.push_back(static_cast<double>(zdcTimeZNC));
+          }
+          if (storeEtaProngs) {
+            valuesToFill.push_back(static_cast<double>(track0.eta()));
+            valuesToFill.push_back(static_cast<double>(track1.eta()));
+          }
+          if constexpr (FillMl) {
+            registry.get<THnSparse>(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"))->Fill(valuesToFill.data());
+          } else {
+            registry.get<THnSparse>(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"))->Fill(valuesToFill.data());
+          }
+        };
+
+        if (candidate.isSelD0() >= selectionFlagD0) {
+          fillTHnData(massD0, SigD0);
+          fillTHnData(massD0, candidate.isSelD0bar() ? ReflectedD0 : PureSigD0);
+        }
+        if (candidate.isSelD0bar() >= selectionFlagD0bar) {
+          fillTHnData(massD0bar, SigD0bar);
+          fillTHnData(massD0bar, candidate.isSelD0() ? ReflectedD0bar : PureSigD0bar);
+        }
+      }
+    }
+  }
+
+  void processDataWithDCAFitterN(D0Candidates const&, Collisions const& collisions, aod::TracksWExtra const& tracks, aod::BcFullInfos const& bcs)
+  {
+    processData<aod::hf_cand::VertexerType::DCAFitter, false>(selectedD0Candidates, collisions, tracks, bcs);
   }
   PROCESS_SWITCH(HfTaskD0, processDataWithDCAFitterN, "process taskD0 with DCAFitterN", true);
 
-  void processDataWithDCAFitterNCent(D0Candidates const&, CollisionsCent const& collisions, aod::TracksWExtra const& tracks)
+  void processDataWithDCAFitterNCent(D0Candidates const&, CollisionsCent const& collisions, aod::TracksWExtra const& tracks, aod::BcFullInfos const& bcs)
   {
-    processData<aod::hf_cand::VertexerType::DCAFitter, false>(selectedD0Candidates, collisions, tracks);
+    processData<aod::hf_cand::VertexerType::DCAFitter, false>(selectedD0Candidates, collisions, tracks, bcs);
   }
   PROCESS_SWITCH(HfTaskD0, processDataWithDCAFitterNCent, "process taskD0 with DCAFitterN and centrality", false);
 
-  void processDataWithKFParticle(D0CandidatesKF const&, Collisions const& collisions, aod::TracksWExtra const& tracks)
+  void processDataWithKFParticle(D0CandidatesKF const&, Collisions const& collisions, aod::TracksWExtra const& tracks, aod::BcFullInfos const& bcs)
   {
-    processData<aod::hf_cand::VertexerType::KfParticle, false>(selectedD0CandidatesKF, collisions, tracks);
+    processData<aod::hf_cand::VertexerType::KfParticle, false>(selectedD0CandidatesKF, collisions, tracks, bcs);
   }
   PROCESS_SWITCH(HfTaskD0, processDataWithKFParticle, "process taskD0 with KFParticle", false);
   // TODO: add processKFParticleCent
 
-  void processDataWithDCAFitterNMl(D0CandidatesMl const&, Collisions const& collisions, aod::TracksWExtra const& tracks)
+  void processDataWithDCAFitterNMl(D0CandidatesMl const&, Collisions const& collisions, aod::TracksWExtra const& tracks, aod::BcFullInfos const& bcs)
   {
-    processData<aod::hf_cand::VertexerType::DCAFitter, true>(selectedD0CandidatesMl, collisions, tracks);
+    processData<aod::hf_cand::VertexerType::DCAFitter, true>(selectedD0CandidatesMl, collisions, tracks, bcs);
   }
   PROCESS_SWITCH(HfTaskD0, processDataWithDCAFitterNMl, "process taskD0 with DCAFitterN and ML selections", false);
 
-  void processDataWithDCAFitterNMlCent(D0CandidatesMl const&, CollisionsCent const& collisions, aod::TracksWExtra const& tracks)
+  void processDataWithDCAFitterNMlCent(D0CandidatesMl const&, CollisionsCent const& collisions, aod::TracksWExtra const& tracks, aod::BcFullInfos const& bcs)
   {
-    processData<aod::hf_cand::VertexerType::DCAFitter, true>(selectedD0CandidatesMl, collisions, tracks);
+    processData<aod::hf_cand::VertexerType::DCAFitter, true>(selectedD0CandidatesMl, collisions, tracks, bcs);
   }
   PROCESS_SWITCH(HfTaskD0, processDataWithDCAFitterNMlCent, "process taskD0 with DCAFitterN and ML selections and centrality", false);
 
-  void processDataWithKFParticleMl(D0CandidatesMlKF const&, Collisions const& collisions, aod::TracksWExtra const& tracks)
+  void processDataWithKFParticleMl(D0CandidatesMlKF const&, Collisions const& collisions, aod::TracksWExtra const& tracks, aod::BcFullInfos const& bcs)
   {
-    processData<aod::hf_cand::VertexerType::KfParticle, true>(selectedD0CandidatesMlKF, collisions, tracks);
+    processData<aod::hf_cand::VertexerType::KfParticle, true>(selectedD0CandidatesMlKF, collisions, tracks, bcs);
   }
   PROCESS_SWITCH(HfTaskD0, processDataWithKFParticleMl, "process taskD0 with KFParticle and ML selections", false);
   // TODO: add processKFParticleMlCent
 
-  template <int reconstructionType, bool applyMl, typename CandType, typename CollType>
+  template <int ReconstructionType, bool ApplyMl, typename CandType, typename CollType, typename BCsType>
   void processMc(CandType const& candidates,
                  soa::Join<aod::McParticles, aod::HfCand2ProngMcGen> const& mcParticles,
                  TracksSelQuality const&,
                  CollType const& collisions,
-                 aod::McCollisions const&)
+                 aod::McCollisions const&,
+                 BCsType const&)
   {
     // MC rec.
     for (const auto& candidate : candidates) {
       if (!(candidate.hfflag() & 1 << aod::hf_cand_2prong::DecayType::D0ToPiK)) {
         continue;
       }
-      if (yCandRecoMax >= 0. && std::abs(hfHelper.yD0(candidate)) > yCandRecoMax) {
+      if (yCandRecoMax >= 0. && std::abs(HfHelper::yD0(candidate)) > yCandRecoMax) {
         continue;
       }
 
       float cent{-1.f};
       float occ{-1.f};
+      float ir{-1.f};
       auto collision = candidate.template collision_as<CollType>();
       auto numPvContributors = collision.numContrib();
       if (storeCentrality && centEstimator != CentralityEstimator::None) {
         cent = getCentralityColl(collision, centEstimator);
       }
-      if (storeOccupancy && occEstimator != OccupancyEstimator::None) {
+      if (storeOccupancyAndIR && occEstimator != OccupancyEstimator::None) {
         occ = o2::hf_occupancy::getOccupancyColl(collision, occEstimator);
+        auto bc = collision.template foundBC_as<BCsType>();
+        ir = mRateFetcher.fetch(ccdb.service, bc.timestamp(), bc.runNumber(), irSource, true) * 1.e-3; // kHz
       }
-      float massD0, massD0bar;
-      if constexpr (reconstructionType == aod::hf_cand::VertexerType::KfParticle) {
+      float massD0{0.f}, massD0bar{0.f};
+      if constexpr (ReconstructionType == aod::hf_cand::VertexerType::KfParticle) {
         massD0 = candidate.kfGeoMassD0();
         massD0bar = candidate.kfGeoMassD0bar();
       } else {
-        massD0 = hfHelper.invMassD0ToPiK(candidate);
-        massD0bar = hfHelper.invMassD0barToKPi(candidate);
+        massD0 = HfHelper::invMassD0ToPiK(candidate);
+        massD0bar = HfHelper::invMassD0barToKPi(candidate);
       }
       auto trackPos = candidate.template prong0_as<TracksSelQuality>(); // positive daughter
       auto trackNeg = candidate.template prong1_as<TracksSelQuality>(); // negative daughter
@@ -578,7 +1010,7 @@ struct HfTaskD0 {
         auto yGen = RecoDecay::y(particleMother.pVector(), o2::constants::physics::MassD0); // gen. level y
         registry.fill(HIST("hPtGenSig"), ptGen);                                            // gen. level pT
         auto ptRec = candidate.pt();
-        auto yRec = hfHelper.yD0(candidate);
+        auto yRec = HfHelper::yD0(candidate);
         if (candidate.isRecoHfFlag() >= selectionFlagHf) {
           registry.fill(HIST("hPtVsYRecSigRecoHFFlag"), ptRec, yRec);
           registry.fill(HIST("hPtGenVsPtRecSig"), ptGen, ptRec);
@@ -648,7 +1080,7 @@ struct HfTaskD0 {
       auto ptCandidate = candidate.pt();
       auto ptProng0 = candidate.ptProng0();
       auto ptProng1 = candidate.ptProng1();
-      auto rapidityCandidate = hfHelper.yD0(candidate);
+      auto rapidityCandidate = HfHelper::yD0(candidate);
       auto declengthCandidate = candidate.decayLength();
       auto declengthxyCandidate = candidate.decayLengthXY();
       auto normaliseddeclengthCandidate = candidate.decayLengthNormalised();
@@ -656,12 +1088,12 @@ struct HfTaskD0 {
       auto d0Prong0 = candidate.impactParameter0();
       auto d0Prong1 = candidate.impactParameter1();
       auto d0d0Candidate = candidate.impactParameterProduct();
-      auto ctsCandidate = hfHelper.cosThetaStarD0(candidate);
-      auto ctCandidate = hfHelper.ctD0(candidate);
+      auto ctsCandidate = HfHelper::cosThetaStarD0(candidate);
+      auto ctCandidate = HfHelper::ctD0(candidate);
       auto cpaCandidate = candidate.cpa();
       auto cpaxyCandidate = candidate.cpaXY();
-      int minItsClustersOfProngs = std::min(trackPos.itsNCls(), trackNeg.itsNCls());
-      int minTpcCrossedRowsOfProngs = std::min(trackPos.tpcNClsCrossedRows(), trackNeg.tpcNClsCrossedRows());
+      int const minItsClustersOfProngs = std::min(trackPos.itsNCls(), trackNeg.itsNCls());
+      int const minTpcCrossedRowsOfProngs = std::min(trackPos.tpcNClsCrossedRows(), trackNeg.tpcNClsCrossedRows());
       if (candidate.isSelD0() >= selectionFlagD0) {
         registry.fill(HIST("hMassSigBkgD0"), massD0, ptCandidate, rapidityCandidate);
         if (candidate.flagMcMatchRec() == o2::hf_decay::hf_cand_2prong::DecayChannelMain::D0ToPiK) {
@@ -688,25 +1120,25 @@ struct HfTaskD0 {
           registry.fill(HIST("hDecLengthVsPtSig"), declengthCandidate, ptCandidate);
           registry.fill(HIST("hDecLengthxyVsPtSig"), declengthxyCandidate, ptCandidate);
           registry.fill(HIST("hMassSigD0"), massD0, ptCandidate, rapidityCandidate);
-          if constexpr (applyMl) {
-            if (storeCentrality && storeOccupancy) {
-              registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, rapidityCandidate, SigD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent, occ);
-            } else if (storeCentrality && !storeOccupancy) {
+          if constexpr (ApplyMl) {
+            if (storeCentrality && storeOccupancyAndIR) {
+              registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, rapidityCandidate, SigD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent, occ, ir);
+            } else if (storeCentrality && !storeOccupancyAndIR) {
               registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, rapidityCandidate, SigD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent);
-            } else if (!storeCentrality && storeOccupancy) {
-              registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, rapidityCandidate, SigD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, occ);
+            } else if (!storeCentrality && storeOccupancyAndIR) {
+              registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, rapidityCandidate, SigD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, occ, ir);
             } else if (storeTrackQuality) {
               registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, rapidityCandidate, SigD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, minItsClustersOfProngs, minTpcCrossedRowsOfProngs);
             } else {
               registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, rapidityCandidate, SigD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors);
             }
           } else {
-            if (storeCentrality && storeOccupancy) {
-              registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, rapidityCandidate, SigD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent, occ);
-            } else if (storeCentrality && !storeOccupancy) {
+            if (storeCentrality && storeOccupancyAndIR) {
+              registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, rapidityCandidate, SigD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent, occ, ir);
+            } else if (storeCentrality && !storeOccupancyAndIR) {
               registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, rapidityCandidate, SigD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent);
-            } else if (!storeCentrality && storeOccupancy) {
-              registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, rapidityCandidate, SigD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, occ);
+            } else if (!storeCentrality && storeOccupancyAndIR) {
+              registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, rapidityCandidate, SigD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, occ, ir);
             } else if (storeTrackQuality) {
               registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, rapidityCandidate, SigD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, minItsClustersOfProngs, minTpcCrossedRowsOfProngs);
             } else {
@@ -730,25 +1162,25 @@ struct HfTaskD0 {
           registry.fill(HIST("hMassBkgD0"), massD0, ptCandidate, rapidityCandidate);
           if (candidate.flagMcMatchRec() == -o2::hf_decay::hf_cand_2prong::DecayChannelMain::D0ToPiK) {
             registry.fill(HIST("hMassReflBkgD0"), massD0, ptCandidate, rapidityCandidate);
-            if constexpr (applyMl) {
-              if (storeCentrality && storeOccupancy) {
-                registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, rapidityCandidate, ReflectedD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent, occ);
-              } else if (storeCentrality && !storeOccupancy) {
+            if constexpr (ApplyMl) {
+              if (storeCentrality && storeOccupancyAndIR) {
+                registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, rapidityCandidate, ReflectedD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent, occ, ir);
+              } else if (storeCentrality && !storeOccupancyAndIR) {
                 registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, rapidityCandidate, ReflectedD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent);
-              } else if (!storeCentrality && storeOccupancy) {
-                registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, rapidityCandidate, ReflectedD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, occ);
+              } else if (!storeCentrality && storeOccupancyAndIR) {
+                registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, rapidityCandidate, ReflectedD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, occ, ir);
               } else if (storeTrackQuality) {
                 registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, rapidityCandidate, ReflectedD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, minItsClustersOfProngs, minTpcCrossedRowsOfProngs);
               } else {
                 registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0()[0], candidate.mlProbD0()[1], candidate.mlProbD0()[2], massD0, ptCandidate, rapidityCandidate, ReflectedD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors);
               }
             } else {
-              if (storeCentrality && storeOccupancy) {
-                registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, rapidityCandidate, ReflectedD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent, occ);
-              } else if (storeCentrality && !storeOccupancy) {
+              if (storeCentrality && storeOccupancyAndIR) {
+                registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, rapidityCandidate, ReflectedD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent, occ, ir);
+              } else if (storeCentrality && !storeOccupancyAndIR) {
                 registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, rapidityCandidate, ReflectedD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent);
-              } else if (!storeCentrality && storeOccupancy) {
-                registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, rapidityCandidate, ReflectedD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, occ);
+              } else if (!storeCentrality && storeOccupancyAndIR) {
+                registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, rapidityCandidate, ReflectedD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, occ, ir);
               } else if (storeTrackQuality) {
                 registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0, ptCandidate, rapidityCandidate, ReflectedD0, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, minItsClustersOfProngs, minTpcCrossedRowsOfProngs);
               } else {
@@ -762,25 +1194,25 @@ struct HfTaskD0 {
         registry.fill(HIST("hMassSigBkgD0bar"), massD0bar, ptCandidate, rapidityCandidate);
         if (candidate.flagMcMatchRec() == -o2::hf_decay::hf_cand_2prong::DecayChannelMain::D0ToPiK) {
           registry.fill(HIST("hMassSigD0bar"), massD0bar, ptCandidate, rapidityCandidate);
-          if constexpr (applyMl) {
-            if (storeCentrality && storeOccupancy) {
-              registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, rapidityCandidate, SigD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent, occ);
-            } else if (storeCentrality && !storeOccupancy) {
+          if constexpr (ApplyMl) {
+            if (storeCentrality && storeOccupancyAndIR) {
+              registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, rapidityCandidate, SigD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent, occ, ir);
+            } else if (storeCentrality && !storeOccupancyAndIR) {
               registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, rapidityCandidate, SigD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent);
-            } else if (!storeCentrality && storeOccupancy) {
-              registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, rapidityCandidate, SigD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, occ);
+            } else if (!storeCentrality && storeOccupancyAndIR) {
+              registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, rapidityCandidate, SigD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, occ, ir);
             } else if (storeTrackQuality) {
               registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, rapidityCandidate, SigD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, minItsClustersOfProngs, minTpcCrossedRowsOfProngs);
             } else {
               registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, rapidityCandidate, SigD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors);
             }
           } else {
-            if (storeCentrality && storeOccupancy) {
-              registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, rapidityCandidate, SigD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent, occ);
-            } else if (storeCentrality && !storeOccupancy) {
+            if (storeCentrality && storeOccupancyAndIR) {
+              registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, rapidityCandidate, SigD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent, occ, ir);
+            } else if (storeCentrality && !storeOccupancyAndIR) {
               registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, rapidityCandidate, SigD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent);
-            } else if (!storeCentrality && storeOccupancy) {
-              registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, rapidityCandidate, SigD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, occ);
+            } else if (!storeCentrality && storeOccupancyAndIR) {
+              registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, rapidityCandidate, SigD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, occ, ir);
             } else if (storeTrackQuality) {
               registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, rapidityCandidate, SigD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, minItsClustersOfProngs, minTpcCrossedRowsOfProngs);
             } else {
@@ -791,25 +1223,25 @@ struct HfTaskD0 {
           registry.fill(HIST("hMassBkgD0bar"), massD0bar, ptCandidate, rapidityCandidate);
           if (candidate.flagMcMatchRec() == o2::hf_decay::hf_cand_2prong::DecayChannelMain::D0ToPiK) {
             registry.fill(HIST("hMassReflBkgD0bar"), massD0bar, ptCandidate, rapidityCandidate);
-            if constexpr (applyMl) {
-              if (storeCentrality && storeOccupancy) {
-                registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, rapidityCandidate, ReflectedD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent, occ);
-              } else if (storeCentrality && !storeOccupancy) {
+            if constexpr (ApplyMl) {
+              if (storeCentrality && storeOccupancyAndIR) {
+                registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, rapidityCandidate, ReflectedD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent, occ, ir);
+              } else if (storeCentrality && !storeOccupancyAndIR) {
                 registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, rapidityCandidate, ReflectedD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent);
-              } else if (!storeCentrality && storeOccupancy) {
-                registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, rapidityCandidate, ReflectedD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, occ);
+              } else if (!storeCentrality && storeOccupancyAndIR) {
+                registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, rapidityCandidate, ReflectedD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, occ, ir);
               } else if (storeTrackQuality) {
                 registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, rapidityCandidate, ReflectedD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, minItsClustersOfProngs, minTpcCrossedRowsOfProngs);
               } else {
                 registry.fill(HIST("hBdtScoreVsMassVsPtVsPtBVsYVsOriginVsD0Type"), candidate.mlProbD0bar()[0], candidate.mlProbD0bar()[1], candidate.mlProbD0bar()[2], massD0bar, ptCandidate, rapidityCandidate, ReflectedD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors);
               }
             } else {
-              if (storeCentrality && storeOccupancy) {
-                registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, rapidityCandidate, ReflectedD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent, occ);
-              } else if (storeCentrality && !storeOccupancy) {
+              if (storeCentrality && storeOccupancyAndIR) {
+                registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, rapidityCandidate, ReflectedD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent, occ, ir);
+              } else if (storeCentrality && !storeOccupancyAndIR) {
                 registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, rapidityCandidate, ReflectedD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, cent);
-              } else if (!storeCentrality && storeOccupancy) {
-                registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, rapidityCandidate, ReflectedD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, occ);
+              } else if (!storeCentrality && storeOccupancyAndIR) {
+                registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, rapidityCandidate, ReflectedD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, occ, ir);
               } else if (storeTrackQuality) {
                 registry.fill(HIST("hMassVsPtVsPtBVsYVsOriginVsD0Type"), massD0bar, ptCandidate, rapidityCandidate, ReflectedD0bar, candidate.ptBhadMotherPart(), candidate.originMcRec(), numPvContributors, minItsClustersOfProngs, minTpcCrossedRowsOfProngs);
               } else {
@@ -843,7 +1275,7 @@ struct HfTaskD0 {
           if (storeCentrality && centEstimator != CentralityEstimator::None) {
             cent = getCentralityGenColl(recoCollsPerMcCollCent, centEstimator);
           }
-          if (storeOccupancy && occEstimator != OccupancyEstimator::None) {
+          if (storeOccupancyAndIR && occEstimator != OccupancyEstimator::None) {
             occ = o2::hf_occupancy::getOccupancyGenColl(recoCollsPerMcCollCent, occEstimator);
           }
         } else {
@@ -857,11 +1289,11 @@ struct HfTaskD0 {
           registry.fill(HIST("hPtGenPrompt"), ptGen);
           registry.fill(HIST("hYGenPrompt"), yGen);
           registry.fill(HIST("hPtVsYGenPrompt"), ptGen, yGen);
-          if (storeCentrality && storeOccupancy) {
+          if (storeCentrality && storeOccupancyAndIR) {
             registry.fill(HIST("hSparseAcc"), ptGen, ptGenB, yGen, 1, maxNumContrib, cent, occ);
-          } else if (storeCentrality && !storeOccupancy) {
+          } else if (storeCentrality && !storeOccupancyAndIR) {
             registry.fill(HIST("hSparseAcc"), ptGen, ptGenB, yGen, 1, maxNumContrib, cent);
-          } else if (!storeCentrality && storeOccupancy) {
+          } else if (!storeCentrality && storeOccupancyAndIR) {
             registry.fill(HIST("hSparseAcc"), ptGen, ptGenB, yGen, 1, maxNumContrib, occ);
           } else {
             registry.fill(HIST("hSparseAcc"), ptGen, ptGenB, yGen, 1, maxNumContrib);
@@ -871,11 +1303,11 @@ struct HfTaskD0 {
           registry.fill(HIST("hPtGenNonPrompt"), ptGen);
           registry.fill(HIST("hYGenNonPrompt"), yGen);
           registry.fill(HIST("hPtVsYGenNonPrompt"), ptGen, yGen);
-          if (storeCentrality && storeOccupancy) {
+          if (storeCentrality && storeOccupancyAndIR) {
             registry.fill(HIST("hSparseAcc"), ptGen, ptGenB, yGen, 2, maxNumContrib, cent, occ);
-          } else if (storeCentrality && !storeOccupancy) {
+          } else if (storeCentrality && !storeOccupancyAndIR) {
             registry.fill(HIST("hSparseAcc"), ptGen, ptGenB, yGen, 2, maxNumContrib, cent);
-          } else if (!storeCentrality && storeOccupancy) {
+          } else if (!storeCentrality && storeOccupancyAndIR) {
             registry.fill(HIST("hSparseAcc"), ptGen, ptGenB, yGen, 2, maxNumContrib, occ);
           } else {
             registry.fill(HIST("hSparseAcc"), ptGen, ptGenB, yGen, 2, maxNumContrib);
@@ -890,9 +1322,10 @@ struct HfTaskD0 {
                                soa::Join<aod::McParticles, aod::HfCand2ProngMcGen> const& mcParticles,
                                TracksSelQuality const& tracks,
                                CollisionsWithMcLabels const& collisions,
-                               aod::McCollisions const& mcCollisions)
+                               aod::McCollisions const& mcCollisions,
+                               aod::BcFullInfos const& bcs)
   {
-    processMc<aod::hf_cand::VertexerType::DCAFitter, false>(selectedD0CandidatesMc, mcParticles, tracks, collisions, mcCollisions);
+    processMc<aod::hf_cand::VertexerType::DCAFitter, false>(selectedD0CandidatesMc, mcParticles, tracks, collisions, mcCollisions, bcs);
   }
   PROCESS_SWITCH(HfTaskD0, processMcWithDCAFitterN, "Process MC with DCAFitterN", false);
 
@@ -900,9 +1333,10 @@ struct HfTaskD0 {
                                    soa::Join<aod::McParticles, aod::HfCand2ProngMcGen> const& mcParticles,
                                    TracksSelQuality const& tracks,
                                    CollisionsWithMcLabelsCent const& collisions,
-                                   aod::McCollisions const& mcCollisions)
+                                   aod::McCollisions const& mcCollisions,
+                                   aod::BcFullInfos const& bcs)
   {
-    processMc<aod::hf_cand::VertexerType::DCAFitter, false>(selectedD0CandidatesMc, mcParticles, tracks, collisions, mcCollisions);
+    processMc<aod::hf_cand::VertexerType::DCAFitter, false>(selectedD0CandidatesMc, mcParticles, tracks, collisions, mcCollisions, bcs);
   }
   PROCESS_SWITCH(HfTaskD0, processMcWithDCAFitterNCent, "Process MC with DCAFitterN and centrality", false);
 
@@ -910,9 +1344,10 @@ struct HfTaskD0 {
                                soa::Join<aod::McParticles, aod::HfCand2ProngMcGen> const& mcParticles,
                                TracksSelQuality const& tracks,
                                CollisionsWithMcLabels const& collisions,
-                               aod::McCollisions const& mcCollisions)
+                               aod::McCollisions const& mcCollisions,
+                               aod::BcFullInfos const& bcs)
   {
-    processMc<aod::hf_cand::VertexerType::KfParticle, false>(selectedD0CandidatesMcKF, mcParticles, tracks, collisions, mcCollisions);
+    processMc<aod::hf_cand::VertexerType::KfParticle, false>(selectedD0CandidatesMcKF, mcParticles, tracks, collisions, mcCollisions, bcs);
   }
   PROCESS_SWITCH(HfTaskD0, processMcWithKFParticle, "Process MC with KFParticle", false);
   // TODO: add the processMcWithKFParticleCent
@@ -921,9 +1356,10 @@ struct HfTaskD0 {
                                  soa::Join<aod::McParticles, aod::HfCand2ProngMcGen> const& mcParticles,
                                  TracksSelQuality const& tracks,
                                  CollisionsWithMcLabels const& collisions,
-                                 aod::McCollisions const& mcCollisions)
+                                 aod::McCollisions const& mcCollisions,
+                                 aod::BcFullInfos const& bcs)
   {
-    processMc<aod::hf_cand::VertexerType::DCAFitter, true>(selectedD0CandidatesMlMc, mcParticles, tracks, collisions, mcCollisions);
+    processMc<aod::hf_cand::VertexerType::DCAFitter, true>(selectedD0CandidatesMlMc, mcParticles, tracks, collisions, mcCollisions, bcs);
   }
   PROCESS_SWITCH(HfTaskD0, processMcWithDCAFitterNMl, "Process MC with DCAFitterN and ML selection", false);
 
@@ -931,9 +1367,10 @@ struct HfTaskD0 {
                                      soa::Join<aod::McParticles, aod::HfCand2ProngMcGen> const& mcParticles,
                                      TracksSelQuality const& tracks,
                                      CollisionsWithMcLabelsCent const& collisions,
-                                     aod::McCollisions const& mcCollisions)
+                                     aod::McCollisions const& mcCollisions,
+                                     aod::BcFullInfos const& bcs)
   {
-    processMc<aod::hf_cand::VertexerType::DCAFitter, true>(selectedD0CandidatesMlMc, mcParticles, tracks, collisions, mcCollisions);
+    processMc<aod::hf_cand::VertexerType::DCAFitter, true>(selectedD0CandidatesMlMc, mcParticles, tracks, collisions, mcCollisions, bcs);
   }
   PROCESS_SWITCH(HfTaskD0, processMcWithDCAFitterNMlCent, "Process MC with DCAFitterN and ML selection and centrality", false);
 
@@ -941,12 +1378,42 @@ struct HfTaskD0 {
                                  soa::Join<aod::McParticles, aod::HfCand2ProngMcGen> const& mcParticles,
                                  TracksSelQuality const& tracks,
                                  CollisionsWithMcLabels const& collisions,
-                                 aod::McCollisions const& mcCollisions)
+                                 aod::McCollisions const& mcCollisions,
+                                 aod::BcFullInfos const& bcs)
   {
-    processMc<aod::hf_cand::VertexerType::KfParticle, true>(selectedD0CandidatesMlMcKF, mcParticles, tracks, collisions, mcCollisions);
+    processMc<aod::hf_cand::VertexerType::KfParticle, true>(selectedD0CandidatesMlMcKF, mcParticles, tracks, collisions, mcCollisions, bcs);
   }
   PROCESS_SWITCH(HfTaskD0, processMcWithKFParticleMl, "Process MC with KFParticle and ML selections", false);
   // TODO: add the processMcWithKFParticleMlCent
+
+  void processDataWithDCAFitterNWithUpc(soa::Join<aod::Collisions, aod::EvSels> const& collisions,
+                                        aod::BcFullInfos const& bcs,
+                                        D0Candidates const&,
+                                        aod::TracksWExtra const&,
+                                        aod::FT0s const& ft0s,
+                                        aod::FV0As const& fv0as,
+                                        aod::FDDs const& fdds,
+                                        TracksWPid const& tracks,
+                                        aod::Zdcs const& /*zdcs*/
+  )
+  {
+    runAnalysisPerCollisionDataWithUpc<false>(collisions, selectedD0Candidates, bcs, ft0s, fv0as, fdds, tracks);
+  }
+  PROCESS_SWITCH(HfTaskD0, processDataWithDCAFitterNWithUpc, "Process real data with DCAFitterN w/o ML with UPC", false);
+
+  void processDataWithDCAFitterNMlWithUpc(soa::Join<aod::Collisions, aod::EvSels> const& collisions,
+                                          aod::BcFullInfos const& bcs,
+                                          D0CandidatesMl const&,
+                                          aod::TracksWExtra const&,
+                                          aod::FT0s const& ft0s,
+                                          aod::FV0As const& fv0as,
+                                          aod::FDDs const& fdds,
+                                          TracksWPid const& tracks,
+                                          aod::Zdcs const& /*zdcs*/)
+  {
+    runAnalysisPerCollisionDataWithUpc<true>(collisions, selectedD0CandidatesMl, bcs, ft0s, fv0as, fdds, tracks);
+  }
+  PROCESS_SWITCH(HfTaskD0, processDataWithDCAFitterNMlWithUpc, "Process real data with DCAFitterN and ML with UPC", false);
 };
 
 WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)

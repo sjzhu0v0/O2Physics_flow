@@ -16,38 +16,43 @@
 
 #include "PWGJE/DataModel/JetSubstructure.h"
 
-#include "RecoDecay.h"
-
 #include "PWGJE/Core/FastJetUtilities.h"
+#include "PWGJE/Core/JetDerivedDataUtilities.h"
 #include "PWGJE/Core/JetFinder.h"
+#include "PWGJE/Core/JetFindingUtilities.h"
 #include "PWGJE/Core/JetSubstructureUtilities.h"
 #include "PWGJE/Core/JetUtilities.h"
 #include "PWGJE/DataModel/Jet.h"
 #include "PWGJE/DataModel/JetReducedData.h"
 #include "PWGJE/DataModel/JetSubtraction.h"
 
-#include "Framework/ASoA.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/HistogramRegistry.h"
-#include "Framework/O2DatabasePDGPlugin.h"
+#include "Common/Core/RecoDecay.h"
+
+#include <Framework/ASoA.h>
 #include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
 #include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
 #include <Framework/HistogramSpec.h>
 #include <Framework/InitContext.h>
+#include <Framework/O2DatabasePDGPlugin.h>
 #include <Framework/runDataProcessing.h>
 
 #include <TMath.h>
 
-#include "fastjet/ClusterSequenceArea.hh"
-#include "fastjet/PseudoJet.hh"
+#include <fastjet/ClusterSequenceArea.hh>
 #include <fastjet/JetDefinition.hh>
+#include <fastjet/PseudoJet.hh>
 
 #include <cmath>
 #include <cstdint>
+#include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
 #include <math.h>
+
 using namespace o2;
 using namespace o2::framework;
 using namespace o2::framework::expressions;
@@ -74,6 +79,7 @@ struct JetSubstructureTask {
   Configurable<float> alpha{"alpha", 1.0, "angularity alpha"};
   Configurable<bool> doPairBkg{"doPairBkg", true, "save bkg pairs"};
   Configurable<float> pairConstituentPtMin{"pairConstituentPtMin", 1.0, "pt cut off for constituents going into pairs"};
+  Configurable<std::string> trackSelections{"trackSelections", "globalTracks", "set track selections"};
 
   Service<o2::framework::O2DatabasePDG> pdg;
   std::vector<fastjet::PseudoJet> jetConstituents;
@@ -103,6 +109,8 @@ struct JetSubstructureTask {
 
   HistogramRegistry registry;
 
+  int trackSelection = -1;
+
   void init(InitContext const&)
   {
     registry.add("h2_jet_pt_jet_zg", ";#it{p}_{T,jet} (GeV/#it{c});#it{z}_{g}", {HistType::kTH2F, {{200, 0., 200.}, {22, 0.0, 1.1}}});
@@ -119,6 +127,9 @@ struct JetSubstructureTask {
 
     jetReclusterer.isReclustering = true;
     jetReclusterer.algorithm = fastjet::JetAlgorithm::cambridge_algorithm;
+    jetReclusterer.ghostRepeatN = 0;
+
+    trackSelection = jetderiveddatautilities::initialiseTrackSelection(static_cast<std::string>(trackSelections));
   }
 
   Preslice<aod::JetTracks> TracksPerCollision = aod::jtrack::collisionId;
@@ -140,8 +151,6 @@ struct JetSubstructureTask {
     fastjet::PseudoJet parentSubJet2;
     bool softDropped = false;
     auto nsd = 0.0;
-    auto zg = -1.0;
-    auto rg = -1.0;
 
     while (daughterSubJet.has_parents(parentSubJet1, parentSubJet2)) {
       if (parentSubJet1.perp() < parentSubJet2.perp()) {
@@ -151,7 +160,7 @@ struct JetSubstructureTask {
       std::vector<int32_t> candidates;
       std::vector<int32_t> clusters;
       for (const auto& constituent : sorted_by_pt(parentSubJet2.constituents())) {
-        if (constituent.template user_info<fastjetutilities::fastjet_user_info>().getStatus() == static_cast<int>(JetConstituentStatus::track)) {
+        if (constituent.template user_info<fastjetutilities::fastjet_user_info>().getStatus() == JetConstituentStatus::track) {
           tracks.push_back(constituent.template user_info<fastjetutilities::fastjet_user_info>().getIndex());
         }
       }
@@ -165,8 +174,8 @@ struct JetSubstructureTask {
 
       if (z >= zCut * TMath::Power(theta / (jet.r() / 100.f), beta)) {
         if (!softDropped) {
-          zg = z;
-          rg = theta;
+          auto zg = z;
+          auto rg = theta;
           if constexpr (!isSubtracted && !isMCP) {
             registry.fill(HIST("h2_jet_pt_jet_zg"), jet.pt(), zg);
             registry.fill(HIST("h2_jet_pt_jet_rg"), jet.pt(), rg);
@@ -246,6 +255,16 @@ struct JetSubstructureTask {
     std::vector<typename U::iterator> tracksPerpCone1Vec;
     std::vector<typename U::iterator> tracksPerpCone2Vec;
     for (auto const& track : tracksPerCollision) {
+      if (!jetderiveddatautilities::applyTrackKinematics(track)) {
+        continue;
+      }
+
+      if constexpr (!std::is_same_v<std::decay_t<U>, aod::JetParticles>) {
+        if (!jetfindingutilities::isTrackSelected<typename U::iterator, typename U::iterator>(track, trackSelection)) {
+          continue;
+        }
+      }
+
       float deltaPhi1 = track.phi() - perpCone1Phi;
       deltaPhi1 = RecoDecay::constrainAngle<float, float>(deltaPhi1, -M_PI);
       float deltaPhi2 = track.phi() - perpCone2Phi;
@@ -314,7 +333,7 @@ struct JetSubstructureTask {
       }
       angularity += std::pow(constituent.pt(), kappa) * std::pow(jetutilities::deltaR(jet, constituent), alpha);
     }
-    angularity /= (jet.pt() * (jet.r() / 100.f));
+    angularity /= (std::pow(jet.pt(), kappa) * std::pow((jet.r() / 100.f), alpha));
   }
 
   template <bool isSubtracted, typename T, typename U, typename V, typename M, typename N, typename O>
@@ -362,7 +381,7 @@ struct JetSubstructureTask {
   {
     jetConstituents.clear();
     for (auto& jetConstituent : jet.template tracks_as<aod::JetParticles>()) {
-      fastjetutilities::fillTracks(jetConstituent, jetConstituents, jetConstituent.globalIndex(), static_cast<int>(JetConstituentStatus::track), pdg->Mass(jetConstituent.pdgCode()));
+      fastjetutilities::fillTracks(jetConstituent, jetConstituents, jetConstituent.globalIndex(), JetConstituentStatus::track, pdg->Mass(jetConstituent.pdgCode()));
     }
     nSub = jetsubstructureutilities::getNSubjettiness(jet, particles, particles, particles, 2, fastjet::contrib::CA_Axes(), true, zCut, beta);
     jetReclustering<true, false>(jet, jetSplittingsMCPTable);

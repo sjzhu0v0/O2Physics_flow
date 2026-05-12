@@ -10,24 +10,32 @@
 // or submit itself to any jurisdiction.
 //
 
+#include "Common/Core/ZorroHelper.h"
+
+#include <CCDB/BasicCCDBManager.h>
+#include <CCDB/CcdbApi.h>
+#include <CommonConstants/LHCConstants.h>
+
+#include <TFile.h>
+#include <TGrid.h>
+#include <TH1.h>
+#include <TKey.h>
+#include <TString.h>
+#include <TSystem.h>
+#include <TTree.h>
+
+#include <RtypesCore.h>
+
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
 #include <fstream>
 #include <iostream>
-#include <vector>
-#include <string>
 #include <map>
-#include <array>
-#include <cmath>
-
-#include "TFile.h"
-#include "TGrid.h"
-#include "TH1.h"
-#include "TKey.h"
-#include "TSystem.h"
-#include "TTree.h"
-
-#include "CCDB/BasicCCDBManager.h"
-#include "EventFiltering/ZorroHelper.h"
-#include "CommonConstants/LHCConstants.h"
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 constexpr uint32_t chunkSize = 1000000;
 
@@ -67,8 +75,11 @@ void uploadOTSobjects(std::string inputList, std::string passName, bool useAlien
     if (!hCounterTVX) {
       hCounterTVX = static_cast<TH1*>(scalersFile->Get("lumi-task/hCounterTVX"));
       if (!hCounterTVX) {
-        std::cout << "No hCounterTVX histogram found in the file, skipping upload for run " << runString << std::endl;
-        continue;
+        hCounterTVX = static_cast<TH1*>(scalersFile->Get("eventselection-run3/luminosity/hCounterTVX"));
+        if (!hCounterTVX) {
+          std::cout << "No hCounterTVX histogram found in the file, skipping upload for run " << runString << std::endl;
+          continue;
+        }
       }
     }
     api.storeAsTFile(hCounterTVX, baseCCDBpath + "InspectedTVX", metadata, duration.first, duration.second + 1);

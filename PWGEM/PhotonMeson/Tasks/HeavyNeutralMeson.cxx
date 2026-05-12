@@ -16,32 +16,45 @@
 /// \author Nicolas Strangmann (nicolas.strangmann@cern.ch) - Goethe University Frankfurt
 ///
 
-#include <vector>
-#include <iterator>
-#include <string>
-
-#include "Math/GenVector/Boost.h"
-#include "Math/Vector4D.h"
-#include "TMath.h"
-#include "TRandom3.h"
-
 #include "PWGEM/PhotonMeson/Utils/HNMUtilities.h"
+#include "PWGEM/PhotonMeson/Utils/PairUtilities.h"
 #include "PWGJE/DataModel/EMCALMatchedCollisions.h"
 
-#include "Common/DataModel/PIDResponse.h"
-#include "Common/DataModel/PIDResponseITS.h"
-#include "fairlogger/Logger.h"
-#include "Framework/Configurable.h"
-#include "Framework/ASoAHelpers.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/HistogramRegistry.h"
-#include "Framework/runDataProcessing.h"
-#include "CommonConstants/MathConstants.h"
-#include "Common/Core/TrackSelection.h"
-#include "Common/DataModel/TrackSelectionTables.h"
+#include "Common/CCDB/TriggerAliases.h"
+#include "Common/Core/RecoDecay.h"
 #include "Common/DataModel/EventSelection.h"
 #include "Common/DataModel/Multiplicity.h"
+#include "Common/DataModel/PIDResponseITS.h"
+#include "Common/DataModel/PIDResponseTOF.h"
+#include "Common/DataModel/PIDResponseTPC.h"
+#include "Common/DataModel/TrackSelectionTables.h"
+
+#include <CommonConstants/MathConstants.h>
+#include <CommonConstants/PhysicsConstants.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Array2D.h>
+#include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/Logger.h>
+#include <Framework/OutputObjHeader.h>
+#include <Framework/runDataProcessing.h>
+
+#include <Math/Vector4D.h> // IWYU pragma: keep (do not replace with Math/Vector4Dfwd.h)
+#include <Math/Vector4Dfwd.h>
+#include <TH1.h>
+#include <TString.h>
+
+#include <sys/types.h>
+
+#include <array>
+#include <cmath>
+#include <cstddef>
+#include <string>
+#include <vector>
 
 using namespace o2;
 using namespace o2::framework;

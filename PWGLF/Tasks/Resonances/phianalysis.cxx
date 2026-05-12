@@ -15,17 +15,26 @@
 ///
 /// \author Bong-Hwi Lim <bong-hwi.lim@cern.ch>
 
+#include "PWGLF/DataModel/LFResonanceTables.h"
+
+#include <CommonConstants/PhysicsConstants.h>
+#include <Framework/ASoA.h>
+#include <Framework/ASoAHelpers.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/BinningPolicy.h>
+#include <Framework/Configurable.h>
+#include <Framework/GroupedCombinations.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/OutputObjHeader.h>
+#include <Framework/SliceCache.h>
+#include <Framework/runDataProcessing.h>
+
 #include <TLorentzVector.h>
 
-#include "Common/DataModel/PIDResponse.h"
-#include "Common/DataModel/Centrality.h"
-#include "Common/DataModel/EventSelection.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/ASoAHelpers.h"
-#include "Framework/runDataProcessing.h"
-#include "PWGLF/DataModel/LFResonanceTables.h"
-#include "DataFormatsParameters/GRPObject.h"
-#include "CommonConstants/PhysicsConstants.h"
+#include <cstdlib>
 
 using namespace o2;
 using namespace o2::framework;

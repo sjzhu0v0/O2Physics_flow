@@ -11,55 +11,44 @@
 // L* baryon v2
 // Prottay Das (prottay.das@cern.ch)
 
-#include <TH1F.h>
-#include <TDirectory.h>
-#include <THn.h>
-#include <TLorentzVector.h>
+#include "PWGLF/DataModel/EPCalibrationTables.h"
+
+#include "Common/CCDB/EventSelectionParams.h"
+#include "Common/DataModel/Centrality.h"
+#include "Common/DataModel/EventSelection.h"
+#include "Common/DataModel/Multiplicity.h"
+#include "Common/DataModel/PIDResponseITS.h"
+#include "Common/DataModel/PIDResponseTOF.h"
+#include "Common/DataModel/PIDResponseTPC.h"
+#include "Common/DataModel/TrackSelectionTables.h"
+
+#include <CCDB/BasicCCDBManager.h>
+#include <CommonConstants/PhysicsConstants.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/O2DatabasePDGPlugin.h>
+#include <Framework/OutputObjHeader.h>
+#include <Framework/runDataProcessing.h>
+#include <ReconstructionDataFormats/PID.h>
+
+#include <Math/Vector4D.h> // IWYU pragma: keep (do not replace with Math/Vector4Dfwd.h)
+#include <Math/Vector4Dfwd.h>
 #include <TMath.h>
-#include <TObjArray.h>
-#include <TFile.h>
-#include <TH2F.h>
-#include <TLorentzVector.h>
-#include <TPDGCode.h>
+
+#include <cmath>
+#include <cstdlib>
 #include <string>
 #include <vector>
-#include <TDatabasePDG.h>
-#include <cmath>
-#include <array>
-#include <cstdlib>
-
-#include "TRandom3.h"
-#include "Math/Vector3D.h"
-#include "Math/Vector4D.h"
-#include "Math/GenVector/Boost.h"
-#include "TF1.h"
-
-#include "PWGLF/DataModel/EPCalibrationTables.h"
-#include "Framework/runDataProcessing.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/HistogramRegistry.h"
-#include "Framework/StepTHn.h"
-#include "Framework/O2DatabasePDGPlugin.h"
-#include "Common/DataModel/PIDResponse.h"
-#include "Common/DataModel/Multiplicity.h"
-#include "Common/DataModel/Centrality.h"
-#include "Common/DataModel/TrackSelectionTables.h"
-#include "Common/DataModel/EventSelection.h"
-#include "Common/Core/trackUtilities.h"
-#include "CommonConstants/PhysicsConstants.h"
-#include "Common/Core/TrackSelection.h"
-#include "Framework/ASoAHelpers.h"
-#include "ReconstructionDataFormats/Track.h"
-#include "DataFormatsParameters/GRPObject.h"
-#include "DataFormatsParameters/GRPMagField.h"
-#include "Common/DataModel/PIDResponseITS.h"
-#include "CCDB/BasicCCDBManager.h"
 
 using namespace o2;
 using namespace o2::framework;
 using namespace o2::framework::expressions;
-using std::array;
+
 struct lstarpbpbv2 {
 
   Service<o2::ccdb::BasicCCDBManager> ccdb;

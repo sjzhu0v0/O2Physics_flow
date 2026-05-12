@@ -19,36 +19,32 @@
 #include "PWGJE/DataModel/Jet.h"
 #include "PWGJE/DataModel/JetReducedData.h"
 
-#include "Framework/ASoA.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/HistogramRegistry.h"
-#include "Framework/O2DatabasePDGPlugin.h"
+#include <Framework/ASoA.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/O2DatabasePDGPlugin.h>
+#include <Framework/runDataProcessing.h>
 
 #include <TMath.h>
 #include <TMathBase.h>
 #include <TVector3.h>
 
-#include "fastjet/ClusterSequenceArea.hh"
-#include "fastjet/PseudoJet.hh"
+#include <fastjet/ClusterSequenceArea.hh>
 #include <fastjet/JetDefinition.hh>
+#include <fastjet/PseudoJet.hh>
 
 #include <cmath>
 #include <utility>
 #include <vector>
 
-// #include "PWGLF/DataModel/LFResonanceTables.h"
-
-#include <Framework/AnalysisHelpers.h>
-#include <Framework/Configurable.h>
-#include <Framework/HistogramSpec.h>
-#include <Framework/InitContext.h>
-#include <Framework/runDataProcessing.h>
-
 using namespace std;
 using namespace o2;
 using namespace o2::framework;
 using namespace o2::framework::expressions;
-using std::array;
 
 int trackSelection = -1;
 int trackL = -1;
@@ -174,8 +170,6 @@ struct JetChCorr {
     fastjet::PseudoJet parentSubJet2;
     bool softDropped = false;
     auto nsd = 0.0;
-    auto zg = -1.0;
-    auto rg = -1.0;
 
     // std::vector<float> energyMotherVec;
     // std::vector<float> ptLeadingVec;
@@ -219,8 +213,8 @@ struct JetChCorr {
       if (z >= zCut * TMath::Power(theta / (jet.r() / 100.f), beta)) {
         if (found1 == true && found2 == true) { // found leading and next-to-leading in seperate prongs
           if (!softDropped) {
-            zg = z;
-            rg = theta;
+            auto zg = z;
+            auto rg = theta;
             if constexpr (!isSubtracted && !isMCP) {
               registry.fill(HIST("h2_jet_pt_jet_zg"), jet.pt(), zg);
               registry.fill(HIST("h2_jet_pt_jet_rg"), jet.pt(), rg);
@@ -239,7 +233,7 @@ struct JetChCorr {
             v2.SetXYZ(parentSubJet2.px(), parentSubJet2.py(), parentSubJet2.pz());
 
             vR = v1 + v2;
-            float z = v2.Perp(vR.Orthogonal()) / (v1.Perp(vR.Orthogonal()) + v2.Perp(vR.Orthogonal()));
+            float z = v2.Perp(vR.Orthogonal()) / (v1.Perp(vR.Orthogonal()) + v2.Perp(vR.Orthogonal())); // you redefine z here, please check!
             float fT = ((2. * z * (1 - z) * vR.Mag()) / v1.Perp2(vR)) / 6.;
             float kt_p = v1.Perp(vR);
 
@@ -421,7 +415,7 @@ struct JetChCorr {
   {
     jetConstituents.clear();
     for (auto& jetConstituent : jet.template tracks_as<aod::JetParticles>()) {
-      fastjetutilities::fillTracks(jetConstituent, jetConstituents, jetConstituent.globalIndex(), static_cast<int>(JetConstituentStatus::track), pdg->Mass(jetConstituent.pdgCode()));
+      fastjetutilities::fillTracks(jetConstituent, jetConstituents, jetConstituent.globalIndex(), JetConstituentStatus::track, pdg->Mass(jetConstituent.pdgCode()));
     }
     jetReclustering<true, false>(jet);
   }

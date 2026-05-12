@@ -24,6 +24,8 @@
 #include "PWGJE/Core/JetFindingUtilities.h"
 #include "PWGJE/DataModel/JetReducedData.h"
 
+#include "Common/Core/RecoDecay.h"
+
 #include <Framework/Logger.h>
 
 #include <TKDTree.h>
@@ -123,13 +125,13 @@ std::tuple<std::vector<int>, std::vector<int>> MatchJetsGeometricallyImpl(
   const std::vector<T>& jetsBaseEta,
   std::vector<T> jetsBasePhiForMatching,
   std::vector<T> jetsBaseEtaForMatching,
-  const std::vector<std::size_t> jetMapBaseToJetIndex,
+  const std::vector<std::size_t>& jetMapBaseToJetIndex,
   const std::vector<T>& jetsTagPhi,
   const std::vector<T>& jetsTagEta,
   std::vector<T> jetsTagPhiForMatching,
   std::vector<T> jetsTagEtaForMatching,
-  const std::vector<std::size_t> jetMapTagToJetIndex,
-  double maxMatchingDistance)
+  const std::vector<std::size_t>& jetMapTagToJetIndex,
+  const double maxMatchingDistance)
 {
   // Validation
   // If no jets in either collection, then return immediately.
@@ -293,7 +295,7 @@ std::tuple<std::vector<int>, std::vector<int>> MatchJetsGeometrically(
 }
 
 template <typename T, typename U>
-void MatchGeo(T const& jetsBasePerCollision, U const& jetsTagPerCollision, std::vector<std::vector<int>>& baseToTagMatchingGeo, std::vector<std::vector<int>>& tagToBaseMatchingGeo, float maxMatchingDistance)
+void MatchGeo(T const& jetsBasePerCollision, U const& jetsTagPerCollision, std::vector<std::vector<int>>& baseToTagMatchingGeo, std::vector<std::vector<int>>& tagToBaseMatchingGeo, std::vector<double> const& jetRadiiForMatchingDistance, std::vector<double> const& maxMatchingDistancePerJetR)
 {
   std::vector<double> jetsR;
   for (const auto& jetBase : jetsBasePerCollision) {
@@ -307,8 +309,19 @@ void MatchGeo(T const& jetsBasePerCollision, U const& jetsTagPerCollision, std::
     }
   }
   for (auto jetR : jetsR) {
+    float effectiveMatchingDistance = -1.0f;
+    for (std::size_t i = 0; i < jetRadiiForMatchingDistance.size(); i++) {
+      if (std::round(jetRadiiForMatchingDistance[i] * 100.0) == std::round(jetR)) {
+        effectiveMatchingDistance = maxMatchingDistancePerJetR[i];
+        break;
+      }
+    }
+    if (effectiveMatchingDistance < 0.0f) {
+      LOGP(fatal, "No matching distance configured for jet R={:.2f}. Add it to jetRadiiForMatchingDistance and maxMatchingDistancePerJetR.", jetR / 100.0);
+    }
     std::vector<double> jetsBasePhi;
     std::vector<double> jetsBaseEta;
+    std::vector<int> jetsBaseGlobalIndex;
     std::vector<int> baseToTagMatchingGeoIndex;
     std::vector<int> tagToBaseMatchingGeoIndex;
 
@@ -316,41 +329,43 @@ void MatchGeo(T const& jetsBasePerCollision, U const& jetsTagPerCollision, std::
       if (std::round(jetBase.r()) != std::round(jetR)) {
         continue;
       }
-      jetsBasePhi.emplace_back(jetBase.phi());
+      jetsBasePhi.emplace_back(RecoDecay::constrainAngle(jetBase.phi(), 0.0));
       jetsBaseEta.emplace_back(jetBase.eta());
+      jetsBaseGlobalIndex.emplace_back(jetBase.globalIndex());
     }
     std::vector<double> jetsTagPhi;
     std::vector<double> jetsTagEta;
+    std::vector<int> jetsTagGlobalIndex;
     for (const auto& jetTag : jetsTagPerCollision) {
       if (std::round(jetTag.r()) != std::round(jetR)) {
         continue;
       }
-      jetsTagPhi.emplace_back(jetTag.phi());
+      jetsTagPhi.emplace_back(RecoDecay::constrainAngle(jetTag.phi(), 0.0));
       jetsTagEta.emplace_back(jetTag.eta());
+      jetsTagGlobalIndex.emplace_back(jetTag.globalIndex());
     }
-    std::tie(baseToTagMatchingGeoIndex, tagToBaseMatchingGeoIndex) = MatchJetsGeometrically(jetsBasePhi, jetsBaseEta, jetsTagPhi, jetsTagEta, maxMatchingDistance); // change max distnace to a function call
+    std::tie(baseToTagMatchingGeoIndex, tagToBaseMatchingGeoIndex) = MatchJetsGeometrically(jetsBasePhi, jetsBaseEta, jetsTagPhi, jetsTagEta, effectiveMatchingDistance);
     int jetBaseIndex = 0;
+    int jetTagIndex = 0;
     for (const auto& jetBase : jetsBasePerCollision) {
       if (std::round(jetBase.r()) != std::round(jetR)) {
         continue;
       }
-      int jetTagIndex = baseToTagMatchingGeoIndex[jetBaseIndex];
-      int jetTagGlobalIndex;
-      if (jetTagIndex > -1 && jetTagIndex < jetsTagPerCollision.size()) {
-        jetTagGlobalIndex = jetsTagPerCollision.iteratorAt(jetTagIndex).globalIndex();
+      jetTagIndex = baseToTagMatchingGeoIndex[jetBaseIndex];
+      if (jetTagIndex > -1 && jetTagIndex < std::ssize(jetsTagPhi)) {
+        int jetTagGlobalIndex = jetsTagGlobalIndex[jetTagIndex];
         baseToTagMatchingGeo[jetBase.globalIndex()].push_back(jetTagGlobalIndex);
       }
       jetBaseIndex++;
     }
-    int jetTagIndex = 0;
+    jetTagIndex = 0;
     for (const auto& jetTag : jetsTagPerCollision) {
       if (std::round(jetTag.r()) != std::round(jetR)) {
         continue;
       }
-      int jetBaseIndex = tagToBaseMatchingGeoIndex[jetTagIndex];
-      int jetBaseGlobalIndex;
-      if (jetBaseIndex > -1 && jetBaseIndex < jetsBasePerCollision.size()) {
-        jetBaseGlobalIndex = jetsBasePerCollision.iteratorAt(jetBaseIndex).globalIndex();
+      jetBaseIndex = tagToBaseMatchingGeoIndex[jetTagIndex];
+      if (jetBaseIndex > -1 && jetBaseIndex < std::ssize(jetsBasePhi)) {
+        int jetBaseGlobalIndex = jetsBaseGlobalIndex[jetBaseIndex];
         tagToBaseMatchingGeo[jetTag.globalIndex()].push_back(jetBaseGlobalIndex);
       }
       jetTagIndex++;
@@ -366,7 +381,6 @@ void MatchHF(T const& jetsBasePerCollision, U const& jetsTagPerCollision, std::v
     if (jetBase.candidatesIds().size() == 0) {
       continue;
     }
-    const auto candidateBase = jetBase.template candidates_first_as<V>();
     for (const auto& jetTag : jetsTagPerCollision) {
       if (jetTag.candidatesIds().size() == 0) {
         continue;
@@ -374,22 +388,30 @@ void MatchHF(T const& jetsBasePerCollision, U const& jetsTagPerCollision, std::v
       if (std::round(jetBase.r()) != std::round(jetTag.r())) {
         continue;
       }
-      if constexpr (jetsBaseIsMc || jetsTagIsMc) {
-        if (jetcandidateutilities::isMatchedCandidate(candidateBase)) {
-          const auto candidateBaseMcId = jetcandidateutilities::matchedParticleId(candidateBase, tracksBase, tracksTag);
-          const auto candidateTag = jetTag.template candidates_first_as<M>();
-          const auto candidateTagId = candidateTag.mcParticleId();
-          if (candidateBaseMcId == candidateTagId) {
-            baseToTagMatchingHF[jetBase.globalIndex()].push_back(jetTag.globalIndex());
-            tagToBaseMatchingHF[jetTag.globalIndex()].push_back(jetBase.globalIndex());
+      auto const& candidatesBase = jetBase.template candidates_as<V>();
+      std::size_t iCandidateBaseMatched = 0;
+      for (auto const& candidateBase : candidatesBase) {
+        if constexpr (jetsBaseIsMc || jetsTagIsMc) {
+          if (jetcandidateutilities::isMatchedCandidate(candidateBase)) {
+            const auto candidateBaseMcId = jetcandidateutilities::matchedParticleId(candidateBase, tracksBase, tracksTag);
+            for (auto const& candidateTag : jetTag.template candidates_as<M>()) {
+              const auto candidateTagId = candidateTag.mcParticleId();
+              if (candidateBaseMcId == candidateTagId) {
+                iCandidateBaseMatched++;
+              }
+            }
+          }
+        } else {
+          for (auto const& candidateTag : jetTag.template candidates_as<M>()) {
+            if (candidateBase.globalIndex() == candidateTag.globalIndex()) {
+              iCandidateBaseMatched++;
+            }
           }
         }
-      } else {
-        const auto candidateTag = jetTag.template candidates_first_as<M>();
-        if (candidateBase.globalIndex() == candidateTag.globalIndex()) {
-          baseToTagMatchingHF[jetBase.globalIndex()].push_back(jetTag.globalIndex());
-          tagToBaseMatchingHF[jetTag.globalIndex()].push_back(jetBase.globalIndex());
-        }
+      }
+      if (iCandidateBaseMatched == candidatesBase.size()) {
+        baseToTagMatchingHF[jetBase.globalIndex()].push_back(jetTag.globalIndex());
+        tagToBaseMatchingHF[jetTag.globalIndex()].push_back(jetBase.globalIndex());
       }
     }
   }
@@ -479,10 +501,8 @@ float getPtSum(T const& tracksBase, U const& candidatesBase, V const& clustersBa
             if (candidateBaseMcId == candidateTagId) {
               ptSum += candidateBase.pt();
             }
-            break; // should only be one
           }
         }
-        break;
       }
     } else if constexpr (jetsBaseIsMc) {
       for (auto const& candidateTag : candidatesTag) {
@@ -493,10 +513,8 @@ float getPtSum(T const& tracksBase, U const& candidatesBase, V const& clustersBa
             if (candidateTagMcId == candidateBaseId) {
               ptSum += candidateTag.pt();
             }
-            break; // should only be one
           }
         }
-        break;
       }
     } else {
       for (auto const& candidateBase : candidatesBase) {
@@ -504,9 +522,7 @@ float getPtSum(T const& tracksBase, U const& candidatesBase, V const& clustersBa
           if (candidateBase.globalIndex() == candidateTag.globalIndex()) {
             ptSum += candidateBase.pt();
           }
-          break; // should only be one
         }
-        break;
       }
     }
   }
@@ -544,8 +560,10 @@ void MatchPt(T const& jetsBasePerCollision, U const& jetsTagPerCollision, std::v
       auto jetTagClusters = getConstituents(jetTag, clustersTag);
       auto jetTagCandidates = getConstituents(jetTag, candidatesTag);
 
-      ptSumBase = getPtSum < jetfindingutilities::isEMCALClusterTable<N>() || jetfindingutilities::isEMCALClusterTable<Q>(), (jetcandidateutilities::isCandidateTable<M>() || jetcandidateutilities::isCandidateMcTable<M>()) && (jetcandidateutilities::isCandidateTable<P>() || jetcandidateutilities::isCandidateMcTable<P>()), jetsBaseIsMc, jetsTagIsMc > (jetBaseTracks, jetBaseCandidates, jetBaseClusters, jetTagTracks, jetTagCandidates, jetTagClusters, tracksBase, tracksTag);
-      ptSumTag = getPtSum < jetfindingutilities::isEMCALClusterTable<N>() || jetfindingutilities::isEMCALClusterTable<Q>(), (jetcandidateutilities::isCandidateTable<M>() || jetcandidateutilities::isCandidateMcTable<M>()) && (jetcandidateutilities::isCandidateTable<P>() || jetcandidateutilities::isCandidateMcTable<P>()), jetsTagIsMc, jetsBaseIsMc > (jetTagTracks, jetTagCandidates, jetTagClusters, jetBaseTracks, jetBaseCandidates, jetBaseClusters, tracksTag, tracksBase);
+      constexpr bool IsEMCAL{jetfindingutilities::isEMCALClusterTable<N>() || jetfindingutilities::isEMCALClusterTable<Q>()};
+      constexpr bool IsCandidate{(jetcandidateutilities::isCandidateTable<M>() || jetcandidateutilities::isCandidateMcTable<M>()) && (jetcandidateutilities::isCandidateTable<P>() || jetcandidateutilities::isCandidateMcTable<P>())};
+      ptSumBase = getPtSum<IsEMCAL, IsCandidate, jetsBaseIsMc, jetsTagIsMc>(jetBaseTracks, jetBaseCandidates, jetBaseClusters, jetTagTracks, jetTagCandidates, jetTagClusters, tracksBase, tracksTag);
+      ptSumTag = getPtSum<IsEMCAL, IsCandidate, jetsTagIsMc, jetsBaseIsMc>(jetTagTracks, jetTagCandidates, jetTagClusters, jetBaseTracks, jetBaseCandidates, jetBaseClusters, tracksTag, tracksBase);
       if (ptSumBase > jetBase.pt() * minPtFraction) {
         baseToTagMatchingPt[jetBase.globalIndex()].push_back(jetTag.globalIndex());
       }
@@ -558,11 +576,11 @@ void MatchPt(T const& jetsBasePerCollision, U const& jetsTagPerCollision, std::v
 
 // function that calls all the Match functions
 template <bool jetsBaseIsMc, bool jetsTagIsMc, typename T, typename U, typename V, typename M, typename N, typename O, typename P, typename R>
-void doAllMatching(T const& jetsBasePerCollision, U const& jetsTagPerCollision, std::vector<std::vector<int>>& baseToTagMatchingGeo, std::vector<std::vector<int>>& baseToTagMatchingPt, std::vector<std::vector<int>>& baseToTagMatchingHF, std::vector<std::vector<int>>& tagToBaseMatchingGeo, std::vector<std::vector<int>>& tagToBaseMatchingPt, std::vector<std::vector<int>>& tagToBaseMatchingHF, V const& candidatesBase, M const& tracksBase, N const& clustersBase, O const& candidatesTag, P const& tracksTag, R const& clustersTag, bool doMatchingGeo, bool doMatchingHf, bool doMatchingPt, float maxMatchingDistance, float minPtFraction)
+void doAllMatching(T const& jetsBasePerCollision, U const& jetsTagPerCollision, std::vector<std::vector<int>>& baseToTagMatchingGeo, std::vector<std::vector<int>>& baseToTagMatchingPt, std::vector<std::vector<int>>& baseToTagMatchingHF, std::vector<std::vector<int>>& tagToBaseMatchingGeo, std::vector<std::vector<int>>& tagToBaseMatchingPt, std::vector<std::vector<int>>& tagToBaseMatchingHF, V const& candidatesBase, M const& tracksBase, N const& clustersBase, O const& candidatesTag, P const& tracksTag, R const& clustersTag, bool doMatchingGeo, bool doMatchingHf, bool doMatchingPt, float minPtFraction, std::vector<double> const& jetRadiiForMatchingDistance, std::vector<double> const& maxMatchingDistancePerJetR)
 {
   // geometric matching
   if (doMatchingGeo) {
-    MatchGeo(jetsBasePerCollision, jetsTagPerCollision, baseToTagMatchingGeo, tagToBaseMatchingGeo, maxMatchingDistance);
+    MatchGeo(jetsBasePerCollision, jetsTagPerCollision, baseToTagMatchingGeo, tagToBaseMatchingGeo, jetRadiiForMatchingDistance, maxMatchingDistancePerJetR);
   }
   // pt matching
   if (doMatchingPt) {

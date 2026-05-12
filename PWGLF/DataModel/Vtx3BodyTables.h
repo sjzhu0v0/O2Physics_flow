@@ -19,10 +19,12 @@
 
 #include "Common/Core/RecoDecay.h"
 
-#include "CommonConstants/PhysicsConstants.h"
-#include "Framework/AnalysisDataModel.h"
+#include <CommonConstants/PhysicsConstants.h>
+#include <Framework/AnalysisDataModel.h>
 
+#include <array>
 #include <cmath>
+#include <cstdint>
 
 namespace o2::aod
 {
@@ -59,12 +61,18 @@ DECLARE_SOA_COLUMN(PyTrackDe, pyTrackDe, float); //! track2 py at min
 DECLARE_SOA_COLUMN(PzTrackDe, pzTrackDe, float); //! track2 pz at min
 
 // DCAs to PV
-DECLARE_SOA_COLUMN(DCAXYTrackPrToPV, dcaXYtrackPrToPv, float); //! DCAXY of proton to PV
-DECLARE_SOA_COLUMN(DCAXYTrackPiToPV, dcaXYtrackPiToPv, float); //! DCAXY of pion to PV
-DECLARE_SOA_COLUMN(DCAXYTrackDeToPV, dcaXYtrackDeToPv, float); //! DCAXY of deuteron to PV
-DECLARE_SOA_COLUMN(DCAZTrackPrToPV, dcaZtrackPrToPv, float);   //! DCAZ of proton to PV
-DECLARE_SOA_COLUMN(DCAZTrackPiToPV, dcaZtrackPiToPv, float);   //! DCAZ of pion to PV
-DECLARE_SOA_COLUMN(DCAZTrackDeToPV, dcaZtrackDeToPv, float);   //! DCAZ of deuteron to PV
+DECLARE_SOA_COLUMN(DCAXYTrackPrToPV, dcaXYtrackPrToPv, float);         //! DCAXY of proton to PV (computed with KFParticle)
+DECLARE_SOA_COLUMN(DCAXYTrackPiToPV, dcaXYtrackPiToPv, float);         //! DCAXY of pion to PV (computed with KFParticle)
+DECLARE_SOA_COLUMN(DCAXYTrackDeToPV, dcaXYtrackDeToPv, float);         //! DCAXY of deuteron to PV (computed with KFParticle)
+DECLARE_SOA_COLUMN(DCATrackPrToPV, dcaTrackPrToPv, float);             //! DCA of proton to PV (computed with KFParticle)
+DECLARE_SOA_COLUMN(DCATrackPiToPV, dcaTrackPiToPv, float);             //! DCA of pion to PV (computed with KFParticle)
+DECLARE_SOA_COLUMN(DCATrackDeToPV, dcaTrackDeToPv, float);             //! DCA of deuteron to PV (computed with KFParticle)
+DECLARE_SOA_COLUMN(DCAXYTrackPrToPVProp, dcaXYtrackPrToPvProp, float); //! DCAXY of proton to PV (propagated with O2 Propagator)
+DECLARE_SOA_COLUMN(DCAXYTrackPiToPVProp, dcaXYtrackPiToPvProp, float); //! DCAXY of pion to PV (propagated with O2 Propagator)
+DECLARE_SOA_COLUMN(DCAXYTrackDeToPVProp, dcaXYtrackDeToPvProp, float); //! DCAXY of deuteron to PV (propagated with O2 Propagator)
+DECLARE_SOA_COLUMN(DCATrackPrToPVProp, dcaTrackPrToPvProp, float);     //! DCA of proton to PV (propagated with O2 Propagator)
+DECLARE_SOA_COLUMN(DCATrackPiToPVProp, dcaTrackPiToPvProp, float);     //! DCA of pion to PV (propagated with O2 Propagator)
+DECLARE_SOA_COLUMN(DCATrackDeToPVProp, dcaTrackDeToPvProp, float);     //! DCA of deuteron to PV (propagated with O2 Propagator)
 
 // DCAs to SV
 DECLARE_SOA_COLUMN(DCATrackPrToSV, dcaTrackPrToSv, float);           //! DCA of proton to SV
@@ -104,31 +112,30 @@ DECLARE_SOA_COLUMN(CovDeuteron, covDeuteron, float[21]); //! covariance matrix e
 DECLARE_SOA_COLUMN(VtxCovMat, vtxCovMat, float[21]);     //! covariance matrix elements of candidate
 
 // Monte Carlo info
-DECLARE_SOA_COLUMN(GenPx, genPx, float);                // generated Px of the hypertriton in GeV/c
-DECLARE_SOA_COLUMN(GenPy, genPy, float);                // generated Py of the hypertriton in GeV/c
-DECLARE_SOA_COLUMN(GenPz, genPz, float);                // generated Pz of the hypertriton in GeV/c
-DECLARE_SOA_COLUMN(GenX, genX, float);                  // generated decay vtx position X of the hypertriton
-DECLARE_SOA_COLUMN(GenY, genY, float);                  // generated decay vtx position Y of the hypertriton
-DECLARE_SOA_COLUMN(GenZ, genZ, float);                  // generated decay vtx position Z of the hypertriton
-DECLARE_SOA_COLUMN(GenCt, genCt, float);                // generated Ct of the hypertriton
-DECLARE_SOA_COLUMN(GenPhi, genPhi, float);              // generated Phi of the hypertriton
-DECLARE_SOA_COLUMN(GenEta, genEta, float);              // Eta of the hypertriton
-DECLARE_SOA_COLUMN(GenRap, genRap, float);              // generated rapidity of the hypertriton
-DECLARE_SOA_COLUMN(GenPPr, genPPr, float);              //! generated momentum proton daughter particle
-DECLARE_SOA_COLUMN(GenPPi, genPPi, float);              //! generated momentum pion daughter particle
-DECLARE_SOA_COLUMN(GenPDe, genPDe, float);              //! generated momentum deuteron daughter particle
-DECLARE_SOA_COLUMN(GenPtPr, genPtPr, float);            //! generated transverse momentum proton daughter particle
-DECLARE_SOA_COLUMN(GenPtPi, genPtPi, float);            //! generated transverse momentum pion daughter particle
-DECLARE_SOA_COLUMN(GenPtDe, genPtDe, float);            //! generated transverse momentum deuteron daughter particle
-DECLARE_SOA_COLUMN(IsTrueH3L, isTrueH3l, bool);         //! flag for true hypertriton candidate
-DECLARE_SOA_COLUMN(IsTrueAntiH3L, isTrueAntiH3l, bool); //! flag for true anti-hypertriton candidate
-DECLARE_SOA_COLUMN(MotherPdgCode, motherPdgCode, int);  //! PDG code of the mother particle
-DECLARE_SOA_COLUMN(PrPdgCode, prPdgCode, int);          //! MC particle proton PDG code
-DECLARE_SOA_COLUMN(PiPdgCode, piPdgCode, int);          //! MC particle pion PDG code
-DECLARE_SOA_COLUMN(DePdgCode, dePdgCode, int);          //! MC particle deuteron PDG code
-DECLARE_SOA_COLUMN(IsDePrimary, isDePrimary, bool);     //! flag for deuteron daughter primary
-DECLARE_SOA_COLUMN(IsSurvEvSel, isSurvEvSel, int);      //! flag if reco collision survived event selection
-DECLARE_SOA_COLUMN(IsReco, isreco, int);                //! flag if candidate was reconstructed
+DECLARE_SOA_COLUMN(GenPx, genPx, float);               // generated Px of the hypertriton in GeV/c
+DECLARE_SOA_COLUMN(GenPy, genPy, float);               // generated Py of the hypertriton in GeV/c
+DECLARE_SOA_COLUMN(GenPz, genPz, float);               // generated Pz of the hypertriton in GeV/c
+DECLARE_SOA_COLUMN(GenX, genX, float);                 // generated decay vtx position X of the hypertriton
+DECLARE_SOA_COLUMN(GenY, genY, float);                 // generated decay vtx position Y of the hypertriton
+DECLARE_SOA_COLUMN(GenZ, genZ, float);                 // generated decay vtx position Z of the hypertriton
+DECLARE_SOA_COLUMN(GenCt, genCt, float);               // generated Ct of the hypertriton
+DECLARE_SOA_COLUMN(GenPhi, genPhi, float);             // generated Phi of the hypertriton
+DECLARE_SOA_COLUMN(GenEta, genEta, float);             // Eta of the hypertriton
+DECLARE_SOA_COLUMN(GenRap, genRap, float);             // generated rapidity of the hypertriton
+DECLARE_SOA_COLUMN(GenPPr, genPPr, float);             //! generated momentum proton daughter particle
+DECLARE_SOA_COLUMN(GenPPi, genPPi, float);             //! generated momentum pion daughter particle
+DECLARE_SOA_COLUMN(GenPDe, genPDe, float);             //! generated momentum deuteron daughter particle
+DECLARE_SOA_COLUMN(GenPtPr, genPtPr, float);           //! generated transverse momentum proton daughter particle
+DECLARE_SOA_COLUMN(GenPtPi, genPtPi, float);           //! generated transverse momentum pion daughter particle
+DECLARE_SOA_COLUMN(GenPtDe, genPtDe, float);           //! generated transverse momentum deuteron daughter particle
+DECLARE_SOA_COLUMN(MotherPdgCode, motherPdgCode, int); //! PDG code of the mother particle
+DECLARE_SOA_COLUMN(PrPdgCode, prPdgCode, int);         //! MC particle proton PDG code
+DECLARE_SOA_COLUMN(PiPdgCode, piPdgCode, int);         //! MC particle pion PDG code
+DECLARE_SOA_COLUMN(DePdgCode, dePdgCode, int);         //! MC particle deuteron PDG code
+DECLARE_SOA_COLUMN(IsDePrimary, isDePrimary, bool);    //! flag for deuteron daughter primary
+DECLARE_SOA_COLUMN(IsSurvEvSel, isSurvEvSel, int);     //! flag if reco collision survived event selection
+DECLARE_SOA_COLUMN(IsReco, isreco, int);               //! flag if candidate was reconstructed
+DECLARE_SOA_COLUMN(MotherLabel, motherLabel, int);     //! label of the mother particle (signal: MC index, bkg: negative value)
 
 // Derived expressions
 // Momenta
@@ -209,7 +216,9 @@ DECLARE_SOA_TABLE(Vtx3BodyDatas, "AOD", "VTX3BODYDATA", //!
                   vtx3body::PxTrackPi, vtx3body::PyTrackPi, vtx3body::PzTrackPi,
                   vtx3body::PxTrackDe, vtx3body::PyTrackDe, vtx3body::PzTrackDe,
                   vtx3body::DCAXYTrackPrToPV, vtx3body::DCAXYTrackPiToPV, vtx3body::DCAXYTrackDeToPV,
-                  vtx3body::DCAZTrackPrToPV, vtx3body::DCAZTrackPiToPV, vtx3body::DCAZTrackDeToPV,
+                  vtx3body::DCATrackPrToPV, vtx3body::DCATrackPiToPV, vtx3body::DCATrackDeToPV,
+                  vtx3body::DCAXYTrackPrToPVProp, vtx3body::DCAXYTrackPiToPVProp, vtx3body::DCAXYTrackDeToPVProp,
+                  vtx3body::DCATrackPrToPVProp, vtx3body::DCATrackPiToPVProp, vtx3body::DCATrackDeToPVProp,
                   vtx3body::DCATrackPrToSV, vtx3body::DCATrackPiToSV, vtx3body::DCATrackDeToSV,
                   vtx3body::DCAVtxToDaughtersAv,
                   vtx3body::CosPA, vtx3body::Ct,
@@ -258,7 +267,9 @@ DECLARE_SOA_TABLE(McVtx3BodyDatas, "AOD", "MC3BODYDATA", //!
                   vtx3body::PxTrackPi, vtx3body::PyTrackPi, vtx3body::PzTrackPi,
                   vtx3body::PxTrackDe, vtx3body::PyTrackDe, vtx3body::PzTrackDe,
                   vtx3body::DCAXYTrackPrToPV, vtx3body::DCAXYTrackPiToPV, vtx3body::DCAXYTrackDeToPV,
-                  vtx3body::DCAZTrackPrToPV, vtx3body::DCAZTrackPiToPV, vtx3body::DCAZTrackDeToPV,
+                  vtx3body::DCATrackPrToPV, vtx3body::DCATrackPiToPV, vtx3body::DCATrackDeToPV,
+                  vtx3body::DCAXYTrackPrToPVProp, vtx3body::DCAXYTrackPiToPVProp, vtx3body::DCAXYTrackDeToPVProp,
+                  vtx3body::DCATrackPrToPVProp, vtx3body::DCATrackPiToPVProp, vtx3body::DCATrackDeToPVProp,
                   vtx3body::DCATrackPrToSV, vtx3body::DCATrackPiToSV, vtx3body::DCATrackDeToSV,
                   vtx3body::DCAVtxToDaughtersAv,
                   vtx3body::CosPA, vtx3body::Ct,
@@ -275,8 +286,8 @@ DECLARE_SOA_TABLE(McVtx3BodyDatas, "AOD", "MC3BODYDATA", //!
                   vtx3body::GenPhi, vtx3body::GenEta, vtx3body::GenRap,
                   vtx3body::GenPPr, vtx3body::GenPPi, vtx3body::GenPDe,
                   vtx3body::GenPtPr, vtx3body::GenPtPi, vtx3body::GenPtDe,
-                  vtx3body::IsTrueH3L, vtx3body::IsTrueAntiH3L,
                   vtx3body::IsReco,
+                  vtx3body::MotherLabel,
                   vtx3body::MotherPdgCode,
                   vtx3body::PrPdgCode, vtx3body::PiPdgCode, vtx3body::DePdgCode,
                   vtx3body::IsDePrimary,

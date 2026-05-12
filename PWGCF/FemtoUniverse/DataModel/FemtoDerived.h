@@ -16,15 +16,17 @@
 #ifndef PWGCF_FEMTOUNIVERSE_DATAMODEL_FEMTODERIVED_H_
 #define PWGCF_FEMTOUNIVERSE_DATAMODEL_FEMTODERIVED_H_
 
-#include <cmath>
-#include "Framework/ASoA.h"
-#include "MathUtils/Utils.h"
-#include "Framework/DataTypes.h"
-#include "Common/DataModel/Multiplicity.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/Expressions.h"
+#include "Common/DataModel/PIDResponseTOF.h"
+#include "Common/DataModel/PIDResponseTPC.h"
 #include "Common/DataModel/TrackSelectionTables.h"
-#include "Common/DataModel/PIDResponse.h"
+
+#include <Framework/ASoA.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/Expressions.h>
+
+#include <cmath>
+#include <cstdint>
+#include <string_view>
 
 namespace o2::aod
 {
@@ -64,6 +66,7 @@ enum ParticleType {
   kV0,              //! V0
   kV0Child,         //! Child track of a V0
   kCascade,         //! Cascade
+  kCascadeV0Child,  //! Child track of a V0 coming from a cascade
   kCascadeBachelor, //! Bachelor track of a cascade
   kPhi,             //! Phi meson
   kPhiChild,        //! Child track of a Phi meson
@@ -72,7 +75,7 @@ enum ParticleType {
   kNParticleTypes   //! Number of particle types
 };
 
-static constexpr std::string_view ParticleTypeName[kNParticleTypes] = {"Tracks", "MCTruthTracks", "V0", "V0Child", "Cascade", "CascadeBachelor", "Phi", "PhiChild", "D0", "D0Child"}; //! Naming of the different particle types
+static constexpr std::string_view ParticleTypeName[kNParticleTypes] = {"Tracks", "MCTruthTracks", "V0", "V0Child", "Cascade", "CascadeV0Child", "CascadeBachelor", "Phi", "PhiChild", "D0", "D0Child"}; //! Naming of the different particle types
 static constexpr std::string_view TempFitVarName[kNParticleTypes] = {"/hDCAxy", "/hPDGvspT", "/hCPA", "/hDCAxy", "/hCPA", "/hDCAxy", "/hInvMass", "/hDCAxy", "/hInvMass", "/hDCAxy"};
 
 using CutContainerType = uint32_t; //! Definition of the data type for the bit-wise container for the different selection criteria
@@ -119,6 +122,15 @@ DECLARE_SOA_DYNAMIC_COLUMN(P, p, //! Compute the overall momentum in GeV/c
                            [](float pt, float eta) -> float {
                              return pt * std::cosh(eta);
                            });
+
+DECLARE_SOA_COLUMN(ITSNSigmaEl, itsNSigmaEl, float); //! Nsigma separation with the Its detector for electron
+DECLARE_SOA_COLUMN(ITSNSigmaPi, itsNSigmaPi, float); //! Nsigma separation with the Its detector for pion
+DECLARE_SOA_COLUMN(ITSNSigmaKa, itsNSigmaKa, float); //! Nsigma separation with the Its detector for kaon
+DECLARE_SOA_COLUMN(ITSNSigmaPr, itsNSigmaPr, float); //! Nsigma separation with the Its detector for proton
+DECLARE_SOA_COLUMN(ITSNSigmaDe, itsNSigmaDe, float); //! Nsigma separation with the Its detector for deuteron
+DECLARE_SOA_COLUMN(ITSNSigmaTr, itsNSigmaTr, float); //! Nsigma separation with the Its detector for triton
+DECLARE_SOA_COLUMN(ITSNSigmaHe, itsNSigmaHe, float); //! Nsigma separation with the Its detector for helium3
+
 // debug variables
 DECLARE_SOA_COLUMN(Sign, sign, int8_t);                                                  //! Sign of the track charge
 DECLARE_SOA_COLUMN(TpcNClsFound, tpcNClsFound, uint8_t);                                 //! Number of TPC clusters
@@ -165,7 +177,7 @@ namespace femtouniversecascparticle
 DECLARE_SOA_INDEX_COLUMN(FDParticle, fdParticle);
 DECLARE_SOA_COLUMN(DcaV0daughters, dcaV0daughters, float);     //! DCA between V0 daughters
 DECLARE_SOA_COLUMN(Cpav0, cpav0, float);                       //! V0 cos of pointing angle
-DECLARE_SOA_COLUMN(V0radius, v0radius, float);                 //! V0 transverse radius*/
+DECLARE_SOA_COLUMN(V0radius, v0radius, float);                 //! V0 transverse radius
 DECLARE_SOA_COLUMN(CpaCasc, cpaCasc, float);                   //! cascade cosinus of pointing angle
 DECLARE_SOA_COLUMN(Dcacascdaughters, dcacascdaughters, float); //! DCA between cascade daughters
 DECLARE_SOA_COLUMN(Cascradius, cascradius, float);             //! cascade transverse radius
@@ -217,6 +229,14 @@ DECLARE_SOA_TABLE(FDExtParticles, "AOD", "FDEXTPARTICLE",
                   pidtof_tiny::TOFNSigmaPr<pidtof_tiny::TOFNSigmaStorePr>,
                   pidtof_tiny::TOFNSigmaDe<pidtof_tiny::TOFNSigmaStoreDe>);
 using FDFullParticle = FDExtParticles::iterator;
+
+DECLARE_SOA_TABLE(FDItsParticles, "AOD", "FDITSPARTICLE",
+                  femtouniverseparticle::ITSNSigmaEl,
+                  femtouniverseparticle::ITSNSigmaPi,
+                  femtouniverseparticle::ITSNSigmaKa,
+                  femtouniverseparticle::ITSNSigmaPr,
+                  femtouniverseparticle::ITSNSigmaDe);
+using FDItsParticle = FDItsParticles::iterator;
 
 DECLARE_SOA_TABLE(FDCascParticles, "AOD", "FDCASCPARTICLE",
                   o2::soa::Index<>,

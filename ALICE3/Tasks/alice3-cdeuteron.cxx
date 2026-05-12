@@ -12,16 +12,30 @@
 /// \author Nicolo' Jacazio <nicolo.jacazio@cern.ch>, CERN
 /// \author Alexander Kalweit <alexander.kalweit@cern.ch>, CERN
 
-// O2 includes
-#include "Framework/AnalysisTask.h"
-#include "Framework/runDataProcessing.h"
-#include "TLorentzVector.h"
-#include "Framework/HistogramRegistry.h"
-#include "ReconstructionDataFormats/PID.h"
-#include "Common/Core/RecoDecay.h"
-#include "DCAFitter/DCAFitterN.h"
-#include "Common/DataModel/PIDResponse.h"
 #include "Common/Core/trackUtilities.h"
+#include "Common/DataModel/PIDResponseTOF.h"
+
+#include <DCAFitter/DCAFitterN.h>
+#include <Framework/ASoA.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/OutputObjHeader.h>
+#include <Framework/SliceCache.h>
+#include <Framework/runDataProcessing.h>
+
+#include <TH1.h>
+#include <TLorentzVector.h>
+#include <TMath.h>
+#include <TString.h>
+
+#include <GPUROOTCartesianFwd.h>
+
+#include <array>
+#include <cmath>
 
 using namespace o2;
 using namespace o2::framework;
@@ -468,7 +482,7 @@ struct Alice3CDeuteron {
 
           // fitterCasc.getTrack(1).getPxPyPzGlo(pvecbach);
         } // End loop on pions
-      }   // End loop on kaons
+      } // End loop on kaons
       histos.fill(HIST("event/candperdeuteron"), ncand);
     } // End loop on deuterons
   }

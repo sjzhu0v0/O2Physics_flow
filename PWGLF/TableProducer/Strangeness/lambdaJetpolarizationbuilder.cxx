@@ -12,28 +12,39 @@
 
 /// \author Youpeng Su (yousu@cern.ch)
 
-#include <iostream>
-#include <string>
-#include <vector>
-#include <cmath>
-#include "Framework/runDataProcessing.h"
-#include "Framework/AnalysisTask.h"
-#include "Common/DataModel/EventSelection.h"
-#include "PWGLF/DataModel/LFStrangenessTables.h"
-#include "Common/DataModel/PIDResponse.h"
-#include "Framework/O2DatabasePDGPlugin.h"
 #include "PWGJE/Core/JetDerivedDataUtilities.h"
 #include "PWGJE/DataModel/Jet.h"
-#include <TLorentzVector.h>
-#include "Framework/ASoA.h"
-#include "Framework/AnalysisDataModel.h"
-#include <TTree.h>
-#include <TFile.h>
-#include <TMatrixD.h>
+#include "PWGJE/DataModel/JetReducedData.h"
+#include "PWGLF/DataModel/LFStrangenessTables.h"
 #include "PWGLF/DataModel/lambdaJetpolarization.h"
 
-using std::cout;
-using std::endl;
+#include "Common/CCDB/EventSelectionParams.h"
+#include "Common/DataModel/Centrality.h"
+#include "Common/DataModel/EventSelection.h"
+#include "Common/DataModel/Multiplicity.h"
+#include "Common/DataModel/PIDResponseTOF.h"
+#include "Common/DataModel/PIDResponseTPC.h"
+#include "Common/DataModel/TrackSelectionTables.h"
+
+#include <CommonConstants/PhysicsConstants.h>
+#include <Framework/ASoA.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/OutputObjHeader.h>
+#include <Framework/runDataProcessing.h>
+
+#include <TLorentzVector.h>
+#include <TTree.h>
+
+#include <cmath>
+#include <string>
+#include <vector>
+
 using namespace o2;
 using namespace o2::framework;
 using namespace o2::framework::expressions;

@@ -11,15 +11,16 @@
 
 /// \file MlResponseO2Track.h
 /// \brief Class to compute the ML response for dielectron analyses at the single track level
-/// \author Daniel Samitz <daniel.samitz@cern.ch>, SMI Vienna
-///         Elisa Meninno, <elisa.meninno@cern.ch>, SMI Vienna
+/// \author Daiki Sekihata <daiki.sekihata@cern.ch>
 
 #ifndef PWGEM_DILEPTON_UTILS_MLRESPONSEO2TRACK_H_
 #define PWGEM_DILEPTON_UTILS_MLRESPONSEO2TRACK_H_
 
 #include "Tools/ML/MlResponse.h"
 
-#include <map>
+#include <Framework/Logger.h>
+
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -160,6 +161,7 @@ enum class InputFeaturesO2Track : uint8_t {
   tpctofNSigmaKa,
   tpctofNSigmaPr,
   tpcNClsFound,
+  tpcNClsPID,
   tpcNClsCrossedRows,
   tpcChi2NCl,
   hasITS,
@@ -191,7 +193,7 @@ class MlResponseO2Track : public MlResponse<TypeOutputScore>
   virtual ~MlResponseO2Track() = default;
 
   template <typename T, typename U, typename V>
-  float return_feature(uint8_t idx, T const& track, U const& trackParCov, V const& collision)
+  float return_feature(uint8_t idx, T const& track, U const& trackParCov, V const& collision, const float beta, const float tofNSigmaEl)
   {
     float inputFeature = 0.;
     switch (idx) {
@@ -215,6 +217,7 @@ class MlResponseO2Track : public MlResponse<TypeOutputScore>
       CHECK_AND_FILL_O2_TRACK_TPCTOF(tpctofNSigmaKa, tpcNSigmaKa, tofNSigmaKa, hasTOF);
       CHECK_AND_FILL_O2_TRACK_TPCTOF(tpctofNSigmaPr, tpcNSigmaPr, tofNSigmaPr, hasTOF);
       CHECK_AND_FILL_O2_TRACK(tpcNClsFound);
+      CHECK_AND_FILL_O2_TRACK(tpcNClsPID);
       CHECK_AND_FILL_O2_TRACK(tpcNClsCrossedRows);
       CHECK_AND_FILL_O2_TRACK(tpcChi2NCl);
       CHECK_AND_FILL_O2_TRACK(hasITS);
@@ -235,6 +238,14 @@ class MlResponseO2Track : public MlResponse<TypeOutputScore>
       CHECK_AND_FILL_DIELECTRON_COLLISION(trackOccupancyInTimeRange);
       CHECK_AND_FILL_DIELECTRON_COLLISION(ft0cOccupancyInTimeRange);
     }
+
+    if (mUseReassociatedTOF) { // vector of map<uint8_t, float> may be better.
+      if (idx == static_cast<uint8_t>(InputFeaturesO2Track::tofNSigmaEl)) {
+        inputFeature = tofNSigmaEl;
+      } else if (idx == static_cast<uint8_t>(InputFeaturesO2Track::beta)) {
+        inputFeature = beta;
+      }
+    }
     return inputFeature;
   }
 
@@ -242,11 +253,11 @@ class MlResponseO2Track : public MlResponse<TypeOutputScore>
   /// \param track is the single track, \param collision is the collision
   /// \return inputFeatures vector
   template <typename T, typename U, typename V>
-  std::vector<float> getInputFeatures(T const& track, U const& trackParCov, V const& collision)
+  std::vector<float> getInputFeatures(T const& track, U const& trackParCov, V const& collision, const float beta = -1.f, const float tofNSigmaEl = -999.f)
   {
     std::vector<float> inputFeatures;
     for (const auto& idx : MlResponse<TypeOutputScore>::mCachedIndices) {
-      float inputFeature = return_feature(idx, track, trackParCov, collision);
+      float inputFeature = return_feature(idx, track, trackParCov, collision, beta, tofNSigmaEl);
       inputFeatures.emplace_back(inputFeature);
     }
     return inputFeatures;
@@ -256,9 +267,9 @@ class MlResponseO2Track : public MlResponse<TypeOutputScore>
   /// \param track is the single track, \param collision is the collision
   /// \return binning variable
   template <typename T, typename U, typename V>
-  float getBinningFeature(T const& track, U const& trackParCov, V const& collision)
+  float getBinningFeature(T const& track, U const& trackParCov, V const& collision, const float beta = -1.f, const float tofNSigmaEl = -999.f)
   {
-    return return_feature(mCachedIndexBinning, track, trackParCov, collision);
+    return return_feature(mCachedIndexBinning, track, trackParCov, collision, beta, tofNSigmaEl);
   }
 
   void cacheBinningIndex(std::string const& cfgBinningFeature)
@@ -270,6 +281,8 @@ class MlResponseO2Track : public MlResponse<TypeOutputScore>
       LOG(fatal) << "Binning feature " << cfgBinningFeature << " not available! Please check your configurables.";
     }
   }
+
+  void useReassociatedTOF(const bool flag) { mUseReassociatedTOF = flag; }
 
  protected:
   /// Method to fill the map of available input features
@@ -296,6 +309,7 @@ class MlResponseO2Track : public MlResponse<TypeOutputScore>
       FILL_MAP_O2_TRACK(tpctofNSigmaKa),
       FILL_MAP_O2_TRACK(tpctofNSigmaPr),
       FILL_MAP_O2_TRACK(tpcNClsFound),
+      FILL_MAP_O2_TRACK(tpcNClsPID),
       FILL_MAP_O2_TRACK(tpcNClsCrossedRows),
       FILL_MAP_O2_TRACK(tpcChi2NCl),
       FILL_MAP_O2_TRACK(hasITS),
@@ -318,6 +332,7 @@ class MlResponseO2Track : public MlResponse<TypeOutputScore>
   }
 
   uint8_t mCachedIndexBinning; // index correspondance between configurable and available input features
+  bool mUseReassociatedTOF{false};
 };
 
 } // namespace o2::analysis

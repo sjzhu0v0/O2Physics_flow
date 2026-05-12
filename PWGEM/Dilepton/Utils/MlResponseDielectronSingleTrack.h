@@ -19,7 +19,9 @@
 
 #include "Tools/ML/MlResponse.h"
 
-#include <map>
+#include <Framework/Logger.h>
+
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -144,6 +146,7 @@ enum class InputFeaturesDielectronSingleTrack : uint8_t {
   tgl,
   isAssociatedToMPC,
   tpcNClsFound,
+  tpcNClsPID,
   tpcNClsCrossedRows,
   tpcCrossedRowsOverFindableCls,
   tpcFoundOverFindableCls,
@@ -266,6 +269,7 @@ class MlResponseDielectronSingleTrack : public MlResponse<TypeOutputScore>
       CHECK_AND_FILL_DIELECTRON_SINGLE_TRACK(tgl);
       CHECK_AND_FILL_DIELECTRON_SINGLE_TRACK(isAssociatedToMPC);
       CHECK_AND_FILL_DIELECTRON_SINGLE_TRACK(tpcNClsFound);
+      CHECK_AND_FILL_DIELECTRON_SINGLE_TRACK(tpcNClsPID);
       CHECK_AND_FILL_DIELECTRON_SINGLE_TRACK(tpcNClsCrossedRows);
       CHECK_AND_FILL_DIELECTRON_SINGLE_TRACK(tpcCrossedRowsOverFindableCls);
       CHECK_AND_FILL_DIELECTRON_SINGLE_TRACK(tpcFoundOverFindableCls);
@@ -414,6 +418,7 @@ class MlResponseDielectronSingleTrack : public MlResponse<TypeOutputScore>
       FILL_MAP_DIELECTRON_SINGLE_TRACK(tgl),
       FILL_MAP_DIELECTRON_SINGLE_TRACK(isAssociatedToMPC),
       FILL_MAP_DIELECTRON_SINGLE_TRACK(tpcNClsFound),
+      FILL_MAP_DIELECTRON_SINGLE_TRACK(tpcNClsPID),
       FILL_MAP_DIELECTRON_SINGLE_TRACK(tpcNClsCrossedRows),
       FILL_MAP_DIELECTRON_SINGLE_TRACK(tpcCrossedRowsOverFindableCls),
       FILL_MAP_DIELECTRON_SINGLE_TRACK(tpcFoundOverFindableCls),

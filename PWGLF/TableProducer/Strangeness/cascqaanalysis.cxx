@@ -13,27 +13,53 @@
 /// \brief Analysis of cascades in pp collisions
 /// \author Roman Nepeivoda (roman.nepeivoda@cern.ch)
 
-#include <algorithm>
-#include <vector>
-#include <TPDGCode.h>
-
-#include "Framework/runDataProcessing.h"
-#include "Framework/AnalysisTask.h"
-#include "Common/DataModel/TrackSelectionTables.h"
-#include "PWGLF/DataModel/LFStrangenessTables.h"
-#include "Common/DataModel/EventSelection.h"
-#include "Common/DataModel/PIDResponse.h"
-#include "Common/DataModel/Multiplicity.h"
-#include "Common/DataModel/Centrality.h"
 #include "PWGLF/DataModel/cascqaanalysis.h"
-#include "TRandom2.h"
-#include "Framework/O2DatabasePDGPlugin.h"
-#include "PWGLF/Utils/inelGt.h"
+
+#include "PWGLF/DataModel/LFStrangenessTables.h"
 #include "PWGLF/DataModel/mcCentrality.h"
+#include "PWGLF/Utils/inelGt.h"
+
+#include "Common/CCDB/EventSelectionParams.h"
+#include "Common/CCDB/RCTSelectionFlags.h"
+#include "Common/DataModel/Centrality.h"
+#include "Common/DataModel/EventSelection.h"
+#include "Common/DataModel/Multiplicity.h"
+#include "Common/DataModel/PIDResponseTOF.h"
+#include "Common/DataModel/PIDResponseTPC.h"
+#include "Common/DataModel/TrackSelectionTables.h"
+
+#include <CommonConstants/PhysicsConstants.h>
+#include <Framework/ASoA.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/DataTypes.h>
+#include <Framework/Expressions.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/O2DatabasePDGPlugin.h>
+#include <Framework/SliceCache.h>
+#include <Framework/runDataProcessing.h>
+
+#include <TH1.h>
+#include <TPDGCode.h>
+#include <TRandom2.h>
+#include <TString.h>
+
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <cstdlib>
+#include <string>
+#include <utility>
+#include <vector>
 
 using namespace o2;
 using namespace o2::framework;
 using namespace o2::framework::expressions;
+using namespace o2::aod::rctsel;
 
 // using DauTracks = soa::Join<aod::TracksIU, aod::TracksExtra, aod::TracksCovIU, aod::TracksDCA, aod::pidTPCPi, aod::pidTPCPr, aod::pidTPCKa, aod::pidTOFPi, aod::pidTOFPr>;
 using TrkPidInfo = soa::Join<aod::pidTPCFullPi, aod::pidTPCFullPr, aod::pidTPCFullKa, aod::pidTOFPi, aod::pidTOFPr, aod::pidTOFKa>;
@@ -63,8 +89,8 @@ struct Cascqaanalysis {
   ConfigurableAxis nChargedFT0MGenAxis{"nChargedFT0MGenAxis", {300, 0, 300}, "N_{FT0M, gen.}"};
   ConfigurableAxis nChargedFV0AGenAxis{"nChargedFV0AGenAxis", {300, 0, 300}, "N_{FV0A, gen.}"};
   ConfigurableAxis multNTracksAxis{"multNTracksAxis", {500, 0, 500}, "N_{tracks}"};
-  ConfigurableAxis signalFT0MAxis{"signalFT0MAxis", {10000, 0, 40000}, "FT0M amplitude"};
-  ConfigurableAxis signalFV0AAxis{"signalFV0AAxis", {10000, 0, 40000}, "FV0A amplitude"};
+  Configurable<int> signalFT0MNBins{"signalFT0MNBins", 1000, "Number of bins for FT0M amplitude QA axis"};
+  Configurable<int> signalFV0ANBins{"signalFV0ANBins", 1000, "Number of bins for FV0A amplitude QA axis"};
   ConfigurableAxis nCandidates{"nCandidates", {30, -0.5, 29.5}, "N_{cand.}"};
 
   // Event selection criteria
@@ -78,6 +104,14 @@ struct Cascqaanalysis {
   Configurable<bool> isNoTimeFrameBorder{"isNoTimeFrameBorder", 1, "TF border cut"};
   Configurable<bool> isNoITSROFrameBorder{"isNoITSROFrameBorder", 1, "ITS ROF border cut"};
   Configurable<bool> isNoCollInTimeRangeNarrow{"isNoCollInTimeRangeNarrow", 1, "No collisions in +-2us window"};
+
+  Configurable<bool> requireRCTFlagChecker{"requireRCTFlagChecker", true, "Check event quality in run condition table"};
+  Configurable<std::string> cfgEvtRCTFlagCheckerLabel{"cfgEvtRCTFlagCheckerLabel", "CBT_hadronPID", "Evt sel: RCT flag checker label"};
+  Configurable<bool> cfgEvtRCTFlagCheckerZDCCheck{"cfgEvtRCTFlagCheckerZDCCheck", false, "Evt sel: RCT flag checker ZDC check"};
+  Configurable<bool> cfgEvtRCTFlagCheckerFV0Check{"cfgEvtRCTFlagCheckerFV0Check", false, "Evt sel: RCT flag checker FV0 check"};
+  Configurable<bool> cfgEvtRCTFlagCheckerLimitAcceptAsBad{"cfgEvtRCTFlagCheckerLimitAcceptAsBad", false, "Evt sel: RCT flag checker treat Limited Acceptance As Bad"};
+
+  RCTFlagsChecker rctChecker;
 
   // Cascade selection criteria
   Configurable<float> scalefactor{"scalefactor", 1.0, "Scaling factor"};
@@ -107,7 +141,7 @@ struct Cascqaanalysis {
   SliceCache cache;
 
   // Random number generator for event scaling
-  TRandom2* fRand = new TRandom2();
+  TRandom2 fRand;
 
   // Struct to select on event type
   typedef struct CollisionIndexAndType {
@@ -115,13 +149,58 @@ struct Cascqaanalysis {
     uint8_t typeFlag;
   } CollisionIndexAndType;
 
+  static constexpr unsigned int kNITSLayers = 7;
+  static constexpr float kGlobalTrackEtaMax = 0.5f;
+  static constexpr float kFT0CMinEta = -3.3f;
+  static constexpr float kFT0CMaxEta = -2.1f;
+  static constexpr float kFT0AMinEta = 3.5f;
+  static constexpr float kFT0AMaxEta = 4.9f;
+  static constexpr float kFV0AMinEta = 2.2f;
+  static constexpr float kFV0AMaxEta = 5.1f;
+  static constexpr size_t kNContributorsCorrelationSize = 2;
+
+  template <typename TTrack>
+  static int countITSHits(TTrack const& track)
+  {
+    int nHits = 0;
+    for (unsigned int i = 0; i < kNITSLayers; ++i) {
+      if (track.itsClusterMap() & (1 << i)) {
+        ++nHits;
+      }
+    }
+    return nHits;
+  }
+
+  template <typename TCollision>
+  static uint8_t buildRecoEventFlags(TCollision const& collision)
+  {
+    uint8_t evFlag = o2::aod::mycascades::EvFlags::EvINEL;
+    if (collision.isInelGt0()) {
+      evFlag |= o2::aod::mycascades::EvFlags::EvINELgt0;
+    }
+    if (collision.isInelGt1()) {
+      evFlag |= o2::aod::mycascades::EvFlags::EvINELgt1;
+    }
+    return evFlag;
+  }
+
+  template <typename TCascade, typename TCollision>
+  static std::pair<float, float> computeCascadeCtau(TCascade const& casc, TCollision const& collision)
+  {
+    const float decayLength = std::hypot(casc.x() - collision.posX(), casc.y() - collision.posY(), casc.z() - collision.posZ());
+    const float totalMomentum = std::hypot(casc.px(), casc.py(), casc.pz());
+    const float invMomentum = 1.f / (totalMomentum + 1.e-13f);
+    return {o2::constants::physics::MassXiMinus * decayLength * invMomentum,
+            o2::constants::physics::MassOmegaMinus * decayLength * invMomentum};
+  }
+
   void init(InitContext const&)
   {
     TString hCandidateCounterLabels[4] = {"All candidates", "passed topo cuts", "has associated MC particle", "associated with Xi(Omega)"};
     TString hNEventsMCLabels[6] = {"All", "z vrtx", "INEL", "INEL>0", "INEL>1", "Associated with rec. collision"};
-    TString hNEventsLabels[13] = {"All", "kIsTriggerTVX", "kNoTimeFrameBorder", "kNoITSROFrameBorder", "kIsVertexITSTPC", "kNoSameBunchPileup", "kIsGoodZvtxFT0vsPV", "isVertexTOFmatched", "kNoCollInTimeRangeNarrow", "z vrtx", "INEL", "INEL>0", "INEL>1"};
+    TString hNEventsLabels[14] = {"All", "kIsTriggerTVX", "kNoTimeFrameBorder", "kNoITSROFrameBorder", "kIsVertexITSTPC", "kNoSameBunchPileup", "kIsGoodZvtxFT0vsPV", "isVertexTOFmatched", "kNoCollInTimeRangeNarrow", "z vrtx", "RCTFlagsChecker", "INEL", "INEL>0", "INEL>1"};
 
-    registry.add("hNEvents", "hNEvents", {HistType::kTH1D, {{13, 0.f, 13.f}}});
+    registry.add("hNEvents", "hNEvents", {HistType::kTH1D, {{14, 0.f, 14.f}}});
 
     for (int n = 1; n <= registry.get<TH1>(HIST("hNEvents"))->GetNbinsX(); n++) {
       registry.get<TH1>(HIST("hNEvents"))->GetXaxis()->SetBinLabel(n, hNEventsLabels[n - 1]);
@@ -156,6 +235,8 @@ struct Cascqaanalysis {
     }
 
     if (multQA) {
+      AxisSpec signalFT0MAxis = {std::max(1, static_cast<int>(signalFT0MNBins)), 0.f, 40000.f, "FT0M amplitude"};
+      AxisSpec signalFV0AAxis = {std::max(1, static_cast<int>(signalFV0ANBins)), 0.f, 40000.f, "FV0A amplitude"};
       if (isMC) {
         // Rec. lvl
         registry.add("hNchFT0Mglobal", "hNchFT0Mglobal", {HistType::kTH3D, {nChargedFT0MGenAxis, multNTracksAxis, eventTypeAxis}});
@@ -169,6 +250,11 @@ struct Cascqaanalysis {
       registry.add("hFT0MFV0Asignal", "hFT0MFV0Asignal", {HistType::kTH2D, {signalFT0MAxis, signalFV0AAxis}});
       registry.add("hFT0MsignalPVContr", "hFT0MsignalPVContr", {HistType::kTH3D, {signalFT0MAxis, multNTracksAxis, eventTypeAxis}});
     }
+
+    rctChecker.init(cfgEvtRCTFlagCheckerLabel, cfgEvtRCTFlagCheckerZDCCheck, cfgEvtRCTFlagCheckerLimitAcceptAsBad);
+    if (cfgEvtRCTFlagCheckerFV0Check) {
+      rctChecker.set(o2::aod::rctsel::kFV0Bad);
+    }
   }
 
   Filter preFilter =
@@ -179,7 +265,7 @@ struct Cascqaanalysis {
      aod::cascdata::dcacascdaughters < dcacascdau);
 
   Partition<DauTracks> pvContribTracksIUEta1 = (nabs(aod::track::eta) < 1.0f) && ((aod::track::flags & static_cast<uint32_t>(o2::aod::track::PVContributor)) == static_cast<uint32_t>(o2::aod::track::PVContributor));
-  Partition<DauTracks> globalTracksIUEta05 = (nabs(aod::track::eta) < 0.5f) && (requireGlobalTrackInFilter());
+  Partition<DauTracks> globalTracksIUEta05 = (nabs(aod::track::eta) < kGlobalTrackEtaMax) && (requireGlobalTrackInFilter());
 
   template <class TCascTracksTo, typename TCascade>
   bool acceptCascCandidate(TCascade const& cascCand, float const& pvx, float const& pvy, float const& pvz)
@@ -190,17 +276,13 @@ struct Cascqaanalysis {
     auto bachelor = cascCand.template bachelor_as<TCascTracksTo>();
 
     // Basic set of selections
-    if (cascCand.cascradius() > cascradius &&
-        cascCand.v0radius() > v0radius &&
-        cascCand.casccosPA(pvx, pvy, pvz) > casccospa &&
-        cascCand.v0cosPA(pvx, pvy, pvz) > v0cospa &&
-        std::fabs(posdau.eta()) < etadau &&
-        std::fabs(negdau.eta()) < etadau &&
-        std::fabs(bachelor.eta()) < etadau) {
-      return true;
-    } else {
-      return false;
-    }
+    return cascCand.cascradius() > cascradius &&
+           cascCand.v0radius() > v0radius &&
+           cascCand.casccosPA(pvx, pvy, pvz) > casccospa &&
+           cascCand.v0cosPA(pvx, pvy, pvz) > v0cospa &&
+           std::fabs(posdau.eta()) < etadau &&
+           std::fabs(negdau.eta()) < etadau &&
+           std::fabs(bachelor.eta()) < etadau;
   }
 
   template <typename TMcParticles>
@@ -219,7 +301,7 @@ struct Cascqaanalysis {
       if (pdgInfo->Charge() == 0) {
         continue;
       }
-      if (mcParticle.eta() < -3.3 || mcParticle.eta() > 4.9 || (mcParticle.eta() > -2.1 && mcParticle.eta() < 3.5)) {
+      if (mcParticle.eta() < kFT0CMinEta || mcParticle.eta() > kFT0AMaxEta || (mcParticle.eta() > kFT0CMaxEta && mcParticle.eta() < kFT0AMinEta)) {
         continue; // select on T0M Nch region
       }
       nchFT0++; // increment
@@ -243,7 +325,7 @@ struct Cascqaanalysis {
       if (pdgInfo->Charge() == 0) {
         continue;
       }
-      if (mcParticle.eta() < 2.2 || mcParticle.eta() > 5.1) {
+      if (mcParticle.eta() < kFV0AMinEta || mcParticle.eta() > kFV0AMaxEta) {
         continue; // select on V0A Nch region
       }
       nchFV0A++; // increment
@@ -256,14 +338,14 @@ struct Cascqaanalysis {
   {
     // 0 - INEL, 1 - INEL>0, 2 - INEL>1
     int evFlag = 0;
-    registry.fill(HIST("hNEvents"), 10.5); // INEL
+    registry.fill(HIST("hNEvents"), 11.5); // INEL
     if (collision.isInelGt0()) {
       evFlag += 1;
-      registry.fill(HIST("hNEvents"), 11.5); // INEL>0
+      registry.fill(HIST("hNEvents"), 12.5); // INEL>0
     }
     if (collision.isInelGt1()) {
       evFlag += 1;
-      registry.fill(HIST("hNEvents"), 12.5); // INEL>1
+      registry.fill(HIST("hNEvents"), 13.5); // INEL>1
     }
     return evFlag;
   }
@@ -347,6 +429,14 @@ struct Cascqaanalysis {
       registry.fill(HIST("hZCollision"), collision.posZ());
     }
 
+    // RCTFlagChecker selection
+    if (requireRCTFlagChecker && !rctChecker(collision)) {
+      return false;
+    }
+    if (isFillEventSelectionQA) {
+      registry.fill(HIST("hNEvents"), 10.5);
+    }
+
     return true;
   }
 
@@ -391,39 +481,16 @@ struct Cascqaanalysis {
         registry.fill(HIST("hCandidateCounter"), 1.5); // passed topo cuts
         nCandSel++;
         // Fill table
-        if (fRand->Rndm() < lEventScale) {
+        if (fRand.Rndm() < lEventScale) {
           auto posdau = casc.posTrack_as<DauTracks>();
           auto negdau = casc.negTrack_as<DauTracks>();
           auto bachelor = casc.bachelor_as<DauTracks>();
 
-          // ITS N hits
-          int posITSNhits = 0, negITSNhits = 0, bachITSNhits = 0;
-          for (unsigned int i = 0; i < 7; i++) {
-            if (posdau.itsClusterMap() & (1 << i)) {
-              posITSNhits++;
-            }
-            if (negdau.itsClusterMap() & (1 << i)) {
-              negITSNhits++;
-            }
-            if (bachelor.itsClusterMap() & (1 << i)) {
-              bachITSNhits++;
-            }
-          }
-
-          uint8_t evFlag = 0;
-          evFlag |= o2::aod::mycascades::EvFlags::EvINEL;
-          if (collision.multNTracksPVeta1() > 0) {
-            evFlag |= o2::aod::mycascades::EvFlags::EvINELgt0;
-          }
-          if (collision.multNTracksPVeta1() > 1) {
-            evFlag |= o2::aod::mycascades::EvFlags::EvINELgt1;
-          }
-
-          // c x tau
-          float cascpos = std::hypot(casc.x() - collision.posX(), casc.y() - collision.posY(), casc.z() - collision.posZ());
-          float cascptotmom = std::hypot(casc.px(), casc.py(), casc.pz());
-          float ctauXi = o2::constants::physics::MassXiMinus * cascpos / (cascptotmom + 1e-13);
-          float ctauOmega = o2::constants::physics::MassOmegaMinus * cascpos / (cascptotmom + 1e-13);
+          const int posITSNhits = countITSHits(posdau);
+          const int negITSNhits = countITSHits(negdau);
+          const int bachITSNhits = countITSHits(bachelor);
+          const uint8_t evFlag = buildRecoEventFlags(collision);
+          const auto [ctauXi, ctauOmega] = computeCascadeCtau(casc, collision);
 
           mycascades(collision.posZ(),
                      collision.centFT0M(), collision.centFV0A(),
@@ -483,15 +550,15 @@ struct Cascqaanalysis {
     uint16_t nchFV0 = getGenNchInFV0Aregion(mcPartSlice);
 
     int evType = 0;
-    registry.fill(HIST("hNEvents"), 10.5); // INEL
+    registry.fill(HIST("hNEvents"), 11.5); // INEL
     // Rec. collision associated with INEL>0 gen. one
     if (pwglf::isINELgtNmc(mcPartSlice, 0, pdgDB)) {
-      registry.fill(HIST("hNEvents"), 11.5); // INEL
+      registry.fill(HIST("hNEvents"), 12.5); // INEL
       evType++;
     }
     // Rec. collision associated with INEL>1 gen. one
     if (pwglf::isINELgtNmc(mcPartSlice, 1, pdgDB)) {
-      registry.fill(HIST("hNEvents"), 12.5); // INEL
+      registry.fill(HIST("hNEvents"), 13.5); // INEL
       evType++;
     }
 
@@ -535,41 +602,17 @@ struct Cascqaanalysis {
             genY = cascmc.y();
           }
         }
-        if (fRand->Rndm() < lEventScale) {
+        if (fRand.Rndm() < lEventScale) {
           // Fill table
           auto posdau = casc.posTrack_as<DauTracks>();
           auto negdau = casc.negTrack_as<DauTracks>();
           auto bachelor = casc.bachelor_as<DauTracks>();
 
-          // ITS N hits
-          int posITSNhits = 0, negITSNhits = 0, bachITSNhits = 0;
-          for (unsigned int i = 0; i < 7; i++) {
-            if (posdau.itsClusterMap() & (1 << i)) {
-              posITSNhits++;
-            }
-            if (negdau.itsClusterMap() & (1 << i)) {
-              negITSNhits++;
-            }
-            if (bachelor.itsClusterMap() & (1 << i)) {
-              bachITSNhits++;
-            }
-          }
-
-          // Event type flag
-          uint8_t evFlag = 0;
-          evFlag |= o2::aod::mycascades::EvFlags::EvINEL;
-          if (collision.multNTracksPVeta1() > 0) {
-            evFlag |= o2::aod::mycascades::EvFlags::EvINELgt0;
-          }
-          if (collision.multNTracksPVeta1() > 1) {
-            evFlag |= o2::aod::mycascades::EvFlags::EvINELgt1;
-          }
-
-          // c x tau
-          float cascpos = std::hypot(casc.x() - collision.posX(), casc.y() - collision.posY(), casc.z() - collision.posZ());
-          float cascptotmom = std::hypot(casc.px(), casc.py(), casc.pz());
-          float ctauXi = o2::constants::physics::MassXiMinus * cascpos / (cascptotmom + 1e-13);
-          float ctauOmega = o2::constants::physics::MassOmegaMinus * cascpos / (cascptotmom + 1e-13);
+          const int posITSNhits = countITSHits(posdau);
+          const int negITSNhits = countITSHits(negdau);
+          const int bachITSNhits = countITSHits(bachelor);
+          const uint8_t evFlag = buildRecoEventFlags(collision);
+          const auto [ctauXi, ctauOmega] = computeCascadeCtau(casc, collision);
 
           mycascades(collision.posZ(),
                      mcCollision.centFT0M(), 0, // mcCollision.centFV0A() to be added
@@ -664,7 +707,7 @@ struct Cascqaanalysis {
 
     registry.fill(HIST("hNchFT0MNAssocMCCollisions"), nchFT0, nAssocColl, evType);
 
-    if (numberOfContributors.size() == 2) {
+    if (numberOfContributors.size() == kNContributorsCorrelationSize) {
       std::sort(numberOfContributors.begin(), numberOfContributors.end());
       registry.fill(HIST("hNContributorsCorrelation"), numberOfContributors[0], numberOfContributors[1]);
     }

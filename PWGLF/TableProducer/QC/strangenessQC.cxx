@@ -14,14 +14,34 @@
 /// In case of questions please write to:
 /// \author Roman Nepeivoda (roman.nepeivoda@cern.ch)
 
-#include "Framework/runDataProcessing.h"
-#include "Framework/AnalysisTask.h"
-#include "Common/DataModel/EventSelection.h"
-#include "Framework/O2DatabasePDGPlugin.h"
-#include "Common/DataModel/TrackSelectionTables.h"
-#include "Common/DataModel/PIDResponse.h"
 #include "PWGLF/DataModel/LFStrangenessTables.h"
 #include "PWGLF/DataModel/QC/strangenessTablesQC.h"
+
+#include "Common/Core/RecoDecay.h"
+#include "Common/DataModel/EventSelection.h"
+#include "Common/DataModel/PIDResponseTPC.h"
+#include "Common/DataModel/TrackSelectionTables.h"
+
+#include <Framework/ASoA.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/Expressions.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/O2DatabasePDGPlugin.h>
+#include <Framework/OutputObjHeader.h>
+#include <Framework/runDataProcessing.h>
+
+#include <TH1.h>
+#include <TMathBase.h>
+#include <TString.h>
+
+#include <RtypesCore.h>
+
+#include <cmath>
 
 using namespace o2;
 using namespace o2::framework;

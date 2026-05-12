@@ -13,20 +13,28 @@
 /// \brief Invariant Mass Reconstruction of Xi(1530) Resonance
 /// \author Yash Patley <yash.patley@cern.ch>
 
-#include <TLorentzVector.h>
-#include <TRandom.h>
-#include <vector>
-
-#include "Common/DataModel/PIDResponse.h"
-#include "Common/DataModel/Centrality.h"
-#include "Common/DataModel/EventSelection.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/ASoAHelpers.h"
-#include "Framework/runDataProcessing.h"
 #include "PWGLF/DataModel/LFResonanceTables.h"
-#include "PWGLF/DataModel/LFStrangenessTables.h"
-#include "CommonConstants/PhysicsConstants.h"
+
 #include "Common/Core/RecoDecay.h"
+
+#include <CommonConstants/PhysicsConstants.h>
+#include <Framework/ASoA.h>
+#include <Framework/ASoAHelpers.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/OutputObjHeader.h>
+#include <Framework/SliceCache.h>
+#include <Framework/runDataProcessing.h>
+
+#include <TLorentzVector.h>
+#include <TMath.h>
+#include <TVector3.h>
+
+#include <vector>
 
 using namespace o2;
 using namespace o2::framework;

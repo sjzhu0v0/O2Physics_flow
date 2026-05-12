@@ -20,40 +20,45 @@
 
 #include "Common/Core/RecoDecay.h"
 #include "Common/Core/TableHelper.h"
-#include "Common/Core/TrackSelection.h"
-#include "Common/DataModel/Centrality.h"
-#include "Common/DataModel/EventSelection.h"
-#include "Common/DataModel/TrackSelectionTables.h"
 
-#include "DataFormatsParameters/GRPObject.h"
-#include "Framework/ASoAHelpers.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/RunningWorkflowInfo.h"
-#include "Framework/runDataProcessing.h"
 #include <CCDB/BasicCCDBManager.h>
+#include <CommonConstants/MathConstants.h>
+#include <DataFormatsParameters/GRPObject.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Array2D.h>
+#include <Framework/BinningPolicy.h>
+#include <Framework/Configurable.h>
+#include <Framework/GroupedCombinations.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/OutputObjHeader.h>
+#include <Framework/runDataProcessing.h>
 
-#include <TDirectory.h>
-#include <TFolder.h>
 #include <TH1.h>
 #include <TH2.h>
 #include <TH3.h>
 #include <TList.h>
 #include <TParameter.h>
-#include <TProfile3D.h>
-#include <TROOT.h>
-#include <TVector2.h>
+
+#include <sys/types.h>
+
+#include <RtypesCore.h>
 
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <ctime>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using namespace o2;
 using namespace o2::framework;
 using namespace o2::soa;
 using namespace o2::framework::expressions;
+using namespace o2::common::core;
 
 #define DPTDPTLOGCOLLISIONS debug
 #define DPTDPTLOGTRACKS debug
@@ -908,9 +913,9 @@ struct DptDptCorrelations {
   TList* ccdblst = nullptr;
   bool loadfromccdb = false;
   std::string cfgCCDBUrl{"http://ccdb-test.cern.ch:8080"};
-  std::string cfgCCDBPathName{""};
-  std::string cfgCCDBDate{"20220307"};
-  std::string cfgCCDBPeriod{"LHC22o"};
+  std::string cfgCCDBPathNameCorrections{""};
+  std::string cfgCCDBDateCorrections{"20220307"};
+  std::string cfgCCDBSuffix{""};
 
   /* pair conversion suppression defaults */
   static constexpr float kCfgPairCutDefaults[1][5] = {{-1, -1, -1, -1, -1}};
@@ -972,10 +977,10 @@ struct DptDptCorrelations {
 
     /* self configure the CCDB access to the input file */
     getTaskOptionValue(initContext, "dpt-dpt-filter", "cfgCCDB.url", cfgCCDBUrl, false);
-    getTaskOptionValue(initContext, "dpt-dpt-filter", "cfgCCDB.pathName", cfgCCDBPathName, false);
-    getTaskOptionValue(initContext, "dpt-dpt-filter", "cfgCCDB.date", cfgCCDBDate, false);
-    getTaskOptionValue(initContext, "dpt-dpt-filter", "cfgCCDB.period", cfgCCDBPeriod, false);
-    loadfromccdb = cfgCCDBPathName.length() > 0;
+    getTaskOptionValue(initContext, "dpt-dpt-filter", "cfgCCDB.pathNameCorrections", cfgCCDBPathNameCorrections, false);
+    getTaskOptionValue(initContext, "dpt-dpt-filter", "cfgCCDB.dateCorrections", cfgCCDBDateCorrections, false);
+    getTaskOptionValue(initContext, "dpt-dpt-filter", "cfgCCDB.suffix", cfgCCDBSuffix, false);
+    loadfromccdb = (cfgCCDBDateCorrections.length() > 0) && (cfgCCDBPathNameCorrections.length() > 0);
 
     /* update the potential binning change */
     etabinwidth = (etaup - etalow) / static_cast<float>(etabins);
@@ -1230,7 +1235,7 @@ struct DptDptCorrelations {
 
     if (ccdblst == nullptr) {
       if (loadfromccdb) {
-        ccdblst = getCCDBInput(ccdb, cfgCCDBPathName.c_str(), cfgCCDBDate.c_str());
+        ccdblst = getCCDBInput(ccdb, cfgCCDBPathNameCorrections.c_str(), cfgCCDBDateCorrections.c_str(), true, cfgCCDBSuffix);
       }
     }
 
@@ -1326,7 +1331,7 @@ struct DptDptCorrelations {
 
     if (ccdblst == nullptr) {
       if (loadfromccdb) {
-        ccdblst = getCCDBInput(ccdb, cfgCCDBPathName.c_str(), cfgCCDBDate.c_str());
+        ccdblst = getCCDBInput(ccdb, cfgCCDBPathNameCorrections.c_str(), cfgCCDBDateCorrections.c_str(), true, cfgCCDBSuffix);
       }
     }
 
@@ -1646,6 +1651,7 @@ struct DptDptCorrelations {
 
 WorkflowSpec defineDataProcessing(ConfigContext const& cfgc)
 {
+  o2::analysis::dptdptfilter::metadataInfo.initMetadata(cfgc);
   WorkflowSpec workflow{
     adaptAnalysisTask<DptDptCorrelations>(cfgc, TaskName{"DptDptCorrelationsRec"}, SetDefaultProcesses{{{"processRecLevel", true}, {"processRecLevelMixed", false}, {"processCleaner", false}}}),  // o2-linter: disable=name/o2-task (It is adapted multiple times)
     adaptAnalysisTask<DptDptCorrelations>(cfgc, TaskName{"DptDptCorrelationsGen"}, SetDefaultProcesses{{{"processGenLevel", false}, {"processGenLevelMixed", false}, {"processCleaner", true}}})}; // o2-linter: disable=name/o2-task (It is adapted multiple times)

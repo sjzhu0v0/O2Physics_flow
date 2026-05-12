@@ -1,4 +1,4 @@
-// Copyright 2019-2025 CERN and copyright holders of ALICE O2.
+// Copyright 2019-2022 CERN and copyright holders of ALICE O2.
 // See https://alice-o2.web.cern.ch/copyright for details of the copyright holders.
 // All rights not expressly granted are reserved.
 //
@@ -16,17 +16,18 @@
 #ifndef PWGCF_FEMTODREAM_CORE_FEMTODREAMOBJECTSELECTION_H_
 #define PWGCF_FEMTODREAM_CORE_FEMTODREAMOBJECTSELECTION_H_
 
+#include "PWGCF/DataModel/FemtoDerived.h"
+#include "PWGCF/FemtoDream/Core/femtoDreamSelection.h"
+
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+
+#include <TH1.h>
+
 #include <algorithm>
+#include <cstddef>
 #include <string>
 #include <vector>
-
-#include "PWGCF/FemtoDream/Core/femtoDreamSelection.h"
-#include "ReconstructionDataFormats/PID.h"
-#include "Framework/HistogramRegistry.h"
-#include "PWGCF/DataModel/FemtoDerived.h"
-
-using namespace o2;
-using namespace o2::framework;
 
 namespace o2::analysis
 {
@@ -51,7 +52,7 @@ class FemtoDreamObjectSelection
   void fillSelectionHistogram()
   {
     int nBins = mSelections.size();
-    mQAHistogramRegistry->add((static_cast<std::string>(o2::aod::femtodreamparticle::ParticleTypeName[part]) + "/cuthist").c_str(), "; Cut; Value", kTH1F, {{nBins, 0, static_cast<double>(nBins)}});
+    mQAHistogramRegistry->add((static_cast<std::string>(o2::aod::femtodreamparticle::ParticleTypeName[part]) + "/cuthist").c_str(), "; Cut; Value", o2::framework::HistType::kTH1F, {{nBins, 0, static_cast<double>(nBins)}});
     auto hist = mQAHistogramRegistry->get<TH1>(HIST(o2::aod::femtodreamparticle::ParticleTypeName[part]) + HIST("/cuthist"));
     for (size_t i = 0; i < mSelections.size(); ++i) {
       hist->GetXaxis()->SetBinLabel(i + 1, Form("%u", mSelections.at(i).getSelectionVariable()));
@@ -69,7 +70,7 @@ class FemtoDreamObjectSelection
   {
     std::vector<selValDataType> tmpSelVals = selVals; // necessary due to some features of the Configurable
     std::vector<FemtoDreamSelection<selValDataType, selVariable>> tempVec;
-    for (const selValDataType selVal : tmpSelVals) {
+    for (const selValDataType& selVal : tmpSelVals) {
       tempVec.push_back(FemtoDreamSelection<selValDataType, selVariable>(selVal, selVar, selType));
     }
     setSelection(tempVec);
@@ -97,7 +98,7 @@ class FemtoDreamObjectSelection
     }
 
     /// Then, the sorted selections are added to the overall container of cuts
-    for (auto& sel : sels) {
+    for (const auto& sel : sels) {
       mSelections.push_back(sel);
     }
   }
@@ -121,7 +122,7 @@ class FemtoDreamObjectSelection
         break;
     }
 
-    for (auto sel : mSelections) {
+    for (auto& sel : mSelections) {
       if (sel.getSelectionVariable() == selVar) {
         switch (sel.getSelectionType()) {
           case (femtoDreamSelection::SelectionType::kUpperLimit):
@@ -164,7 +165,7 @@ class FemtoDreamObjectSelection
   std::vector<FemtoDreamSelection<selValDataType, selVariable>> getSelections(selVariable selVar)
   {
     std::vector<FemtoDreamSelection<selValDataType, selVariable>> selValVec;
-    for (auto it : mSelections) {
+    for (auto& it : mSelections) {
       if (it.getSelectionVariable() == selVar) {
         selValVec.push_back(it);
       }
@@ -177,9 +178,11 @@ class FemtoDreamObjectSelection
   std::vector<selVariable> getSelectionVariables()
   {
     std::vector<selVariable> selVarVec;
-    for (auto it : mSelections) {
+    for (auto& it : mSelections) {
       auto selVar = it.getSelectionVariable();
-      if (std::none_of(selVarVec.begin(), selVarVec.end(), [selVar](selVariable a) { return a == selVar; })) {
+      if (std::none_of(selVarVec.begin(),
+                       selVarVec.end(),
+                       [selVar](selVariable a) { return a == selVar; })) {
         selVarVec.push_back(selVar);
       }
     }
@@ -187,8 +190,8 @@ class FemtoDreamObjectSelection
   }
 
  protected:
-  HistogramRegistry* mHistogramRegistry;                                     ///< For Analysis QA output
-  HistogramRegistry* mQAHistogramRegistry;                                   ///< For QA output
+  o2::framework::HistogramRegistry* mHistogramRegistry;                      ///< For Analysis QA output
+  o2::framework::HistogramRegistry* mQAHistogramRegistry;                    ///< For QA output
   std::vector<FemtoDreamSelection<selValDataType, selVariable>> mSelections; ///< Vector containing all selections
 };
 

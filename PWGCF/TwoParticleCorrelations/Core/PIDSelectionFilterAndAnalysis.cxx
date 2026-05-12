@@ -9,19 +9,29 @@
 // granted to it by virtue of its status as an Intergovernmental Organization
 // or submit itself to any jurisdiction.
 
-#include <boost/regex.hpp>
-#include <TObjArray.h>
-
-#include "Framework/AnalysisTask.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/ASoAHelpers.h"
-#include "Common/DataModel/PIDResponse.h"
 #include "PIDSelectionFilterAndAnalysis.h"
 
+#include "PWGCF/TwoParticleCorrelations/Core/SelectionFilterAndAnalysis.h"
+#include "PWGCF/TwoParticleCorrelations/Core/SkimmingConfigurableCuts.h"
+
+#include <Framework/Logger.h>
+
+#include <TString.h>
+
+#include <boost/regex/v5/regbase.hpp>
+#include <boost/regex/v5/regex.hpp>
+#include <boost/regex/v5/regex_fwd.hpp>
+#include <boost/regex/v5/regex_search.hpp>
+#include <sys/types.h>
+
+#include <Rtypes.h>
+
+#include <cstdint>
+#include <set>
+#include <string>
+#include <vector>
+
 using namespace o2;
-using namespace o2::framework;
-using namespace o2::soa;
-using namespace o2::framework::expressions;
 using namespace o2::analysis::PWGCF;
 using namespace boost;
 

@@ -13,27 +13,24 @@
 //         cascades computed with standard DCAFitter methods and the KFparticle
 //         package. It is meant for the purposes of larger-scale QA of KF reco.
 
-#include <cmath>
-
-#include "Framework/runDataProcessing.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/ASoAHelpers.h"
-#include "ReconstructionDataFormats/Track.h"
-#include "Common/Core/RecoDecay.h"
-#include "Common/Core/trackUtilities.h"
 #include "PWGLF/DataModel/LFStrangenessTables.h"
-#include "Common/Core/TrackSelection.h"
-#include "Common/DataModel/TrackSelectionTables.h"
-#include "Common/DataModel/EventSelection.h"
-#include "Common/DataModel/Centrality.h"
-#include "Common/DataModel/PIDResponse.h"
-#include "Common/DataModel/Multiplicity.h"
+
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/OutputObjHeader.h>
+#include <Framework/runDataProcessing.h>
+
+#include <TMath.h>
+
+#include <cmath>
 
 using namespace o2;
 using namespace o2::framework;
 using namespace o2::framework::expressions;
-using std::array;
 
 // allows for candidate-by-candidate comparison using Cascade to []CascData link table
 using CascadesCrossLinked = soa::Join<aod::Cascades, aod::CascDataLink, aod::KFCascDataLink>;
@@ -151,8 +148,8 @@ struct kfPerformanceStudy {
       }
 
       histos.fill(HIST("hPtCorrelation"), pt, ptKF);
-      histos.fill(HIST("h3dMassLambda"), pt, massLambda, massLambdaKF); // <- implicit pT choice, beware
-      histos.fill(HIST("h3dDCAxy"), pt, dcaXY, dcaXYKF);                // <- implicit pT choice, beware
+      histos.fill(HIST("h3dMassLambda"), pt, massLambda, massLambdaKF);          // <- implicit pT choice, beware
+      histos.fill(HIST("h3dDCAxy"), pt, dcaXY, dcaXYKF);                         // <- implicit pT choice, beware
       histos.fill(HIST("h3dPointingAngle"), pt, pointingAngle, pointingAngleKF); // <- implicit pT choice, beware
 
       histos.fill(HIST("hPointingAngle"), pointingAngle);

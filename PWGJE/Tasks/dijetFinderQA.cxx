@@ -18,10 +18,10 @@
 #include "PWGJE/DataModel/Jet.h"
 #include "PWGJE/DataModel/JetReducedData.h"
 
-#include "Framework/ASoA.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/HistogramRegistry.h"
+#include <Framework/ASoA.h>
+#include <Framework/AnalysisTask.h>
 #include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
 #include <Framework/HistogramSpec.h>
 #include <Framework/InitContext.h>
 #include <Framework/runDataProcessing.h>
@@ -238,12 +238,12 @@ struct DijetFinderQATask {
     }
 
     if (jetPtcuts.size() >= 2) {
-      auto& leading_jet = jetPtcuts[0];
+      const auto& leading_jet = jetPtcuts[0];
 
       bool found_pair = false;
 
       for (size_t i = 1; i < jetPtcuts.size() && !found_pair; i++) {
-        auto& candidate_jet = jetPtcuts[i];
+        const auto& candidate_jet = jetPtcuts[i];
         Double_t dphi = fabs(leading_jet[2] - candidate_jet[2]);
         Double_t deta = fabs(leading_jet[1] - candidate_jet[1]);
         Double_t condition = fabs(dphi - M_PI);
@@ -288,12 +288,12 @@ struct DijetFinderQATask {
     }
 
     if (jetPtcuts.size() >= 2) {
-      auto& leading_jet = jetPtcuts[0];
+      const auto& leading_jet = jetPtcuts[0];
 
       bool found_pair = false;
 
       for (size_t i = 1; i < jetPtcuts.size() && !found_pair; i++) {
-        auto& candidate_jet = jetPtcuts[i];
+        const auto& candidate_jet = jetPtcuts[i];
         Double_t dphi = fabs(leading_jet[2] - candidate_jet[2]);
         Double_t deta = fabs(leading_jet[1] - candidate_jet[1]);
         Double_t condition = fabs(dphi - M_PI);
@@ -338,12 +338,12 @@ struct DijetFinderQATask {
     }
 
     if (jetPtcuts.size() >= 2) {
-      auto& leading_jet = jetPtcuts[0];
+      const auto& leading_jet = jetPtcuts[0];
 
       bool found_pair = false;
 
       for (size_t i = 1; i < jetPtcuts.size() && !found_pair; i++) {
-        auto& candidate_jet = jetPtcuts[i];
+        const auto& candidate_jet = jetPtcuts[i];
         Double_t dphi = fabs(leading_jet[2] - candidate_jet[2]);
         Double_t deta = fabs(leading_jet[1] - candidate_jet[1]);
         Double_t condition = fabs(dphi - M_PI);
@@ -411,8 +411,8 @@ struct DijetFinderQATask {
     }
 
     if (jetPtcuts_D.size() >= 2 && jetPtcuts_P.size() >= 2) {
-      auto& leading_jet_D = jetPtcuts_D[0];
-      auto& leading_jet_P = jetPtcuts_P[0];
+      const auto& leading_jet_D = jetPtcuts_D[0];
+      const auto& leading_jet_P = jetPtcuts_P[0];
 
       std::array<double, 3> candidate_jet_D{};
       std::array<double, 3> candidate_jet_P{};

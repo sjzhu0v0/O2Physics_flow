@@ -20,14 +20,16 @@
 #include "Common/DataModel/Centrality.h"
 #include "Common/DataModel/EventSelection.h"
 #include "Common/DataModel/Multiplicity.h"
-#include "Common/DataModel/PIDResponse.h"
+#include "Common/DataModel/PIDResponseTOF.h"
+#include "Common/DataModel/PIDResponseTPC.h"
 #include "Common/DataModel/Qvectors.h"
 
-#include "Framework/ASoA.h"
-#include "Framework/AnalysisDataModel.h"
-#include "MathUtils/Utils.h"
+#include <Framework/ASoA.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/DataTypes.h>
 
 #include <cmath>
+#include <cstdint>
 #include <vector>
 
 namespace o2::aod
@@ -35,12 +37,8 @@ namespace o2::aod
 
 namespace dqppfilter
 {
-DECLARE_SOA_COLUMN(EventFilter, eventFilter, uint64_t);  //! Bit-field used for the high level event triggering
-DECLARE_SOA_COLUMN(NewBcMultFT0A, newBcMultFT0A, float); //! sum of amplitudes on A side of FT0
-DECLARE_SOA_COLUMN(NewBcMultFT0C, newBcMultFT0C, float); //! sum of amplitudes on C side of FT0
-DECLARE_SOA_COLUMN(NewBcMultFDDA, newBcMultFDDA, float); //! sum of amplitudes on A side of FDD
-DECLARE_SOA_COLUMN(NewBcMultFDDC, newBcMultFDDC, float); //! sum of amplitudes on C side of FDD
-DECLARE_SOA_COLUMN(NewBcMultFV0A, newBcMultFV0A, float); //! sum of amplitudes on A side of FDD
+DECLARE_SOA_COLUMN(EventFilter, eventFilter, uint64_t); //! Bit-field used for the high level event triggering
+DECLARE_SOA_COLUMN(NewBcIndex, newBcIndex, uint64_t);   //! globalIndex of the new BC determined in filterPbPb
 } // namespace dqppfilter
 
 DECLARE_SOA_TABLE(DQEventFilter, "AOD", "EVENTFILTER", //! Store event-level decisions (DQ high level triggers)
@@ -48,41 +46,55 @@ DECLARE_SOA_TABLE(DQEventFilter, "AOD", "EVENTFILTER", //! Store event-level dec
 
 DECLARE_SOA_TABLE(DQRapidityGapFilter, "AOD", "RAPIDITYGAPFILTER",
                   dqppfilter::EventFilter,
-                  dqppfilter::NewBcMultFT0A,
-                  dqppfilter::NewBcMultFT0C,
-                  dqppfilter::NewBcMultFDDA,
-                  dqppfilter::NewBcMultFDDC,
-                  dqppfilter::NewBcMultFV0A,
-                  zdc::EnergyCommonZNA,
-                  zdc::EnergyCommonZNC,
-                  zdc::EnergyCommonZPA,
-                  zdc::EnergyCommonZPC,
-                  zdc::TimeZNA,
-                  zdc::TimeZNC,
-                  zdc::TimeZPA,
-                  zdc::TimeZPC);
+                  dqppfilter::NewBcIndex);
 
 namespace reducedevent
 {
 
 // basic event information
-DECLARE_SOA_INDEX_COLUMN(Collision, collision);                                  //!
-DECLARE_SOA_BITMAP_COLUMN(Tag, tag, 64);                                         //!  Bit-field for storing event information (e.g. high level info, cut decisions)
-DECLARE_SOA_COLUMN(MCPosX, mcPosX, float);                                       //!  MC event position X
-DECLARE_SOA_COLUMN(MCPosY, mcPosY, float);                                       //!  MC event position Y
-DECLARE_SOA_COLUMN(MCPosZ, mcPosZ, float);                                       //!  MC event position Z
-DECLARE_SOA_COLUMN(NTPCoccupContribLongA, nTPCoccupContribLongA, int);           //!  TPC pileup occupancy on A side (long time range)
-DECLARE_SOA_COLUMN(NTPCoccupContribLongC, nTPCoccupContribLongC, int);           //!  TPC pileup occupancy on C side (long time range)
-DECLARE_SOA_COLUMN(NTPCoccupMeanTimeLongA, nTPCoccupMeanTimeLongA, float);       //!  TPC pileup mean time on A side (long time range)
-DECLARE_SOA_COLUMN(NTPCoccupMeanTimeLongC, nTPCoccupMeanTimeLongC, float);       //!  TPC pileup mean time on C side (long time range)
-DECLARE_SOA_COLUMN(NTPCoccupMedianTimeLongA, nTPCoccupMedianTimeLongA, float);   //!  TPC pileup median time on A side (long time range)
-DECLARE_SOA_COLUMN(NTPCoccupMedianTimeLongC, nTPCoccupMedianTimeLongC, float);   //!  TPC pileup median time on C side (long time range)
-DECLARE_SOA_COLUMN(NTPCoccupContribShortA, nTPCoccupContribShortA, int);         //!  TPC pileup occupancy on A side (short time range)
-DECLARE_SOA_COLUMN(NTPCoccupContribShortC, nTPCoccupContribShortC, int);         //!  TPC pileup occupancy on C side (short time range)
-DECLARE_SOA_COLUMN(NTPCoccupMeanTimeShortA, nTPCoccupMeanTimeShortA, float);     //!  TPC pileup mean time on A side (short time range)
-DECLARE_SOA_COLUMN(NTPCoccupMeanTimeShortC, nTPCoccupMeanTimeShortC, float);     //!  TPC pileup mean time on C side (short time range)
-DECLARE_SOA_COLUMN(NTPCoccupMedianTimeShortA, nTPCoccupMedianTimeShortA, float); //!  TPC pileup median time on A side (short time range)
-DECLARE_SOA_COLUMN(NTPCoccupMedianTimeShortC, nTPCoccupMedianTimeShortC, float); //!  TPC pileup median time on C side (short time range)
+DECLARE_SOA_INDEX_COLUMN(Collision, collision);                                                              //!
+DECLARE_SOA_BITMAP_COLUMN(Tag, tag, 64);                                                                     //!  Bit-field for storing event information (e.g. high level info, cut decisions)
+DECLARE_SOA_COLUMN(MCPosX, mcPosX, float);                                                                   //!  MC event position X
+DECLARE_SOA_COLUMN(MCPosY, mcPosY, float);                                                                   //!  MC event position Y
+DECLARE_SOA_COLUMN(MCPosZ, mcPosZ, float);                                                                   //!  MC event position Z
+DECLARE_SOA_COLUMN(NTPCoccupContribLongA, nTPCoccupContribLongA, int);                                       //!  TPC pileup occupancy on A side (long time range)
+DECLARE_SOA_COLUMN(NTPCoccupContribLongC, nTPCoccupContribLongC, int);                                       //!  TPC pileup occupancy on C side (long time range)
+DECLARE_SOA_COLUMN(NTPCoccupMeanTimeLongA, nTPCoccupMeanTimeLongA, float);                                   //!  TPC pileup mean time on A side (long time range)
+DECLARE_SOA_COLUMN(NTPCoccupMeanTimeLongC, nTPCoccupMeanTimeLongC, float);                                   //!  TPC pileup mean time on C side (long time range)
+DECLARE_SOA_COLUMN(NTPCoccupMedianTimeLongA, nTPCoccupMedianTimeLongA, float);                               //!  TPC pileup median time on A side (long time range)
+DECLARE_SOA_COLUMN(NTPCoccupMedianTimeLongC, nTPCoccupMedianTimeLongC, float);                               //!  TPC pileup median time on C side (long time range)
+DECLARE_SOA_COLUMN(NTPCoccupContribShortA, nTPCoccupContribShortA, int);                                     //!  TPC pileup occupancy on A side (short time range)
+DECLARE_SOA_COLUMN(NTPCoccupContribShortC, nTPCoccupContribShortC, int);                                     //!  TPC pileup occupancy on C side (short time range)
+DECLARE_SOA_COLUMN(NTPCoccupMeanTimeShortA, nTPCoccupMeanTimeShortA, float);                                 //!  TPC pileup mean time on A side (short time range)
+DECLARE_SOA_COLUMN(NTPCoccupMeanTimeShortC, nTPCoccupMeanTimeShortC, float);                                 //!  TPC pileup mean time on C side (short time range)
+DECLARE_SOA_COLUMN(NTPCoccupMedianTimeShortA, nTPCoccupMedianTimeShortA, float);                             //!  TPC pileup median time on A side (short time range)
+DECLARE_SOA_COLUMN(NTPCoccupMedianTimeShortC, nTPCoccupMedianTimeShortC, float);                             //!  TPC pileup median time on C side (short time range)
+DECLARE_SOA_COLUMN(DCAzBimodalityCoefficient, dcazBimodalityCoefficient, float);                             //!  Bimodality coefficient of the DCAz distribution of the tracks in the event
+DECLARE_SOA_COLUMN(DCAzBimodalityCoefficientBinned, dcazBimodalityCoefficientBinned, float);                 //!  Bimodality coefficient of the DCAz distribution of the tracks in the event, binned
+DECLARE_SOA_COLUMN(DCAzBimodalityCoefficientBinnedTrimmed1, dcazBimodalityCoefficientBinnedTrimmed1, float); //!  Bimodality coefficient of the DCAz distribution of the tracks in the event, binned and trimmed 1
+DECLARE_SOA_COLUMN(DCAzBimodalityCoefficientBinnedTrimmed2, dcazBimodalityCoefficientBinnedTrimmed2, float); //!  Bimodality coefficient of the DCAz distribution of the tracks in the event, binned and trimmed 2
+DECLARE_SOA_COLUMN(DCAzBimodalityCoefficientBinnedTrimmed3, dcazBimodalityCoefficientBinnedTrimmed3, float); //!  Bimodality coefficient of the DCAz distribution of the tracks in the event, binned and trimmed 3
+DECLARE_SOA_COLUMN(DCAzMean, dcazMean, float);                                                               //!  Mean of the DCAz distribution of the tracks in the event
+DECLARE_SOA_COLUMN(DCAzMeanBinnedTrimmed1, dcazMeanBinnedTrimmed1, float);                                   //!  Mean of the DCAz distribution of the tracks in the event, binned and trimmed 1
+DECLARE_SOA_COLUMN(DCAzMeanBinnedTrimmed2, dcazMeanBinnedTrimmed2, float);                                   //!  Mean of the DCAz distribution of the tracks in the event, binned and trimmed 2
+DECLARE_SOA_COLUMN(DCAzMeanBinnedTrimmed3, dcazMeanBinnedTrimmed3, float);                                   //!  Mean of the DCAz distribution of the tracks in the event, binned and trimmed 3
+DECLARE_SOA_COLUMN(DCAzRMS, dcazRMS, float);                                                                 //!  RMS of the DCAz distribution of the tracks in the event
+DECLARE_SOA_COLUMN(DCAzRMSBinnedTrimmed1, dcazRMSBinnedTrimmed1, float);                                     //!  RMS of the DCAz distribution of the tracks in the event, binned and trimmed 1
+DECLARE_SOA_COLUMN(DCAzRMSBinnedTrimmed2, dcazRMSBinnedTrimmed2, float);                                     //!  RMS of the DCAz distribution of the tracks in the event, binned and trimmed 2
+DECLARE_SOA_COLUMN(DCAzRMSBinnedTrimmed3, dcazRMSBinnedTrimmed3, float);                                     //!  RMS of the DCAz distribution of the tracks in the event, binned and trimmed 3
+DECLARE_SOA_COLUMN(DCAzSkewness, dcazSkewness, float);                                                       //!  Skewness of the DCAz distribution of the tracks in the event
+DECLARE_SOA_COLUMN(DCAzKurtosis, dcazKurtosis, float);                                                       //!  Kurtosis of the DCAz distribution of the tracks in the event
+DECLARE_SOA_COLUMN(DCAzFracAbove100um, dcazFracAbove100um, float);                                           //!  Fraction of tracks in the event with |DCAz| > 100um
+DECLARE_SOA_COLUMN(DCAzFracAbove200um, dcazFracAbove200um, float);                                           //!  Fraction of tracks in the event with |DCAz| > 200um
+DECLARE_SOA_COLUMN(DCAzFracAbove500um, dcazFracAbove500um, float);                                           //!  Fraction of tracks in the event with |DCAz| > 500um
+DECLARE_SOA_COLUMN(DCAzFracAbove1mm, dcazFracAbove1mm, float);                                               //!  Fraction of tracks in the event with |DCAz| > 1mm
+DECLARE_SOA_COLUMN(DCAzFracAbove2mm, dcazFracAbove2mm, float);                                               //!  Fraction of tracks in the event with |DCAz| > 2mm
+DECLARE_SOA_COLUMN(DCAzFracAbove5mm, dcazFracAbove5mm, float);                                               //!  Fraction of tracks in the event with |DCAz| > 5mm
+DECLARE_SOA_COLUMN(DCAzFracAbove10mm, dcazFracAbove10mm, float);                                             //!  Fraction of tracks in the event with |DCAz| > 10mm
+DECLARE_SOA_COLUMN(DCAzNPeaks, dcazNPeaks, int);                                                             //!  Number of peaks in the DCAz distribution of the tracks in the event
+DECLARE_SOA_COLUMN(DCAzNPeaksTrimmed1, dcazNPeaksTrimmed1, int);                                             //!  Number of peaks in the binned DCAz distribution (trimmed 1)
+DECLARE_SOA_COLUMN(DCAzNPeaksTrimmed2, dcazNPeaksTrimmed2, int);                                             //!  Number of peaks in the binned DCAz distribution (trimmed 2)
+DECLARE_SOA_COLUMN(DCAzNPeaksTrimmed3, dcazNPeaksTrimmed3, int);                                             //!  Number of peaks in the binned DCAz distribution (trimmed 3)
 
 // Columns declared to guarantee the backward compatibility of the tables
 DECLARE_SOA_COLUMN(QvecBPosRe, qvecBPosRe, float);
@@ -214,14 +226,33 @@ DECLARE_SOA_TABLE(ReducedEventsQvectorZN, "AOD", "REQVECTORZN", //!    Event Q-v
 DECLARE_SOA_TABLE(ReducedEventsInfo, "AOD", "REDUCEVENTINFO", //!   Main event index table
                   reducedevent::CollisionId);
 
+DECLARE_SOA_TABLE(ReducedEventsMergingTable, "AOD", "REMERGE", //!   Collision merging quatities
+                  reducedevent::DCAzBimodalityCoefficient, reducedevent::DCAzBimodalityCoefficientBinned,
+                  reducedevent::DCAzBimodalityCoefficientBinnedTrimmed1, reducedevent::DCAzBimodalityCoefficientBinnedTrimmed2, reducedevent::DCAzBimodalityCoefficientBinnedTrimmed3,
+                  reducedevent::DCAzMean, reducedevent::DCAzMeanBinnedTrimmed1, reducedevent::DCAzMeanBinnedTrimmed2, reducedevent::DCAzMeanBinnedTrimmed3,
+                  reducedevent::DCAzRMS, reducedevent::DCAzRMSBinnedTrimmed1, reducedevent::DCAzRMSBinnedTrimmed2, reducedevent::DCAzRMSBinnedTrimmed3,
+                  reducedevent::DCAzSkewness, reducedevent::DCAzKurtosis,
+                  reducedevent::DCAzFracAbove100um, reducedevent::DCAzFracAbove200um, reducedevent::DCAzFracAbove500um,
+                  reducedevent::DCAzFracAbove1mm, reducedevent::DCAzFracAbove2mm, reducedevent::DCAzFracAbove5mm, reducedevent::DCAzFracAbove10mm,
+                  reducedevent::DCAzNPeaks, reducedevent::DCAzNPeaksTrimmed1, reducedevent::DCAzNPeaksTrimmed2, reducedevent::DCAzNPeaksTrimmed3);
+
 // TODO and NOTE: This table is just an extension of the ReducedEvents table
 //       There is no explicit accounting for MC events which were not reconstructed!!!
 //       However, for analysis which will require these events, a special skimming process function
 //           can be constructed and the same data model could be used
-DECLARE_SOA_TABLE(ReducedMCEvents, "AOD", "REDUCEDMCEVENT", //!   Event level MC truth information
+
+DECLARE_SOA_TABLE(ReducedMCEvents_000, "AOD", "REDUCEDMCEVENT", //!   Event level MC truth information
                   o2::soa::Index<>,
                   mccollision::GeneratorsID, reducedevent::MCPosX, reducedevent::MCPosY, reducedevent::MCPosZ,
                   mccollision::T, mccollision::Weight, mccollision::ImpactParameter);
+
+DECLARE_SOA_TABLE_VERSIONED(ReducedMCEvents_001, "AOD", "REDUCEDMCEVENT", 1, //!   Event level MC truth information
+                            o2::soa::Index<>,
+                            mccollision::GeneratorsID, reducedevent::MCPosX, reducedevent::MCPosY, reducedevent::MCPosZ,
+                            mccollision::T, mccollision::Weight, mccollision::ImpactParameter, cent::CentFT0C,
+                            mult::MultMCNParticlesEta05, mult::MultMCNParticlesEta08, mult::MultMCNParticlesEta10);
+
+using ReducedMCEvents = ReducedMCEvents_001;
 
 using ReducedEvent = ReducedEvents::iterator;
 using StoredReducedEvent = StoredReducedEvents::iterator;
@@ -279,6 +310,56 @@ DECLARE_SOA_TABLE(ReducedZdcsExtra, "AOD", "REDUCEDZDCEXTRA", //!   Event ZDC ex
 
 using ReducedZdc = ReducedZdcs::iterator;
 using ReducedZdcExtra = ReducedZdcsExtra::iterator;
+
+namespace reducedfit
+{
+// FIT detector information (based on upchelpers::FITInfo structure)
+DECLARE_SOA_COLUMN(AmplitudeFT0A, amplitudeFT0A, float);         //! FT0A total amplitude
+DECLARE_SOA_COLUMN(AmplitudeFT0C, amplitudeFT0C, float);         //! FT0C total amplitude
+DECLARE_SOA_COLUMN(TimeFT0A, timeFT0A, float);                   //! FT0A time
+DECLARE_SOA_COLUMN(TimeFT0C, timeFT0C, float);                   //! FT0C time
+DECLARE_SOA_COLUMN(TriggerMaskFT0, triggerMaskFT0, uint8_t);     //! FT0 trigger mask
+DECLARE_SOA_COLUMN(NFiredChannelsFT0A, nFiredChannelsFT0A, int); //! Number of fired channels in FT0A
+DECLARE_SOA_COLUMN(NFiredChannelsFT0C, nFiredChannelsFT0C, int); //! Number of fired channels in FT0C
+DECLARE_SOA_COLUMN(AmplitudeFDDA, amplitudeFDDA, float);         //! FDDA total amplitude
+DECLARE_SOA_COLUMN(AmplitudeFDDC, amplitudeFDDC, float);         //! FDDC total amplitude
+DECLARE_SOA_COLUMN(TimeFDDA, timeFDDA, float);                   //! FDDA time
+DECLARE_SOA_COLUMN(TimeFDDC, timeFDDC, float);                   //! FDDC time
+DECLARE_SOA_COLUMN(TriggerMaskFDD, triggerMaskFDD, uint8_t);     //! FDD trigger mask
+DECLARE_SOA_COLUMN(AmplitudeFV0A, amplitudeFV0A, float);         //! FV0A total amplitude
+DECLARE_SOA_COLUMN(TimeFV0A, timeFV0A, float);                   //! FV0A time
+DECLARE_SOA_COLUMN(TriggerMaskFV0A, triggerMaskFV0A, uint8_t);   //! FV0A trigger mask
+DECLARE_SOA_COLUMN(NFiredChannelsFV0A, nFiredChannelsFV0A, int); //! Number of fired channels in FV0A
+DECLARE_SOA_COLUMN(BBFT0Apf, bbFT0Apf, int32_t);                 //! Beam-beam flags for FT0A
+DECLARE_SOA_COLUMN(BGFT0Apf, bgFT0Apf, int32_t);                 //! Beam-gas flags for FT0A
+DECLARE_SOA_COLUMN(BBFT0Cpf, bbFT0Cpf, int32_t);                 //! Beam-beam flags for FT0C
+DECLARE_SOA_COLUMN(BGFT0Cpf, bgFT0Cpf, int32_t);                 //! Beam-gas flags for FT0C
+DECLARE_SOA_COLUMN(BBFV0Apf, bbFV0Apf, int32_t);                 //! Beam-beam flags for FV0A
+DECLARE_SOA_COLUMN(BGFV0Apf, bgFV0Apf, int32_t);                 //! Beam-gas flags for FV0A
+DECLARE_SOA_COLUMN(BBFDDApf, bbFDDApf, int32_t);                 //! Beam-beam flags for FDDA
+DECLARE_SOA_COLUMN(BGFDDApf, bgFDDApf, int32_t);                 //! Beam-gas flags for FDDA
+DECLARE_SOA_COLUMN(BBFDDCpf, bbFDDCpf, int32_t);                 //! Beam-beam flags for FDDC
+DECLARE_SOA_COLUMN(BGFDDCpf, bgFDDCpf, int32_t);                 //! Beam-gas flags for FDDC
+} // namespace reducedfit
+
+DECLARE_SOA_TABLE(ReducedFITs, "AOD", "REDUCEDFIT", //! FIT detector information
+                  reducedfit::AmplitudeFT0A, reducedfit::AmplitudeFT0C,
+                  reducedfit::TimeFT0A, reducedfit::TimeFT0C,
+                  reducedfit::TriggerMaskFT0,
+                  reducedfit::NFiredChannelsFT0A, reducedfit::NFiredChannelsFT0C,
+                  reducedfit::AmplitudeFDDA, reducedfit::AmplitudeFDDC,
+                  reducedfit::TimeFDDA, reducedfit::TimeFDDC,
+                  reducedfit::TriggerMaskFDD,
+                  reducedfit::AmplitudeFV0A, reducedfit::TimeFV0A,
+                  reducedfit::TriggerMaskFV0A,
+                  reducedfit::NFiredChannelsFV0A,
+                  reducedfit::BBFT0Apf, reducedfit::BGFT0Apf,
+                  reducedfit::BBFT0Cpf, reducedfit::BGFT0Cpf,
+                  reducedfit::BBFV0Apf, reducedfit::BGFV0Apf,
+                  reducedfit::BBFDDApf, reducedfit::BGFDDApf,
+                  reducedfit::BBFDDCpf, reducedfit::BGFDDCpf);
+
+using ReducedFIT = ReducedFITs::iterator;
 
 namespace reducedtrack
 {
@@ -621,8 +702,10 @@ DECLARE_SOA_COLUMN(Vy2, vy2, float); //! Y production vertex in cm
 DECLARE_SOA_COLUMN(Vz2, vz2, float); //! Z production vertex in cm
 DECLARE_SOA_COLUMN(Vt2, vt2, float); //! Production vertex time
 
-DECLARE_SOA_COLUMN(IsAmbig1, isAmbig1, int); //!
-DECLARE_SOA_COLUMN(IsAmbig2, isAmbig2, int); //!
+DECLARE_SOA_COLUMN(IsAmbig1, isAmbig1, int);                //!
+DECLARE_SOA_COLUMN(IsAmbig2, isAmbig2, int);                //!
+DECLARE_SOA_COLUMN(IsCorrectAssoc1, isCorrectAssoc1, bool); //!
+DECLARE_SOA_COLUMN(IsCorrectAssoc2, isCorrectAssoc2, bool); //!
 
 DECLARE_SOA_COLUMN(FwdDcaX1, fwdDcaX1, float);               //! X component of forward DCA
 DECLARE_SOA_COLUMN(FwdDcaY1, fwdDcaY1, float);               //! Y component of forward DCA
@@ -675,7 +758,7 @@ DECLARE_SOA_COLUMN(DeviationxyTrk1KF, deviationxyTrk1KF, float); //! 2D chi2 dev
 // pair information
 namespace reducedpair
 {
-DECLARE_SOA_INDEX_COLUMN(ReducedEvent, reducedevent);                                    //!
+DECLARE_SOA_INDEX_COLUMN(ReducedEvent, reducedevent);
 DECLARE_SOA_INDEX_COLUMN_FULL(Index0, index0, int, ReducedTracks, "_0");                 //! Index to first prong
 DECLARE_SOA_INDEX_COLUMN_FULL(Index1, index1, int, ReducedTracks, "_1");                 //! Index to second prong
 DECLARE_SOA_INDEX_COLUMN_FULL(Prong0, prong0, int, Tracks, "_0");                        //! Index of first prong in Tracks table
@@ -788,6 +871,17 @@ DECLARE_SOA_TABLE(Dimuons, "AOD", "RTDIMUON", //!
                   reducedpair::Rap<reducedpair::Pt, reducedpair::Eta, reducedpair::Mass>,
                   reducedpair::Y<reducedpair::Pt, reducedpair::Eta, reducedpair::Mass>);
 
+DECLARE_SOA_TABLE(ElectronMuons, "AOD", "RTELECTRONMUON", //!
+                  o2::soa::Index<>, reducedpair::ReducedEventId,
+                  reducedpair::Mass, reducedpair::Pt, reducedpair::Eta, reducedpair::Phi, reducedpair::Sign,
+                  reducedpair::FilterMap, reducedpair::McDecision,
+                  reducedpair::Px<reducedpair::Pt, reducedpair::Phi>,
+                  reducedpair::Py<reducedpair::Pt, reducedpair::Phi>,
+                  reducedpair::Pz<reducedpair::Pt, reducedpair::Eta>,
+                  reducedpair::P<reducedpair::Pt, reducedpair::Eta>,
+                  reducedpair::Rap<reducedpair::Pt, reducedpair::Eta, reducedpair::Mass>,
+                  reducedpair::Y<reducedpair::Pt, reducedpair::Eta, reducedpair::Mass>);
+
 DECLARE_SOA_TABLE(DielectronsExtra, "AOD", "RTDIELEEXTRA", //!
                   reducedpair::Index0Id, reducedpair::Index1Id,
                   reducedpair::Tauz,
@@ -821,21 +915,21 @@ DECLARE_SOA_TABLE(DileptonsFlow, "AOD", "RTDILEPTONFLOW", //!
 DECLARE_SOA_TABLE(DileptonsInfo, "AOD", "RTDILEPTONINFO",
                   reducedpair::CollisionId, collision::PosX, collision::PosY, collision::PosZ);
 
-DECLARE_SOA_TABLE(DielectronsAll, "AOD", "RTDIELECTRONALL", //!
-                  reducedpair::Mass,
-                  reducedpair::Pt, reducedpair::Eta, reducedpair::Phi, reducedpair::Sign,
-                  reducedpair::FilterMap,
-                  reducedpair::McDecision,
-                  dilepton_track_index::Pt1, dilepton_track_index::Eta1, dilepton_track_index::Phi1, dilepton_track_index::ITSClusterMap1, dilepton_track_index::ITSChi2NCl1, dilepton_track_index::TPCNClsCR1, dilepton_track_index::TPCNClsFound1, dilepton_track_index::TPCChi2NCl1, dilepton_track_index::DcaXY1, dilepton_track_index::DcaZ1, dilepton_track_index::TPCSignal1, dilepton_track_index::TPCNSigmaEl1, dilepton_track_index::TPCNSigmaPi1, dilepton_track_index::TPCNSigmaPr1, dilepton_track_index::TOFBeta1, dilepton_track_index::TOFNSigmaEl1, dilepton_track_index::TOFNSigmaPi1, dilepton_track_index::TOFNSigmaPr1,
-                  dilepton_track_index::Pt2, dilepton_track_index::Eta2, dilepton_track_index::Phi2, dilepton_track_index::ITSClusterMap2, dilepton_track_index::ITSChi2NCl2, dilepton_track_index::TPCNClsCR2, dilepton_track_index::TPCNClsFound2, dilepton_track_index::TPCChi2NCl2, dilepton_track_index::DcaXY2, dilepton_track_index::DcaZ2, dilepton_track_index::TPCSignal2, dilepton_track_index::TPCNSigmaEl2, dilepton_track_index::TPCNSigmaPi2, dilepton_track_index::TPCNSigmaPr2, dilepton_track_index::TOFBeta2, dilepton_track_index::TOFNSigmaEl2, dilepton_track_index::TOFNSigmaPi2, dilepton_track_index::TOFNSigmaPr2,
-                  dilepton_track_index::DCAxyzTrk0KF, dilepton_track_index::DCAxyzTrk1KF, reducedpair::DCAxyzBetweenTrksKF, dilepton_track_index::DCAxyTrk0KF, dilepton_track_index::DCAxyTrk1KF, reducedpair::DCAxyBetweenTrksKF,
-                  dilepton_track_index::DeviationTrk0KF, dilepton_track_index::DeviationTrk1KF, dilepton_track_index::DeviationxyTrk0KF, dilepton_track_index::DeviationxyTrk1KF,
-                  reducedpair::MassKFGeo, reducedpair::Chi2OverNDFKFGeo, reducedpair::DecayLengthKFGeo, reducedpair::DecayLengthOverErrKFGeo, reducedpair::DecayLengthXYKFGeo, reducedpair::DecayLengthXYOverErrKFGeo, reducedpair::PseudoproperDecayTimeKFGeo, reducedpair::PseudoproperDecayTimeErrKFGeo, reducedpair::CosPAKFGeo, reducedpair::PairDCAxyz, reducedpair::PairDCAxy,
-                  reducedpair::DeviationPairKF, reducedpair::DeviationxyPairKF,
-                  reducedpair::MassKFGeoTop, reducedpair::Chi2OverNDFKFGeoTop,
-                  reducedpair::Tauz, reducedpair::Tauxy,
-                  reducedpair::Lz,
-                  reducedpair::Lxy);
+DECLARE_SOA_TABLE_STAGED(DielectronsAll, "RTDIELECTRONALL", //!
+                         reducedpair::Mass,
+                         reducedpair::Pt, reducedpair::Eta, reducedpair::Phi, reducedpair::Sign,
+                         reducedpair::FilterMap,
+                         reducedpair::McDecision,
+                         dilepton_track_index::Pt1, dilepton_track_index::Eta1, dilepton_track_index::Phi1, dilepton_track_index::ITSClusterMap1, dilepton_track_index::ITSChi2NCl1, dilepton_track_index::TPCNClsCR1, dilepton_track_index::TPCNClsFound1, dilepton_track_index::TPCChi2NCl1, dilepton_track_index::DcaXY1, dilepton_track_index::DcaZ1, dilepton_track_index::TPCSignal1, dilepton_track_index::TPCNSigmaEl1, dilepton_track_index::TPCNSigmaPi1, dilepton_track_index::TPCNSigmaPr1, dilepton_track_index::TOFBeta1, dilepton_track_index::TOFNSigmaEl1, dilepton_track_index::TOFNSigmaPi1, dilepton_track_index::TOFNSigmaPr1,
+                         dilepton_track_index::Pt2, dilepton_track_index::Eta2, dilepton_track_index::Phi2, dilepton_track_index::ITSClusterMap2, dilepton_track_index::ITSChi2NCl2, dilepton_track_index::TPCNClsCR2, dilepton_track_index::TPCNClsFound2, dilepton_track_index::TPCChi2NCl2, dilepton_track_index::DcaXY2, dilepton_track_index::DcaZ2, dilepton_track_index::TPCSignal2, dilepton_track_index::TPCNSigmaEl2, dilepton_track_index::TPCNSigmaPi2, dilepton_track_index::TPCNSigmaPr2, dilepton_track_index::TOFBeta2, dilepton_track_index::TOFNSigmaEl2, dilepton_track_index::TOFNSigmaPi2, dilepton_track_index::TOFNSigmaPr2,
+                         dilepton_track_index::DCAxyzTrk0KF, dilepton_track_index::DCAxyzTrk1KF, reducedpair::DCAxyzBetweenTrksKF, dilepton_track_index::DCAxyTrk0KF, dilepton_track_index::DCAxyTrk1KF, reducedpair::DCAxyBetweenTrksKF,
+                         dilepton_track_index::DeviationTrk0KF, dilepton_track_index::DeviationTrk1KF, dilepton_track_index::DeviationxyTrk0KF, dilepton_track_index::DeviationxyTrk1KF,
+                         reducedpair::MassKFGeo, reducedpair::Chi2OverNDFKFGeo, reducedpair::DecayLengthKFGeo, reducedpair::DecayLengthOverErrKFGeo, reducedpair::DecayLengthXYKFGeo, reducedpair::DecayLengthXYOverErrKFGeo, reducedpair::PseudoproperDecayTimeKFGeo, reducedpair::PseudoproperDecayTimeErrKFGeo, reducedpair::CosPAKFGeo, reducedpair::PairDCAxyz, reducedpair::PairDCAxy,
+                         reducedpair::DeviationPairKF, reducedpair::DeviationxyPairKF,
+                         reducedpair::MassKFGeoTop, reducedpair::Chi2OverNDFKFGeoTop,
+                         reducedpair::Tauz, reducedpair::Tauxy,
+                         reducedpair::Lz,
+                         reducedpair::Lxy);
 
 DECLARE_SOA_TABLE(DimuonsAll, "AOD", "RTDIMUONALL", //!
                   collision::PosX, collision::PosY, collision::PosZ, collision::NumContrib,
@@ -859,6 +953,7 @@ DECLARE_SOA_TABLE(DimuonsAll, "AOD", "RTDIMUONALL", //!
                   dilepton_track_index::Vx1, dilepton_track_index::Vy1, dilepton_track_index::Vz1, dilepton_track_index::Vt1,
                   dilepton_track_index::Vx2, dilepton_track_index::Vy2, dilepton_track_index::Vz2, dilepton_track_index::Vt2,
                   dilepton_track_index::IsAmbig1, dilepton_track_index::IsAmbig2,
+                  dilepton_track_index::IsCorrectAssoc1, dilepton_track_index::IsCorrectAssoc2,
                   reducedpair::U2Q2,
                   reducedpair::U3Q3,
                   reducedpair::R2EP_AB,
@@ -1123,6 +1218,14 @@ DECLARE_SOA_COLUMN(V0AddID, v0addid, int8_t); //!
 
 DECLARE_SOA_TABLE(V0MapID, "AOD", "V0MAPID", //!
                   v0mapID::V0AddID);
+
+namespace cascmapID
+{
+DECLARE_SOA_COLUMN(CascAddID, cascaddid, int8_t); //!
+} // namespace cascmapID
+
+DECLARE_SOA_TABLE(CascMapID, "AOD", "CASCMAPID", //!
+                  cascmapID::CascAddID);
 
 namespace DalBits
 {

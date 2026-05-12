@@ -13,24 +13,38 @@
 /// \brief Tasks that reads the track tables and creates track triplets; only three identical particles can be used
 /// \author Laura Serksnyte, TU München, laura.serksnyte@tum.de
 
-#include <vector>
-#include <string>
-#include "Framework/AnalysisTask.h"
-#include "Framework/runDataProcessing.h"
-#include "Framework/HistogramRegistry.h"
-#include "Framework/ASoAHelpers.h"
-#include "Framework/RunningWorkflowInfo.h"
-#include "Framework/StepTHn.h"
-#include "Framework/O2DatabasePDGPlugin.h"
-#include "TDatabasePDG.h"
-
 #include "PWGCF/DataModel/FemtoDerived.h"
-#include "PWGCF/FemtoDream/Core/femtoDreamParticleHisto.h"
-#include "PWGCF/FemtoDream/Core/femtoDreamEventHisto.h"
-#include "PWGCF/FemtoDream/Core/femtoDreamPairCleaner.h"
 #include "PWGCF/FemtoDream/Core/femtoDreamContainerThreeBody.h"
 #include "PWGCF/FemtoDream/Core/femtoDreamDetaDphiStar.h"
+#include "PWGCF/FemtoDream/Core/femtoDreamEventHisto.h"
+#include "PWGCF/FemtoDream/Core/femtoDreamMath.h"
+#include "PWGCF/FemtoDream/Core/femtoDreamPairCleaner.h"
+#include "PWGCF/FemtoDream/Core/femtoDreamParticleHisto.h"
 #include "PWGCF/FemtoDream/Core/femtoDreamUtils.h"
+
+#include <Framework/ASoA.h>
+#include <Framework/ASoAHelpers.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/BinningPolicy.h>
+#include <Framework/Configurable.h>
+#include <Framework/DeviceSpec.h>
+#include <Framework/Expressions.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/OutputObjHeader.h>
+#include <Framework/RunningWorkflowInfo.h>
+#include <Framework/SliceCache.h>
+#include <Framework/runDataProcessing.h>
+
+#include <TDatabasePDG.h>
+
+#include <bitset>
+#include <cstdint>
+#include <string>
+#include <vector>
 
 using namespace o2;
 using namespace o2::analysis::femtoDream;
@@ -77,7 +91,7 @@ struct femtoDreamTripletTaskTrackTrackTrack {
                                               (ncheckbit(aod::femtodreamparticle::cut, ConfCutPart)) &&
                                               (aod::femtodreamparticle::pt < ConfMaxpT) &&
                                               (aod::femtodreamparticle::pt > ConfMinpT) &&
-                                              ifnode(ConfDCACutPtDep, (nabs(aod::femtodreamparticle::tempFitVar) <= 0.0105f + (0.035f / npow(aod::femtodreamparticle::pt, 1.1f))),
+                                              ifnode(ConfDCACutPtDep, (nabs(aod::femtodreamparticle::tempFitVar) <= 0.004f + (0.013f / aod::femtodreamparticle::pt)),
                                                      ((aod::femtodreamparticle::tempFitVar >= ConfMinDCAxy) &&
                                                       (aod::femtodreamparticle::tempFitVar <= ConfMaxDCAxy)));
   ;
@@ -87,7 +101,7 @@ struct femtoDreamTripletTaskTrackTrackTrack {
                                                                             (ncheckbit(aod::femtodreamparticle::cut, ConfCutPart)) &&
                                                                             (aod::femtodreamparticle::pt < ConfMaxpT) &&
                                                                             (aod::femtodreamparticle::pt > ConfMinpT) &&
-                                                                            ifnode(ConfDCACutPtDep, (nabs(aod::femtodreamparticle::tempFitVar) <= 0.0105f + (0.035f / npow(aod::femtodreamparticle::pt, 1.1f))),
+                                                                            ifnode(ConfDCACutPtDep, (nabs(aod::femtodreamparticle::tempFitVar) <= 0.004f + (0.013f / aod::femtodreamparticle::pt)),
                                                                                    ((aod::femtodreamparticle::tempFitVar >= ConfMinDCAxy) &&
                                                                                     (aod::femtodreamparticle::tempFitVar <= ConfMaxDCAxy)));
   ;

@@ -8,30 +8,47 @@
 // In applying this license CERN does not waive the privileges and immunities
 // granted to it by virtue of its status as an Intergovernmental Organization
 // or submit itself to any jurisdiction.
-#include <queue>
-#include "TRandom.h"
 
+#include "Common/CCDB/EventSelectionParams.h"
+#include "Common/CCDB/TriggerAliases.h"
 #include "Common/Core/trackUtilities.h"
-#include "Framework/ConfigParamSpec.h"
-#include "Framework/runDataProcessing.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/ASoA.h"
-#include "Framework/HistogramRegistry.h"
-#include "CommonUtils/NameConf.h"
-#include "CCDB/BasicCCDBManager.h"
-#include "DataFormatsParameters/GRPLHCIFData.h"
-#include "DataFormatsParameters/GRPMagField.h"
-#include "DetectorsBase/Propagator.h"
-
-#include "ReconstructionDataFormats/Track.h"
-#include "Common/DataModel/EventSelection.h"
-#include "Common/DataModel/PIDResponse.h"
-#include "Common/DataModel/TrackSelectionTables.h"
 #include "Common/DataModel/CaloClusters.h"
+#include "Common/DataModel/EventSelection.h"
+#include "Common/DataModel/PIDResponseTPC.h"
+#include "Common/DataModel/TrackSelectionTables.h"
 
-#include "PHOSBase/Geometry.h"
-#include "CommonDataFormat/InteractionRecord.h"
+#include <CCDB/BasicCCDBManager.h>
+#include <CommonUtils/NameConf.h>
+#include <DataFormatsParameters/GRPMagField.h>
+#include <DetectorsBase/Propagator.h>
+#include <Framework/ASoA.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/runDataProcessing.h>
+#include <MathUtils/Utils.h>
+#include <ReconstructionDataFormats/TrackParametrization.h>
+
+#include <TH2.h>
+#include <TH3.h>
+#include <TMath.h>
+#include <TRandom.h>
+
+#include <sys/types.h>
+
+#include <GPUROOTCartesianFwd.h>
+
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
+#include <deque>
+#include <memory>
+#include <utility>
+#include <vector>
 
 /// \struct phosNbar
 /// \brief account Nbar who's clusters appeared within PHOS

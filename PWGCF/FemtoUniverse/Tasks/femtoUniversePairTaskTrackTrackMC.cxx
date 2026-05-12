@@ -17,28 +17,40 @@
 /// \author Zuzanna Chochulska, WUT Warsaw, zuzanna.chochulska.stud@pw.edu.pl
 /// \author Zuzanna Chochulska, WUT Warsaw & CTU Prague, zchochul@cern.ch
 
-#include <vector>
-#include "Framework/AnalysisTask.h"
-#include "Framework/runDataProcessing.h"
-#include "Framework/HistogramRegistry.h"
-#include "Framework/ASoAHelpers.h"
-#include "Framework/RunningWorkflowInfo.h"
-#include "Framework/StepTHn.h"
-#include "Framework/O2DatabasePDGPlugin.h"
-#include "TDatabasePDG.h"
-#include "ReconstructionDataFormats/PID.h"
-#include "Common/DataModel/PIDResponse.h"
-
-#include "PWGCF/FemtoUniverse/DataModel/FemtoDerived.h"
-#include "PWGCF/FemtoUniverse/Core/FemtoUniverseParticleHisto.h"
-#include "PWGCF/FemtoUniverse/Core/FemtoUniverseEventHisto.h"
-#include "PWGCF/FemtoUniverse/Core/FemtoUniversePairCleaner.h"
 #include "PWGCF/FemtoUniverse/Core/FemtoUniverseContainer.h"
 #include "PWGCF/FemtoUniverse/Core/FemtoUniverseDetaDphiStar.h"
-#include "PWGCF/FemtoUniverse/Core/femtoUtils.h"
+#include "PWGCF/FemtoUniverse/Core/FemtoUniverseEventHisto.h"
 #include "PWGCF/FemtoUniverse/Core/FemtoUniverseMath.h"
-#include "PWGCF/FemtoUniverse/Core/FemtoUniverseTrackSelection.h"
 #include "PWGCF/FemtoUniverse/Core/FemtoUniversePairAngularWithCentMultKt.h"
+#include "PWGCF/FemtoUniverse/Core/FemtoUniversePairCleaner.h"
+#include "PWGCF/FemtoUniverse/Core/FemtoUniverseParticleHisto.h"
+#include "PWGCF/FemtoUniverse/Core/FemtoUniverseTrackSelection.h"
+#include "PWGCF/FemtoUniverse/DataModel/FemtoDerived.h"
+
+#include <Framework/ASoA.h>
+#include <Framework/ASoAHelpers.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Array2D.h>
+#include <Framework/BinningPolicy.h>
+#include <Framework/Configurable.h>
+#include <Framework/Expressions.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/O2DatabasePDGPlugin.h>
+#include <Framework/OutputObjHeader.h>
+#include <Framework/SliceCache.h>
+#include <Framework/runDataProcessing.h>
+#include <ReconstructionDataFormats/PID.h>
+
+#include <TMath.h>
+#include <TMathBase.h>
+
+#include <cstdint>
+#include <string>
+#include <vector>
 
 using namespace o2;
 using namespace o2::analysis::femto_universe;
@@ -166,6 +178,9 @@ struct femtoUniversePairTaskTrackTrackMC {
   Configurable<bool> cfgProcessMM{"cfgProcessMM", true, "Process particles of the same, negative charge"};
   Configurable<bool> cfgProcessMultBins{"cfgProcessMultBins", true, "Process kstar histograms in multiplicity bins (in multiplicity bins)"};
   Configurable<bool> cfgProcessKtBins{"cfgProcessKtBins", true, "Process kstar histograms in kT bins (if cfgProcessMultBins is set false, this will not be processed regardless this Configurable state)"};
+
+  ConfigurableAxis confDeltaEtaAxis{"confDeltaEtaAxis", {100, -0.15, 0.15}, "DeltaEta"};
+  ConfigurableAxis confDeltaPhiStarAxis{"confDeltaPhiStarAxis", {100, -0.15, 0.15}, "DeltaPhiStar"};
 
   FemtoUniverseContainer<femto_universe_container::EventType::same, femto_universe_container::Observable::kstar> sameEventCont;
   FemtoUniverseContainer<femto_universe_container::EventType::mixed, femto_universe_container::Observable::kstar> mixedEventCont;
@@ -387,7 +402,7 @@ struct femtoUniversePairTaskTrackTrackMC {
 
     pairCleaner.init(&qaRegistry);
     if (ConfIsCPR.value) {
-      pairCloseRejection.init(&resultRegistry, &qaRegistry, ConfCPRdeltaPhiCutMin.value, ConfCPRdeltaPhiCutMax.value, ConfCPRdeltaEtaCutMin.value, ConfCPRdeltaEtaCutMax.value, ConfCPRChosenRadii.value, ConfCPRPlotPerRadii.value);
+      pairCloseRejection.init(&resultRegistry, &qaRegistry, confDeltaEtaAxis, confDeltaPhiStarAxis, ConfCPRdeltaPhiCutMin.value, ConfCPRdeltaPhiCutMax.value, ConfCPRdeltaEtaCutMin.value, ConfCPRdeltaEtaCutMax.value, ConfCPRChosenRadii.value, ConfCPRPlotPerRadii.value);
     }
 
     vPIDPartOne = trackonefilter.ConfPIDPartOne.value;

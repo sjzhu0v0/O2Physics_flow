@@ -17,8 +17,10 @@
 #include "PWGHF/Core/DecayChannels.h"
 #include "PWGHF/Core/HfHelper.h"
 #include "PWGHF/Core/SelectorCuts.h"
+#include "PWGHF/DataModel/AliasTables.h"
 #include "PWGHF/DataModel/CandidateReconstructionTables.h"
 #include "PWGHF/DataModel/CandidateSelectionTables.h"
+#include "PWGHF/DataModel/TrackIndexSkimmingTables.h"
 #include "PWGHF/HFC/DataModel/CorrelationTables.h"
 #include "PWGHF/HFC/Utils/utilsCorrelations.h"
 #include "PWGHF/Utils/utilsAnalysis.h"
@@ -86,19 +88,19 @@ const TString stringMcGenLcFd = "MC gen, non-prompt #Lambda_c;";
 // definition of vectors for standard ptbin and invariant mass configurables
 const int nPtBinsCorrelations = 8;
 const double pTBinsCorrelations[nPtBinsCorrelations + 1] = {0., 2., 4., 6., 8., 12., 16., 24., 99.};
-auto vecBinsPtCorrelations = std::vector<double>{pTBinsCorrelations, pTBinsCorrelations + nPtBinsCorrelations + 1};
+const auto vecBinsPtCorrelations = std::vector<double>{pTBinsCorrelations, pTBinsCorrelations + nPtBinsCorrelations + 1};
 const double signalRegionInnerDefault[nPtBinsCorrelations] = {2.269, 2.269, 2.269, 2.269, 2.269, 2.269, 2.269, 2.269};
 const double signalRegionOuterDefault[nPtBinsCorrelations] = {2.309, 2.309, 2.309, 2.309, 2.309, 2.309, 2.309, 2.309};
 const double sidebandLeftOuterDefault[nPtBinsCorrelations] = {2.209, 2.209, 2.209, 2.209, 2.209, 2.209, 2.209, 2.209};
 const double sidebandLeftInnerDefault[nPtBinsCorrelations] = {2.249, 2.249, 2.249, 2.249, 2.249, 2.249, 2.249, 2.249};
 const double sidebandRightInnerDefault[nPtBinsCorrelations] = {2.329, 2.329, 2.329, 2.329, 2.329, 2.329, 2.329, 2.329};
 const double sidebandRightOuterDefault[nPtBinsCorrelations] = {2.369, 2.369, 2.369, 2.369, 2.369, 2.369, 2.369, 2.369};
-auto vecSignalRegionInner = std::vector<double>{signalRegionInnerDefault, signalRegionInnerDefault + nPtBinsCorrelations};
-auto vecSignalRegionOuter = std::vector<double>{signalRegionOuterDefault, signalRegionOuterDefault + nPtBinsCorrelations};
-auto vecSidebandLeftInner = std::vector<double>{sidebandLeftInnerDefault, sidebandLeftInnerDefault + nPtBinsCorrelations};
-auto vecSidebandLeftOuter = std::vector<double>{sidebandLeftOuterDefault, sidebandLeftOuterDefault + nPtBinsCorrelations};
-auto vecSidebandRightInner = std::vector<double>{sidebandRightInnerDefault, sidebandRightInnerDefault + nPtBinsCorrelations};
-auto vecSidebandRightOuter = std::vector<double>{sidebandRightOuterDefault, sidebandRightOuterDefault + nPtBinsCorrelations};
+const auto vecSignalRegionInner = std::vector<double>{signalRegionInnerDefault, signalRegionInnerDefault + nPtBinsCorrelations};
+const auto vecSignalRegionOuter = std::vector<double>{signalRegionOuterDefault, signalRegionOuterDefault + nPtBinsCorrelations};
+const auto vecSidebandLeftInner = std::vector<double>{sidebandLeftInnerDefault, sidebandLeftInnerDefault + nPtBinsCorrelations};
+const auto vecSidebandLeftOuter = std::vector<double>{sidebandLeftOuterDefault, sidebandLeftOuterDefault + nPtBinsCorrelations};
+const auto vecSidebandRightInner = std::vector<double>{sidebandRightInnerDefault, sidebandRightInnerDefault + nPtBinsCorrelations};
+const auto vecSidebandRightOuter = std::vector<double>{sidebandRightOuterDefault, sidebandRightOuterDefault + nPtBinsCorrelations};
 
 /// Lc-Hadron correlation pair filling task, from pair tables - for real data and data-like analysis (i.e. reco-level w/o matching request via Mc truth)
 struct HfTaskCorrelationLcHadrons {
@@ -106,6 +108,7 @@ struct HfTaskCorrelationLcHadrons {
   Configurable<bool> fillHistoMcRec{"fillHistoMcRec", true, "Flag for filling histograms in MC Rec processes"};
   Configurable<bool> fillHistoMcGen{"fillHistoMcGen", true, "Flag for filling histograms in MC Gen processes"};
   Configurable<bool> fillHistoMcEff{"fillHistoMcEff", true, "Flag for filling histograms in efficiency processes"};
+  Configurable<int> storeMass{"storeMass", 1, "Flag for storing mass information"};
   Configurable<int> applyEfficiency{"applyEfficiency", 1, "Flag for applying efficiency weights"};
   Configurable<bool> loadAccXEffFromCCDB{"loadAccXEffFromCCDB", false, "Flag for loading efficiency distributions from CCDB"};
   Configurable<int> selectionFlagLc{"selectionFlagLc", 1, "Selection Flag for Lc"};
@@ -121,7 +124,7 @@ struct HfTaskCorrelationLcHadrons {
   Configurable<std::vector<float>> efficiencyLc{"efficiencyLc", {1., 1., 1., 1., 1., 1.}, "efficiency values for prompt Lc"};
   Configurable<std::vector<float>> efficiencyFdLc{"efficiencyFdLc", {1., 1., 1., 1., 1., 1.}, "efficiency values for beauty feed-down Lc"};
   Configurable<std::vector<float>> efficiencyHad{"efficiencyHad", {1., 1., 1., 1., 1., 1.}, "efficiency values for associated particles"};
-  // signal and sideband region edges, to be defined via json file (initialised to empty)
+  // Signal and sideband region edges, to be defined via json file (initialised to empty)
   Configurable<std::vector<double>> signalRegionInner{"signalRegionInner", std::vector<double>{vecSignalRegionInner}, "Inner values of signal region vs Pt"};
   Configurable<std::vector<double>> signalRegionOuter{"signalRegionOuter", std::vector<double>{vecSignalRegionOuter}, "Outer values of signal region vs Pt"};
   Configurable<std::vector<double>> sidebandLeftInner{"sidebandLeftInner", std::vector<double>{vecSidebandLeftInner}, "Inner values of left sideband vs Pt"};
@@ -160,8 +163,7 @@ struct HfTaskCorrelationLcHadrons {
   std::shared_ptr<TH1> mEfficiencyFD = nullptr;
   std::shared_ptr<TH1> mEfficiencyAssociated = nullptr;
 
-  HfHelper hfHelper;
-  Service<ccdb::BasicCCDBManager> ccdb;
+  Service<ccdb::BasicCCDBManager> ccdb{};
 
   enum CandidateStep { kCandidateStepMcGenAll = 0,
                        kCandidateStepMcGenLcToPKPi,
@@ -197,13 +199,13 @@ struct HfTaskCorrelationLcHadrons {
     AxisSpec axisMassLc = {binsMassLc, "inv. mass (p K #pi) (GeV/#it{c}^{2})"};
     AxisSpec axisPtCorr = {(std::vector<double>)binsPtCorrelations, "#it{p}_{T}^{#Lambda_c} (GeV/#it{c})"};
     AxisSpec axisPtLc = {(std::vector<double>)binsPtEfficiencyLc, "#it{p}_{T}^{#Lambda_c} (GeV/#it{c})"};
-    AxisSpec axisMultFT0M = {binsMultFT0M, "MultiplicityFT0M"};
+    AxisSpec const axisMultFT0M = {binsMultFT0M, "MultiplicityFT0M"};
     AxisSpec axisDeltaEta = {binsEta, "#it{#eta}^{Hadron}-#it{#eta}^{#Lambda_c}"};
     AxisSpec axisDeltaPhi = {binsPhi, "#it{#varphi}^{Hadron}-#it{#varphi}^{#Lambda_c} (rad)"};
     AxisSpec axisPtHadron = {(std::vector<double>)binsPtHadron, "#it{p}_{T}^{Hadron} (GeV/#it{c})"};
     AxisSpec axisPoolBin = {binsPoolBin, "poolBin"};
     AxisSpec axisLcPrompt = {2, -0.5, 1.5, "Prompt #Lambda_c"};
-    AxisSpec axisBdtScore = {binsBdtScore, "Bdt score"};
+    AxisSpec const axisBdtScore = {binsBdtScore, "Bdt score"};
     AxisSpec axisCorrelationState = {2, 0., 2., ""};
     AxisSpec axisSignPair = {4, 1., 5.};
     AxisSpec axisCentFT0M = {binsCentFt0m, "Centrality percentile (FT0M)"};
@@ -230,9 +232,11 @@ struct HfTaskCorrelationLcHadrons {
         registry.add("hCorrel2DVsPtSidebandLeft", stringLcHadron + "Left" + stringSideband + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTHnSparseF, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtLc}, {axisPtHadron}, {axisPoolBin}, {axisCentFT0M}}});
         registry.add("hCorrel2DVsPtSidebandRight", stringLcHadron + "Right" + stringSideband + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTHnSparseF, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtLc}, {axisPtHadron}, {axisPoolBin}, {axisCentFT0M}}});
         registry.add("hCorrel2DVsPtSignalRegion", stringLcHadron + stringSignal + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTHnSparseF, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtCorr}, {axisPtHadron}, {axisPoolBin}, {axisCentFT0M}}});
+        registry.add("hCorrel2DVsPtGlobalRegion", stringLcHadron + stringSignal + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTHnSparseF, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtCorr}, {axisPtHadron}, {axisPoolBin}, {axisMassLc}}});
         registry.get<THnSparse>(HIST("hCorrel2DVsPtSidebandLeft"))->Sumw2();
         registry.get<THnSparse>(HIST("hCorrel2DVsPtSidebandRight"))->Sumw2();
         registry.get<THnSparse>(HIST("hCorrel2DVsPtSignalRegion"))->Sumw2();
+        registry.get<THnSparse>(HIST("hCorrel2DVsPtGlobalRegion"))->Sumw2();
       } else {
         registry.add("hCorrel2DVsPtSignSidebandLeft", stringLcHadron + "Left" + stringSideband + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + stringSign + "entries", {HistType::kTHnSparseF, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtLc}, {axisPtHadron}, {axisSignPair}, {axisPoolBin}}});
         registry.add("hCorrel2DVsPtSignSidebandRight", stringLcHadron + "Right" + stringSideband + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + stringSign + "entries", {HistType::kTHnSparseF, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtLc}, {axisPtHadron}, {axisSignPair}, {axisPoolBin}}});
@@ -255,8 +259,8 @@ struct HfTaskCorrelationLcHadrons {
     }
     // Histograms for MC Reco analysis
     if (fillHistoMcRec) {
-      registry.add("hMassPromptLcVsPt", "Lc prompt candidates mass Vs Pt", {HistType::kTH2F, {{axisMassLc}, {axisPtLc}}});
-      registry.add("hMassNonPromptLcVsPt", "Lc non prompt candidates mass Vs Pt", {HistType::kTH2F, {{axisMassLc}, {axisPtLc}}});
+      registry.add("hMassPromptLcVsPt", "Lc prompt candidates mass Vs Pt", {HistType::kTH3F, {{axisMassLc}, {axisPtLc}, {axisPoolBin}}});
+      registry.add("hMassNonPromptLcVsPt", "Lc non prompt candidates mass Vs Pt", {HistType::kTH3F, {{axisMassLc}, {axisPtLc}, {axisPoolBin}}});
       registry.add("hDeltaEtaPtIntSignalRegionMcRec", stringLcHadron + stringSignal + stringDeltaEta + "entries", {HistType::kTH1D, {axisDeltaEta}});
       registry.add("hDeltaPhiPtIntSignalRegionMcRec", stringLcHadron + stringSignal + stringDeltaPhi + "entries", {HistType::kTH1D, {axisDeltaPhi}});
       registry.add("hDeltaEtaPtIntSidebandsMcRec", stringLcHadron + stringSideband + stringDeltaEta + "entries", {HistType::kTH1D, {axisDeltaEta}});
@@ -265,6 +269,7 @@ struct HfTaskCorrelationLcHadrons {
       registry.add("hCorrel2DPtIntSidebandsMcRec", stringLcHadron + stringSideband + stringDeltaPhi + stringDeltaEta + "entries", {HistType::kTH2F, {{axisDeltaPhi}, {axisDeltaEta}}});
       registry.add("hCorrel2DVsPtSidebandsMcRec", stringLcHadron + stringSideband + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTHnSparseD, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtCorr}, {axisPtHadron}, {axisPoolBin}}});
       registry.add("hCorrel2DVsPtPhysicalPrimaryMcRec", stringLcHadron + "(only true primary particles)" + stringSignal, {HistType::kTHnSparseD, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtLc}, {axisPtHadron}, {axisLcPrompt}, {axisPoolBin}}});
+      registry.add("hCorrel2DVsPtTrueLcPhysicalPrimaryMcRec", stringLcHadron + "(only true Lc, and true primary particles)" + stringSignal, {HistType::kTHnSparseD, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtLc}, {axisPtHadron}, {axisLcPrompt}, {axisPoolBin}}});
       registry.add("hDeltaEtaPtIntSidebandLeftMcRec", stringLcHadron + "Left" + stringSideband + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTH1D, {axisDeltaEta}});
       registry.add("hDeltaPhiPtIntSidebandLeftMcRec", stringLcHadron + "Left" + stringSideband + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTH1D, {axisDeltaPhi}});
       registry.add("hDeltaEtaPtIntSidebandRightMcRec", stringLcHadron + "Right" + stringSideband + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTH1D, {axisDeltaEta}});
@@ -275,6 +280,8 @@ struct HfTaskCorrelationLcHadrons {
         registry.add("hCorrel2DVsPtSidebandRightMcRec", stringLcHadron + "Right" + stringSideband + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTHnSparseD, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtLc}, {axisPtHadron}, {axisPoolBin}}});
         registry.add("hCorrel2DVsPtSignalRegionPromptLcPromptHadronMcRec", stringLcHadron + "signal region PromptLc - Prompt Track MC reco", {HistType::kTHnSparseD, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtLc}, {axisPtHadron}, {axisPoolBin}}});
         registry.add("hCorrel2DVsPtSignalRegionNonPromptLcNonPromptHadronMcRec", stringLcHadron + " signal region PromptLc - NonPrompt Track MC reco", {HistType::kTHnSparseD, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtLc}, {axisPtHadron}, {axisPoolBin}}});
+        registry.add("hCorrel2DVsPtSignalRegionTruePromptLcPromptHadronMcRec", stringLcHadron + "signal region and true PromptLc - Prompt Track MC reco", {HistType::kTHnSparseD, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtLc}, {axisPtHadron}, {axisPoolBin}}});
+        registry.add("hCorrel2DVsPtSignalRegionTrueNonPromptLcNonPromptHadronMcRec", stringLcHadron + " signal region and true PromptLc - NonPrompt Track MC reco", {HistType::kTHnSparseD, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtLc}, {axisPtHadron}, {axisPoolBin}}});
         registry.add("hCorrel2DVsPtSignalMcRec", stringLcHadron + stringSignal + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTHnSparseD, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtCorr}, {axisPtHadron}, {axisPoolBin}}});
         registry.add("hCorrel2DVsPtSignalRegionMcRec", stringLcHadron + stringSignal + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTHnSparseD, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtCorr}, {axisPtHadron}, {axisLcPrompt}, {axisPoolBin}}});
         registry.add("hCorrel2DVsPtBkgMcRec", stringLcHadron + stringSignal + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTHnSparseD, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtCorr}, {axisPtHadron}, {axisPoolBin}}});
@@ -284,6 +291,8 @@ struct HfTaskCorrelationLcHadrons {
         registry.get<THnSparse>(HIST("hCorrel2DVsPtSignalMcRec"))->Sumw2();
         registry.get<THnSparse>(HIST("hCorrel2DVsPtSignalRegionPromptLcPromptHadronMcRec"))->Sumw2();
         registry.get<THnSparse>(HIST("hCorrel2DVsPtSignalRegionNonPromptLcNonPromptHadronMcRec"))->Sumw2();
+        registry.get<THnSparse>(HIST("hCorrel2DVsPtSignalRegionTruePromptLcPromptHadronMcRec"))->Sumw2();
+        registry.get<THnSparse>(HIST("hCorrel2DVsPtSignalRegionTrueNonPromptLcNonPromptHadronMcRec"))->Sumw2();
         registry.get<THnSparse>(HIST("hCorrel2DVsPtSignalRegionMcRec"))->Sumw2();
         registry.get<THnSparse>(HIST("hCorrel2DVsPtBkgMcRec"))->Sumw2();
 
@@ -317,6 +326,7 @@ struct HfTaskCorrelationLcHadrons {
 
       registry.get<THnSparse>(HIST("hCorrel2DVsPtSidebandsMcRec"))->Sumw2();
       registry.get<THnSparse>(HIST("hCorrel2DVsPtPhysicalPrimaryMcRec"))->Sumw2();
+      registry.get<THnSparse>(HIST("hCorrel2DVsPtTrueLcPhysicalPrimaryMcRec"))->Sumw2();
     }
     // Histograms for MC Gen analysis
     if (fillHistoMcGen) {
@@ -368,7 +378,7 @@ struct HfTaskCorrelationLcHadrons {
     hCandidates->GetAxis(2)->SetTitle("Charm hadron origin");
 
     // Loading efficiency histograms from CCDB
-    if (applyEfficiency && loadAccXEffFromCCDB) {
+    if ((applyEfficiency != 0) && loadAccXEffFromCCDB) {
       ccdb->setURL(ccdbUrl);
       ccdb->setCaching(true);
       ccdb->setLocalObjectValidityChecking();
@@ -415,11 +425,11 @@ struct HfTaskCorrelationLcHadrons {
   void processData(LcHadronPairFullWithMl const& pairEntries, aod::LcRecoInfo const& candidates)
   {
     for (const auto& candidate : candidates) {
-      float massLc = candidate.mLc();
-      float ptLc = std::abs(candidate.ptLc());
-      float bdtScorePrompt = candidate.mlScorePrompt();
-      float bdtScoreBkg = candidate.mlScoreBkg();
-      int effBinLc = o2::analysis::findBin(binsPtEfficiencyLc, ptLc);
+      float const massLc = candidate.mLc();
+      float const ptLc = std::abs(candidate.ptLc());
+      float const bdtScorePrompt = candidate.mlScorePrompt();
+      float const bdtScoreBkg = candidate.mlScoreBkg();
+      int const effBinLc = o2::analysis::findBin(binsPtEfficiencyLc, ptLc);
 
       // reject entries outside Pt ranges of interest
       if (ptLc < binsPtEfficiencyLc->front() || ptLc > binsPtEfficiencyLc->back()) {
@@ -430,7 +440,7 @@ struct HfTaskCorrelationLcHadrons {
         continue;
       }
       double efficiencyWeightLc = 1.;
-      if (applyEfficiency) {
+      if (applyEfficiency != 0) {
         efficiencyWeightLc = 1. / efficiencyLc->at(o2::analysis::findBin(binsPtEfficiencyLc, ptLc));
         if (loadAccXEffFromCCDB) {
           efficiencyWeightLc = 1. / mEfficiencyPrompt->GetBinContent(mEfficiencyPrompt->FindBin(ptLc));
@@ -444,24 +454,24 @@ struct HfTaskCorrelationLcHadrons {
 
     for (const auto& pairEntry : pairEntries) {
       // define variables for widely used quantities
-      float deltaPhi = pairEntry.deltaPhi();
+      float const deltaPhi = pairEntry.deltaPhi();
       float cent = 0.;
       if (useCentrality) {
         cent = pairEntry.cent();
       }
-      float deltaEta = pairEntry.deltaEta();
-      double ptLc = std::abs(pairEntry.ptLc());
-      double ptHadron = std::abs(pairEntry.ptHadron());
-      float bdtScorePrompt = pairEntry.mlScorePrompt();
-      float bdtScoreBkg = pairEntry.mlScoreBkg();
-      float trackDcaXY = pairEntry.trackDcaXY();
-      float trackDcaZ = pairEntry.trackDcaZ();
-      int trackTpcCrossedRows = pairEntry.trackTPCNClsCrossedRows();
-      int poolBin = pairEntry.poolBin();
-      double massLc = pairEntry.mLc();
-      int effBinLc = o2::analysis::findBin(binsPtEfficiencyLc, ptLc);
-      int ptBinLc = o2::analysis::findBin(binsPtCorrelations, ptLc);
-      bool isAutoCorrelated = pairEntry.isAutoCorrelated();
+      float const deltaEta = pairEntry.deltaEta();
+      double const ptLc = std::abs(pairEntry.ptLc());
+      double const ptHadron = std::abs(pairEntry.ptHadron());
+      float const bdtScorePrompt = pairEntry.mlScorePrompt();
+      float const bdtScoreBkg = pairEntry.mlScoreBkg();
+      float const trackDcaXY = pairEntry.trackDcaXY();
+      float const trackDcaZ = pairEntry.trackDcaZ();
+      int const trackTpcCrossedRows = pairEntry.trackTPCNClsCrossedRows();
+      int const poolBin = pairEntry.poolBin();
+      double const massLc = pairEntry.mLc();
+      int const effBinLc = o2::analysis::findBin(binsPtEfficiencyLc, ptLc);
+      int const ptBinLc = o2::analysis::findBin(binsPtCorrelations, ptLc);
+      bool const isAutoCorrelated = pairEntry.isAutoCorrelated();
       int signPair = 0;
       // reject entries outside Pt ranges of interest
       if (ptBinLc < 0 || effBinLc < 0) {
@@ -476,7 +486,7 @@ struct HfTaskCorrelationLcHadrons {
       }
 
       double efficiencyWeight = 1.;
-      if (applyEfficiency) {
+      if (applyEfficiency != 0) {
         efficiencyWeight = 1. / (efficiencyLc->at(effBinLc) * efficiencyHad->at(o2::analysis::findBin(binsPtEfficiencyHad, ptHadron)));
         if (loadAccXEffFromCCDB) {
           efficiencyWeight = 1. / (mEfficiencyPrompt->GetBinContent(mEfficiencyPrompt->FindBin(ptLc)) * mEfficiencyAssociated->GetBinContent(mEfficiencyAssociated->FindBin(ptHadron)));
@@ -488,7 +498,7 @@ struct HfTaskCorrelationLcHadrons {
         if (ptHadron < leadingParticlePtMin) {
           continue;
         }
-        Region region = getRegion(deltaPhi);
+        Region const region = getRegion(deltaPhi);
         switch (region) {
           case Toward:
             registry.fill(HIST("hToward"), massLc, ptLc, isAutoCorrelated, efficiencyWeight);
@@ -511,6 +521,10 @@ struct HfTaskCorrelationLcHadrons {
         registry.fill(HIST("hCorrel2DVsPtSignMass"), deltaPhi, deltaEta, ptLc, ptHadron, massLc, signPair, poolBin, efficiencyWeight);
       }
       // check if correlation entry belongs to signal region, sidebands or is outside both, and fill correlation plots
+      if (storeMass) {
+        registry.fill(HIST("hCorrel2DVsPtGlobalRegion"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin, massLc, efficiencyWeight);
+        continue;
+      }
       if (massLc > signalRegionInner->at(ptBinLc) && massLc < signalRegionOuter->at(ptBinLc)) {
         // in signal region
         if (fillSign) {
@@ -559,22 +573,24 @@ struct HfTaskCorrelationLcHadrons {
                     soa::Join<aod::LcRecoInfo, aod::LcGenInfo> const& candidates)
   {
     for (const auto& candidate : candidates) {
-      float massLc = candidate.mLc();
-      float ptLc = std::abs(candidate.ptLc());
-      float bdtScorePrompt = candidate.mlScorePrompt();
-      float bdtScoreBkg = candidate.mlScoreBkg();
-      int effBinLc = o2::analysis::findBin(binsPtEfficiencyLc, ptLc);
-      bool isLcPrompt = candidate.isPrompt();
+      float const massLc = candidate.mLc();
+      float const ptLc = std::abs(candidate.ptLc());
+      float const bdtScorePrompt = candidate.mlScorePrompt();
+      float const bdtScoreBkg = candidate.mlScoreBkg();
+      int const poolBin = candidate.poolBin();
+      int const effBinLc = o2::analysis::findBin(binsPtEfficiencyLc, ptLc);
+      bool const isLcPrompt = candidate.isPrompt();
 
       // reject entries outside pT ranges of interest
-      if (ptLc < binsPtEfficiencyLc->front() || ptLc > binsPtEfficiencyLc->back())
+      if (ptLc < binsPtEfficiencyLc->front() || ptLc > binsPtEfficiencyLc->back()) {
         continue;
+      }
 
       if (bdtScorePrompt < mlOutputPrompt->at(effBinLc) || bdtScoreBkg > mlOutputBkg->at(effBinLc)) {
         continue;
       }
       double efficiencyWeightLc = 1.;
-      if (applyEfficiency) {
+      if (applyEfficiency != 0) {
         if (isLcPrompt) {
           efficiencyWeightLc = 1. / efficiencyLc->at(effBinLc);
           if (loadAccXEffFromCCDB) {
@@ -582,7 +598,7 @@ struct HfTaskCorrelationLcHadrons {
           }
           registry.fill(HIST("hMassLcVsPt"), massLc, ptLc, efficiencyWeightLc);
           registry.fill(HIST("hMassLcVsPtWoEff"), massLc, ptLc);
-          registry.fill(HIST("hMassPromptLcVsPt"), massLc, ptLc, efficiencyWeightLc);
+          registry.fill(HIST("hMassPromptLcVsPt"), massLc, ptLc, poolBin, efficiencyWeightLc);
           registry.fill(HIST("hBdtScorePrompt"), bdtScorePrompt);
           registry.fill(HIST("hBdtScoreBkg"), bdtScoreBkg);
         } else {
@@ -592,7 +608,7 @@ struct HfTaskCorrelationLcHadrons {
           }
           registry.fill(HIST("hMassLcVsPt"), massLc, ptLc, efficiencyWeightLc);
           registry.fill(HIST("hMassLcVsPtWoEff"), massLc, ptLc);
-          registry.fill(HIST("hMassNonPromptLcVsPt"), massLc, ptLc, efficiencyWeightLc);
+          registry.fill(HIST("hMassNonPromptLcVsPt"), massLc, ptLc, poolBin, efficiencyWeightLc);
           registry.fill(HIST("hBdtScorePrompt"), bdtScorePrompt);
           registry.fill(HIST("hBdtScoreBkg"), bdtScoreBkg);
         }
@@ -601,28 +617,29 @@ struct HfTaskCorrelationLcHadrons {
 
     for (const auto& pairEntry : pairEntries) {
       // define variables for widely used quantities
-      float deltaPhi = pairEntry.deltaPhi();
-      float deltaEta = pairEntry.deltaEta();
-      float ptLc = std::abs(pairEntry.ptLc());
-      float ptHadron = std::abs(pairEntry.ptHadron());
-      float massLc = pairEntry.mLc();
-      float bdtScorePrompt = pairEntry.mlScorePrompt();
-      float bdtScoreBkg = pairEntry.mlScoreBkg();
-      bool isPhysicalPrimary = pairEntry.isPhysicalPrimary();
-      float trackDcaXY = pairEntry.trackDcaXY();
-      float trackDcaZ = pairEntry.trackDcaZ();
-      int trackTpcCrossedRows = pairEntry.trackTPCNClsCrossedRows();
-      int statusLcPrompt = static_cast<int>(pairEntry.isPrompt());
-      int statusPromptHadron = pairEntry.trackOrigin();
-      int poolBin = pairEntry.poolBin();
-      int effBinLc = o2::analysis::findBin(binsPtEfficiencyLc, ptLc);
-      int ptBinLc = o2::analysis::findBin(binsPtCorrelations, ptLc);
-      bool isAutoCorrelated = pairEntry.isAutoCorrelated();
+      float const deltaPhi = pairEntry.deltaPhi();
+      float const deltaEta = pairEntry.deltaEta();
+      float const ptLc = std::abs(pairEntry.ptLc());
+      float const ptHadron = std::abs(pairEntry.ptHadron());
+      float const massLc = pairEntry.mLc();
+      float const bdtScorePrompt = pairEntry.mlScorePrompt();
+      float const bdtScoreBkg = pairEntry.mlScoreBkg();
+      bool const isPhysicalPrimary = pairEntry.isPhysicalPrimary();
+      float const trackDcaXY = pairEntry.trackDcaXY();
+      float const trackDcaZ = pairEntry.trackDcaZ();
+      int const trackTpcCrossedRows = pairEntry.trackTPCNClsCrossedRows();
+      int const statusLcPrompt = static_cast<int>(pairEntry.isPrompt());
+      int const statusPromptHadron = pairEntry.trackOrigin();
+      int const poolBin = pairEntry.poolBin();
+      int const effBinLc = o2::analysis::findBin(binsPtEfficiencyLc, ptLc);
+      int const ptBinLc = o2::analysis::findBin(binsPtCorrelations, ptLc);
+      bool const isAutoCorrelated = pairEntry.isAutoCorrelated();
       int signPair = 0;
 
       // reject entries outside pT ranges of interest
-      if (ptLc < binsPtEfficiencyLc->front() || ptLc > binsPtEfficiencyLc->back())
+      if (ptLc < binsPtEfficiencyLc->front() || ptLc > binsPtEfficiencyLc->back()) {
         continue;
+      }
 
       if (bdtScorePrompt < mlOutputPrompt->at(effBinLc) || bdtScoreBkg > mlOutputBkg->at(effBinLc)) {
         continue;
@@ -632,8 +649,8 @@ struct HfTaskCorrelationLcHadrons {
       }
       double efficiencyWeight = 1.;
 
-      if (applyEfficiency) {
-        if (statusLcPrompt) {
+      if (applyEfficiency != 0) {
+        if (statusLcPrompt != 0) {
           efficiencyWeight = 1. / (efficiencyLc->at(effBinLc) * efficiencyHad->at(o2::analysis::findBin(binsPtEfficiencyHad, ptHadron)));
           if (loadAccXEffFromCCDB) {
             efficiencyWeight = 1. / (mEfficiencyPrompt->GetBinContent(mEfficiencyPrompt->FindBin(ptLc)) * mEfficiencyAssociated->GetBinContent(mEfficiencyAssociated->FindBin(ptHadron)));
@@ -651,7 +668,7 @@ struct HfTaskCorrelationLcHadrons {
         if (ptHadron < leadingParticlePtMin) {
           continue;
         }
-        Region region = getRegion(deltaPhi);
+        Region const region = getRegion(deltaPhi);
         switch (region) {
           case Toward:
             registry.fill(HIST("hTowardRec"), massLc, ptLc, isAutoCorrelated, efficiencyWeight);
@@ -675,7 +692,7 @@ struct HfTaskCorrelationLcHadrons {
       }
 
       // fill correlation plots for signal/bagkground correlations
-      if (pairEntry.signalStatus()) {
+      if (pairEntry.signalStatus() != 0) {
         if (fillSign) {
           registry.fill(HIST("hCorrel2DVsPtSignSignalMcRec"), deltaPhi, deltaEta, ptLc, ptHadron, signPair, poolBin, efficiencyWeight);
         } else {
@@ -703,17 +720,26 @@ struct HfTaskCorrelationLcHadrons {
         registry.fill(HIST("hDeltaPhiPtIntSignalRegionMcRec"), deltaPhi, efficiencyWeight);
         if (isPhysicalPrimary) {
           registry.fill(HIST("hCorrel2DVsPtPhysicalPrimaryMcRec"), deltaPhi, deltaEta, ptLc, ptHadron, statusLcPrompt, poolBin, efficiencyWeight);
+          if (pairEntry.signalStatus() != 0) {
+            registry.fill(HIST("hCorrel2DVsPtTrueLcPhysicalPrimaryMcRec"), deltaPhi, deltaEta, ptLc, ptHadron, statusLcPrompt, poolBin, efficiencyWeight);
+          }
           if (statusLcPrompt == 1 && statusPromptHadron == RecoDecay::OriginType::Prompt) {
             if (fillSign) {
               registry.fill(HIST("hCorrel2DVsPtSignSignalRegionPromptLcPromptHadronMcRec"), deltaPhi, deltaEta, ptLc, ptHadron, signPair, poolBin, efficiencyWeight);
             } else {
               registry.fill(HIST("hCorrel2DVsPtSignalRegionPromptLcPromptHadronMcRec"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin, efficiencyWeight);
+              if (pairEntry.signalStatus() != 0) {
+                registry.fill(HIST("hCorrel2DVsPtSignalRegionTruePromptLcPromptHadronMcRec"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin, efficiencyWeight);
+              }
             }
           } else if (statusLcPrompt == 0 && statusPromptHadron == RecoDecay::OriginType::NonPrompt) {
             if (fillSign) {
               registry.fill(HIST("hCorrel2DVsPtSignSignalRegionNonPromptLcNonPromptHadronMcRec"), deltaPhi, deltaEta, ptLc, ptHadron, signPair, poolBin, efficiencyWeight);
             } else {
               registry.fill(HIST("hCorrel2DVsPtSignalRegionNonPromptLcNonPromptHadronMcRec"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin, efficiencyWeight);
+              if (pairEntry.signalStatus() != 0) {
+                registry.fill(HIST("hCorrel2DVsPtSignalRegionTrueNonPromptLcNonPromptHadronMcRec"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin, efficiencyWeight);
+              }
             }
           }
         }
@@ -755,14 +781,14 @@ struct HfTaskCorrelationLcHadrons {
   {
     for (const auto& pairEntry : pairEntries) {
       // define variables for widely used quantities
-      float deltaPhi = pairEntry.deltaPhi();
-      float deltaEta = pairEntry.deltaEta();
-      float ptLc = std::abs(pairEntry.ptLc());
-      float ptHadron = std::abs(pairEntry.ptHadron());
-      int poolBin = pairEntry.poolBin();
-      int statusPromptHadron = pairEntry.trackOrigin();
-      bool isLcPrompt = pairEntry.isPrompt();
-      bool isAutoCorrelated = pairEntry.isAutoCorrelated();
+      float const deltaPhi = pairEntry.deltaPhi();
+      float const deltaEta = pairEntry.deltaEta();
+      float const ptLc = std::abs(pairEntry.ptLc());
+      float const ptHadron = std::abs(pairEntry.ptHadron());
+      int const poolBin = pairEntry.poolBin();
+      int const statusPromptHadron = pairEntry.trackOrigin();
+      bool const isLcPrompt = pairEntry.isPrompt();
+      bool const isAutoCorrelated = pairEntry.isAutoCorrelated();
       int signPair = 0;
 
       if (isTowardTransverseAway) {
@@ -770,7 +796,7 @@ struct HfTaskCorrelationLcHadrons {
         if (ptHadron < leadingParticlePtMin) {
           continue;
         }
-        Region region = getRegion(deltaPhi);
+        Region const region = getRegion(deltaPhi);
         switch (region) {
           case Toward:
             registry.fill(HIST("hTowardRec"), o2::constants::physics::MassLambdaCPlus, ptLc, isAutoCorrelated);
@@ -897,7 +923,7 @@ struct HfTaskCorrelationLcHadrons {
       multiplicity = collision.multFT0M();
       if (std::abs(candidate.flagMcMatchRec()) == hf_decay::hf_cand_3prong::DecayChannelMain::LcToPKPi) {
         hCandidates->Fill(kCandidateStepMcReco, candidate.pt(), multiplicity, candidate.originMcRec());
-        if (std::abs(hfHelper.yLc(candidate)) <= yCandMax) {
+        if (std::abs(HfHelper::yLc(candidate)) <= yCandMax) {
           hCandidates->Fill(kCandidateStepMcRecoInAcceptance, candidate.pt(), multiplicity, candidate.originMcRec());
           if (candidate.originMcRec() == RecoDecay::OriginType::Prompt) {
             registry.fill(HIST("Efficiency/hPtCandMcRecPrompt"), candidate.pt());

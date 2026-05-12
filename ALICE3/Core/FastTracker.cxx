@@ -11,13 +11,36 @@
 
 #include "FastTracker.h"
 
-#include "ReconstructionDataFormats/TrackParametrization.h"
+#include "DetLayer.h"
+#include "GeometryContainer.h"
 
-#include "TMath.h"
-#include "TMatrixD.h"
-#include "TMatrixDSymEigen.h"
-#include "TRandom.h"
+#include <CCDB/BasicCCDBManager.h>
+#include <CommonConstants/MathConstants.h>
+#include <Framework/Logger.h>
+#include <MathUtils/Utils.h>
+#include <ReconstructionDataFormats/Track.h>
+#include <ReconstructionDataFormats/TrackParametrization.h>
 
+#include <TFile.h>
+#include <TGraph.h>
+#include <TMathBase.h>
+#include <TMatrixD.h> // IWYU pragma: keep (do not replace with TMatrixDfwd.h)
+#include <TMatrixDSymEigen.h>
+#include <TMatrixDSymfwd.h>
+#include <TMatrixDfwd.h>
+#include <TObject.h>
+#include <TRandom.h>
+#include <TString.h>
+#include <TVectorDfwd.h>
+
+#include <Rtypes.h>
+#include <RtypesCore.h>
+
+#include <array>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -28,8 +51,9 @@ namespace fastsim
 
 // +-~-<*>-~-+-~-<*>-~-+-~-<*>-~-+-~-<*>-~-+-~-<*>-~-+-~-<*>-~-+-~-<*>-~-+-~-<*>-~-+
 
-void FastTracker::AddLayer(TString name, float r, float z, float x0, float xrho, float resRPhi, float resZ, float eff, int type)
+DetLayer* FastTracker::AddLayer(TString name, float r, float z, float x0, float xrho, float resRPhi, float resZ, float eff, int type)
 {
+  LOG(debug) << "Adding layer " << name << " r=" << r << " z=" << z << " x0=" << x0 << " xrho=" << xrho << " resRPhi=" << resRPhi << " resZ=" << resZ << " eff=" << eff << " type=" << type;
   DetLayer newLayer(name, r, z, x0, xrho, resRPhi, resZ, eff, type);
   // Check that efficient layers are not inert layers
   if (newLayer.getEfficiency() > 0.0f && newLayer.isInert()) {
@@ -47,20 +71,18 @@ void FastTracker::AddLayer(TString name, float r, float z, float x0, float xrho,
   }
   // Add the new layer to the layers vector
   layers.push_back(newLayer);
+  // Return the last added layer
+  return &layers.back();
 }
 
-DetLayer FastTracker::GetLayer(int layer, bool ignoreBarrelLayers) const
+void FastTracker::addDeadPhiRegionInLayer(const std::string& layerName, float phiStart, float phiEnd)
 {
-  int layerIdx = layer;
-  if (ignoreBarrelLayers) {
-    for (int il = 0, trackingLayerIdx = 0; trackingLayerIdx <= layer; il++) {
-      if (layers[il].isInert())
-        continue;
-      trackingLayerIdx++;
-      layerIdx = il;
-    }
+  const int layerIdx = GetLayerIndex(layerName);
+  if (layerIdx < 0) {
+    LOG(fatal) << "Cannot add dead phi region to non-existing layer " << layerName;
+    return;
   }
-  return layers[layerIdx];
+  layers[layerIdx].addDeadPhiRegion(phiStart, phiEnd);
 }
 
 int FastTracker::GetLayerIndex(const std::string& name) const
@@ -85,91 +107,6 @@ void FastTracker::Print()
     LOG(info) << " Layer #" << il << "\t" << layers[il];
   }
   LOG(info) << "+-~-<*>-~-+-~-<*>-~-+-~-<*>-~-+-~-<*>-~-+-~-<*>-~-+-~-<*>-~-+-~-<*>-~-+";
-}
-
-void FastTracker::AddSiliconALICE3v4(std::vector<float> pixelResolution)
-{
-  LOG(info) << " ALICE 3: Adding v4 tracking layers";
-  float x0IT = 0.001;        // 0.1%
-  float x0OT = 0.005;        // 0.5%
-  float xrhoIB = 1.1646e-02; // 50 mum Si
-  float xrhoOT = 1.1646e-01; // 500 mum Si
-  float eff = 1.00;
-
-  float resRPhiIT = pixelResolution[0];
-  float resZIT = pixelResolution[1];
-  float resRPhiOT = pixelResolution[2];
-  float resZOT = pixelResolution[3];
-
-  AddLayer("bpipe0", 0.48, 250, 0.00042, 2.772e-02, 0.0f, 0.0f, 0.0f, 0); // 150 mum Be
-  AddLayer("ddd0", 0.5, 250, x0IT, xrhoIB, resRPhiIT, resZIT, eff, 1);
-  AddLayer("ddd1", 1.2, 250, x0IT, xrhoIB, resRPhiIT, resZIT, eff, 1);
-  AddLayer("ddd2", 2.5, 250, x0IT, xrhoIB, resRPhiIT, resZIT, eff, 1);
-  AddLayer("bpipe1", 5.7, 250, 0.0014, 9.24e-02, 0.0f, 0.0f, 0.0f, 0); // 500 mum Be
-  AddLayer("ddd3", 7., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-  AddLayer("ddd4", 10., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-  AddLayer("ddd5", 13., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-  AddLayer("ddd6", 16., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-  AddLayer("ddd7", 25., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-  AddLayer("ddd8", 40., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-  AddLayer("ddd9", 45., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-}
-
-void FastTracker::AddSiliconALICE3v2(std::vector<float> pixelResolution)
-{
-  LOG(info) << "ALICE 3: Adding v2 tracking layers;";
-  float x0IT = 0.001;        // 0.1%
-  float x0OT = 0.01;         // 1.0%
-  float xrhoIB = 2.3292e-02; // 100 mum Si
-  float xrhoOT = 2.3292e-01; // 1000 mum Si
-  float eff = 1.00;
-
-  float resRPhiIT = pixelResolution[0];
-  float resZIT = pixelResolution[1];
-  float resRPhiOT = pixelResolution[2];
-  float resZOT = pixelResolution[3];
-
-  AddLayer("bpipe0", 0.48, 250, 0.00042, 2.772e-02, 0.0f, 0.0f, 0.0f, 0); // 150 mum Be
-  AddLayer("B00", 0.5, 250, x0IT, xrhoIB, resRPhiIT, resZIT, eff, 1);
-  AddLayer("B01", 1.2, 250, x0IT, xrhoIB, resRPhiIT, resZIT, eff, 1);
-  AddLayer("B02", 2.5, 250, x0IT, xrhoIB, resRPhiIT, resZIT, eff, 1);
-  AddLayer("bpipe1", 3.7, 250, 0.0014, 9.24e-02, 0.0f, 0.0f, 0.0f, 0); // 500 mum Be
-  AddLayer("B03", 3.75, 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-  AddLayer("B04", 7., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-  AddLayer("B05", 12., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-  AddLayer("B06", 20., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-  AddLayer("B07", 30., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-  AddLayer("B08", 45., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-  AddLayer("B09", 60., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-  AddLayer("B10", 80., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-}
-
-void FastTracker::AddSiliconALICE3(std::vector<float> pixelResolution)
-{
-  float x0IT = 0.001;        // 0.1%
-  float x0OT = 0.01;         // 1.0%
-  float xrhoIB = 2.3292e-02; // 100 mum Si
-  float xrhoOT = 2.3292e-01; // 1000 mum Si
-  float eff = 1.00;
-
-  float resRPhiIT = pixelResolution[0];
-  float resZIT = pixelResolution[1];
-  float resRPhiOT = pixelResolution[2];
-  float resZOT = pixelResolution[3];
-
-  AddLayer("bpipe0", 0.48, 250, 0.00042, 2.772e-02, 0.0f, 0.0f, 0.0f, 0); // 150 mum Be
-  AddLayer("B00", 0.5, 250, x0IT, xrhoIB, resRPhiIT, resZIT, eff, 1);
-  AddLayer("B01", 1.2, 250, x0IT, xrhoIB, resRPhiIT, resZIT, eff, 1);
-  AddLayer("B02", 2.5, 250, x0IT, xrhoIB, resRPhiIT, resZIT, eff, 1);
-  AddLayer("bpipe1", 3.7, 250, 0.0014, 9.24e-02, 0.0f, 0.0f, 0.0f, 0); // 500 mum Be
-  AddLayer("B03", 7., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-  AddLayer("B04", 9., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-  AddLayer("B05", 12., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-  AddLayer("B06", 20., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-  AddLayer("B07", 30., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-  AddLayer("B08", 45., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-  AddLayer("B09", 60., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
-  AddLayer("B10", 80., 250, x0OT, xrhoOT, resRPhiOT, resZOT, eff, 1);
 }
 
 void FastTracker::AddTPC(float phiResMean, float zResMean)
@@ -214,6 +151,58 @@ void FastTracker::AddTPC(float phiResMean, float zResMean)
       rowRadius = row128Radius + (k - innerRows - middleRows + 1) * tpcOuterRadialPitch;
 
     AddLayer(Form("tpc_%d", k), rowRadius, zLength, radLPerRow, 0, phiResMean, zResMean, 1.0f, 2);
+  }
+}
+
+void FastTracker::AddGenericDetector(o2::fastsim::GeometryEntry configMap, o2::ccdb::BasicCCDBManager* ccdbManager)
+{
+  // Layers
+  for (const auto& layer : configMap.getLayerNames()) {
+    if (layer.find("global") != std::string::npos) { // Layers with global tag are skipped
+      LOG(info) << " Skipping global configuration entry " << layer;
+      continue;
+    }
+
+    LOG(info) << " Reading layer " << layer;
+    const float r = configMap.getFloatValue(layer, "r");
+    LOG(info) << " Layer " << layer << " has radius " << r;
+    const float z = configMap.getFloatValue(layer, "z");
+    const float x0 = configMap.getFloatValue(layer, "x0");
+    const float xrho = configMap.getFloatValue(layer, "xrho");
+    const float resRPhi = configMap.getFloatValue(layer, "resRPhi");
+    const float resZ = configMap.getFloatValue(layer, "resZ");
+    const float eff = configMap.getFloatValue(layer, "eff");
+    const int type = configMap.getIntValue(layer, "type");
+    const std::string deadPhiRegions = configMap.getValue(layer, "deadPhiRegions", false);
+
+    // void AddLayer(TString name, float r, float z, float x0, float xrho, float resRPhi = 0.0f, float resZ = 0.0f, float eff = 0.0f, int type = 0);
+    LOG(info) << " Adding layer " << layer << " r=" << r << " z=" << z << " x0=" << x0 << " xrho=" << xrho << " resRPhi=" << resRPhi << " resZ=" << resZ << " eff=" << eff << " type=" << type << " deadPhiRegions=" << deadPhiRegions;
+
+    DetLayer* addedLayer = AddLayer(layer.c_str(), r, z, x0, xrho, resRPhi, resZ, eff, type);
+    if (!deadPhiRegions.empty()) { // Taking it as ccdb path or local file
+                                   // Check if it begins with ccdb:
+      if (std::string(deadPhiRegions).rfind("ccdb:", 0) == 0) {
+        std::string ccdbPath = std::string(deadPhiRegions).substr(5); // remove "ccdb:" prefix
+        if (ccdbManager == nullptr) {
+          LOG(fatal) << "CCDB manager is null, cannot retrieve file " << ccdbPath;
+          return;
+        }
+        TGraph* g = ccdbManager->getForTimeStamp<TGraph>(ccdbPath, 1);
+        addedLayer->setDeadPhiRegions(g);
+      } else {
+        // Taking it as local file
+        TFile infile(deadPhiRegions.c_str(), "READ");
+        if (!infile.IsOpen()) {
+          LOG(fatal) << "Cannot open dead phi regions file " << deadPhiRegions;
+          return;
+        }
+        TGraph* g = reinterpret_cast<TGraph*>(infile.Get(infile.GetListOfKeys()->At(0)->GetName()));
+        infile.Close();
+        addedLayer->setDeadPhiRegions(g);
+      }
+    } else {
+      LOG(debug) << " No dead phi regions for layer " << layer;
+    }
   }
 }
 
@@ -312,7 +301,7 @@ float FastTracker::ProbGoodChiSqHit(float radius, float searchRadiusRPhi, float 
 
 // function to provide a reconstructed track from a perfect input track
 // returns number of intercepts (generic for now)
-int FastTracker::FastTrack(o2::track::TrackParCov inputTrack, o2::track::TrackParCov& outputTrack, const float nch)
+int FastTracker::FastTrack(o2::track::TrackParCov inputTrack, o2::track::TrackParCov& outputTrack, const float nch, const float maxRadius)
 {
   dNdEtaCent = nch; // set the number of charged particles per unit rapidity
   hits.clear();
@@ -323,11 +312,7 @@ int FastTracker::FastTrack(o2::track::TrackParCov inputTrack, o2::track::TrackPa
   inputTrack.getXYZGlo(posIni);
   const float initialRadius = std::hypot(posIni[0], posIni[1]);
   const float kTrackingMargin = 0.1;
-  const int kMaxNumberOfDetectors = 20;
-  if (kMaxNumberOfDetectors < layers.size()) {
-    LOG(fatal) << "Too many layers in FastTracker, increase kMaxNumberOfDetectors";
-    return -1; // too many layers
-  }
+
   int firstActiveLayer = -1; // first layer that is not inert
   for (size_t i = 0; i < layers.size(); ++i) {
     if (!layers[i].isInert()) {
@@ -342,8 +327,12 @@ int FastTracker::FastTrack(o2::track::TrackParCov inputTrack, o2::track::TrackPa
   const int xrhosteps = 100;
   const bool applyAngularCorrection = true;
 
+  // Delphes sets this to 20 instead of the number of layers,
+  // but does not count all points in the tpc as layers which we do here
+  // Loop over all the added layers to prevent crash when adding the tpc
+  // Should not affect efficiency calculation
   goodHitProbability.clear();
-  for (int i = 0; i < kMaxNumberOfDetectors; ++i) {
+  for (size_t i = 0; i < layers.size(); ++i) {
     goodHitProbability.push_back(-1.);
   }
   goodHitProbability[0] = 1.; // we use layer zero to accumulate
@@ -357,6 +346,14 @@ int FastTracker::FastTrack(o2::track::TrackParCov inputTrack, o2::track::TrackPa
     // check if layer is doable
     if (layers[il].getRadius() < initialRadius) {
       continue; // this layer should not be attempted, but go ahead
+    }
+
+    if (layers[il].getRadius() > maxRadius) {
+      if (lastLayerReached == -1) {
+        // This means that we didn't reach the first layer
+        return -9;
+      }
+      break; // could not reach
     }
 
     // check if layer is reached
@@ -391,6 +388,7 @@ int FastTracker::FastTrack(o2::track::TrackParCov inputTrack, o2::track::TrackPa
         break;
       }
     }
+
     if (std::abs(inputTrack.getZ()) > layers[il].getZ() && mApplyZacceptance) {
       break; // out of acceptance bounds
     }
@@ -400,6 +398,11 @@ int FastTracker::FastTrack(o2::track::TrackParCov inputTrack, o2::track::TrackPa
         LOG(info) << "Skipping inert layer: " << layers[il].getName() << " at radius " << layers[il].getRadius() << " cm";
       }
       continue; // inert layer, skip
+    }
+
+    if (layers[il].isInDeadPhiRegion(inputTrack.getPhi())) {
+      LOGF(debug, "Track is in dead region of layer %d", il);
+      continue; // dead region, skip
     }
 
     // layer is reached
@@ -424,8 +427,9 @@ int FastTracker::FastTrack(o2::track::TrackParCov inputTrack, o2::track::TrackPa
   static constexpr float kLargeErr2Dir = 0.7 * 0.7;
   static constexpr float kLargeErr2PtI = 30.5 * 30.5;
   std::array<float, o2::track::kCovMatSize> largeCov = {0.};
-  for (int ic = o2::track::kCovMatSize; ic--;)
+  for (int ic = o2::track::kCovMatSize; ic--;) {
     largeCov[ic] = 0.;
+  }
   largeCov[o2::track::CovLabels::kSigY2] = largeCov[o2::track::CovLabels::kSigZ2] = kLargeErr2Coord;
   largeCov[o2::track::CovLabels::kSigSnp2] = largeCov[o2::track::CovLabels::kSigTgl2] = kLargeErr2Dir;
   largeCov[o2::track::CovLabels::kSigQ2Pt2] = kLargeErr2PtI * trPars[o2::track::ParLabels::kQ2Pt] * trPars[o2::track::ParLabels::kQ2Pt];
@@ -461,8 +465,10 @@ int FastTracker::FastTrack(o2::track::TrackParCov inputTrack, o2::track::TrackPa
       std::cos(alpha) * spacePoint[0] + std::sin(alpha) * spacePoint[1],
       -std::sin(alpha) * spacePoint[0] + std::cos(alpha) * spacePoint[1],
       spacePoint[2]};
-    if (!inwardTrack.propagateTo(xyz1[0], magneticField))
+
+    if (!inwardTrack.propagateTo(xyz1[0], magneticField)) {
       continue;
+    }
 
     if (!layers[il].isInert()) { // only update covm for tracker hits
       const o2::track::TrackParametrization<float>::dim2_t hitpoint = {
@@ -493,13 +499,14 @@ int FastTracker::FastTrack(o2::track::TrackParCov inputTrack, o2::track::TrackPa
       }
     }
 
-    if (layers[il].isSilicon())
+    if (layers[il].isSilicon()) {
       nSiliconPoints++; // count silicon hits
-    if (layers[il].isGas())
+    }
+    if (layers[il].isGas()) {
       nGasPoints++; // count TPC/gas hits
+    }
 
     hits.push_back(thisHit);
-
     if (!layers[il].isInert()) { // good hit probability calculation
       float sigYCmb = o2::math_utils::sqrt(inwardTrack.getSigmaY2() + layers[il].getResolutionRPhi() * layers[il].getResolutionRPhi());
       float sigZCmb = o2::math_utils::sqrt(inwardTrack.getSigmaZ2() + layers[il].getResolutionZ() * layers[il].getResolutionZ());
@@ -521,21 +528,24 @@ int FastTracker::FastTrack(o2::track::TrackParCov inputTrack, o2::track::TrackPa
   }
 
   // only attempt to continue if intercepts are at least four
-  if (nIntercepts < 4)
+  if (nIntercepts < 4) {
     return nIntercepts;
+  }
 
   // generate efficiency
   float eff = 1.;
-  for (int i = 0; i < kMaxNumberOfDetectors; i++) {
+  for (size_t i = 0; i < layers.size(); i++) {
     float iGoodHit = goodHitProbability[i];
-    if (iGoodHit <= 0)
+    if (iGoodHit <= 0) {
       continue;
+    }
 
     eff *= iGoodHit;
   }
   if (mApplyEffCorrection) {
-    if (gRandom->Uniform() > eff)
+    if (gRandom->Uniform() > eff) {
       return -8;
+    }
   }
 
   outputTrack.setCov(inwardTrack.getCov());
@@ -543,8 +553,9 @@ int FastTracker::FastTrack(o2::track::TrackParCov inputTrack, o2::track::TrackPa
 
   // Use covariance matrix based smearing
   std::array<float, o2::track::kCovMatSize> covMat = {0.};
-  for (int ii = 0; ii < o2::track::kCovMatSize; ii++)
+  for (int ii = 0; ii < o2::track::kCovMatSize; ii++) {
     covMat[ii] = outputTrack.getCov()[ii];
+  }
   TMatrixDSym m(5);
   double fcovm[5][5]; // double precision is needed for regularisation
 

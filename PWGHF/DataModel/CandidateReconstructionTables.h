@@ -18,17 +18,13 @@
 #ifndef PWGHF_DATAMODEL_CANDIDATERECONSTRUCTIONTABLES_H_
 #define PWGHF_DATAMODEL_CANDIDATERECONSTRUCTIONTABLES_H_
 
-#include "PWGHF/Utils/utilsEvSelHf.h"
+#include "PWGHF/DataModel/TrackIndexSkimmingTables.h"
 #include "PWGHF/Utils/utilsPid.h"
 //
 #include "PWGLF/DataModel/LFStrangenessTables.h"
 
-#include "ALICE3/DataModel/ECAL.h"
+// #include "ALICE3/DataModel/ECAL.h"
 #include "Common/Core/RecoDecay.h"
-#include "Common/DataModel/EventSelection.h"
-#include "Common/DataModel/PIDResponseTOF.h"
-#include "Common/DataModel/PIDResponseTPC.h"
-#include "Common/DataModel/TrackSelectionTables.h"
 
 #include <CommonConstants/PhysicsConstants.h>
 #include <Framework/ASoA.h>
@@ -36,118 +32,9 @@
 
 #include <array>
 #include <cstdint>
-#include <vector>
 
 namespace o2::aod
 {
-// Table aliases
-using BcFullInfos = soa::Join<aod::BCsWithTimestamps, aod::BcSels, aod::Run3MatchedToBCSparse>;
-
-using TracksWCov = soa::Join<Tracks, TracksCov>;
-using TracksWDca = soa::Join<Tracks, TracksDCA>;
-using TracksWExtra = soa::Join<Tracks, TracksExtra>;
-using TracksWCovDca = soa::Join<Tracks, TracksCov, TracksDCA>;
-using TracksWCovExtra = soa::Join<Tracks, TracksCov, TracksExtra>;
-using TracksWDcaExtra = soa::Join<Tracks, TracksDCA, TracksExtra>;
-using TracksWCovDcaExtra = soa::Join<Tracks, TracksCov, TracksDCA, TracksExtra>;
-
-using TracksWMc = soa::Join<Tracks, McTrackLabels>;
-
-using TracksPidEl = soa::Join<aod::pidTPCFullEl, aod::pidTOFFullEl>;
-using TracksPidMu = soa::Join<aod::pidTPCFullMu, aod::pidTOFFullMu>;
-using TracksPidPi = soa::Join<aod::pidTPCFullPi, aod::pidTOFFullPi>;
-using TracksPidKa = soa::Join<aod::pidTPCFullKa, aod::pidTOFFullKa>;
-using TracksPidPr = soa::Join<aod::pidTPCFullPr, aod::pidTOFFullPr>;
-
-using TracksPidTinyEl = soa::Join<aod::pidTPCEl, aod::pidTOFEl>;
-using TracksPidTinyMu = soa::Join<aod::pidTPCMu, aod::pidTOFMu>;
-using TracksPidTinyPi = soa::Join<aod::pidTPCPi, aod::pidTOFPi>;
-using TracksPidTinyKa = soa::Join<aod::pidTPCKa, aod::pidTOFKa>;
-using TracksPidTinyPr = soa::Join<aod::pidTPCPr, aod::pidTOFPr>;
-
-// namespace pid_tpc_tof_utils
-// {
-// /// Function to combine TPC and TOF NSigma (for ML purposes)
-// /// \param tpcNSigma is the (binned) NSigma separation in TPC (if tiny = true)
-// /// \param tofNSigma is the (binned) NSigma separation in TOF (if tiny = true)
-// /// \return Node containing the combined NSigma of TPC and TOF
-// template <bool tiny = false, typename T1>
-// o2::framework::expressions::Node combineNSigma(const T1& tpcNSigma, const T1& tofNSigma)
-// {
-//   float defaultNSigmaTolerance = .1f;
-//   float defaultNSigma = -999.f + defaultNSigmaTolerance; // -999.f is the default value set in TPCPIDResponse.h and PIDTOF.h
-
-//   if constexpr (tiny) {
-//     auto tpcBinWidth = 1.f * pidtpc_tiny::binning::bin_width;
-//     auto tofBinWidth = 1.f * pidtof_tiny::binning::bin_width;
-
-//     return o2::framework::expressions::ifnode((tpcNSigma * tpcBinWidth > defaultNSigma) && (tofNSigma * tofBinWidth > defaultNSigma), o2::framework::expressions::nsqrt(.5f * tpcNSigma * tpcNSigma * tpcBinWidth * tpcBinWidth + .5f * tofNSigma * tofNSigma * tofBinWidth * tofBinWidth), // TPC and TOF
-//                                               o2::framework::expressions::ifnode(tpcNSigma * tpcBinWidth > defaultNSigma, o2::framework::expressions::nabs(tpcNSigma * tpcBinWidth),                                                                                                        // only TPC
-//                                                                                  o2::framework::expressions::ifnode(tofNSigma * tofBinWidth > defaultNSigma, o2::framework::expressions::nabs(tofNSigma * tofBinWidth),                                                                     // only TOF
-//                                                                                                                     1.f * tofNSigma * tofBinWidth)));                                                                                                                                       // no TPC nor TOF
-//   }
-
-//   return o2::framework::expressions::ifnode((tpcNSigma > defaultNSigma) && (tofNSigma > defaultNSigma), o2::framework::expressions::nsqrt(.5f * tpcNSigma * tpcNSigma + .5f * tofNSigma * tofNSigma), // TPC and TOF
-//                                             o2::framework::expressions::ifnode(tpcNSigma > defaultNSigma, o2::framework::expressions::nabs(tpcNSigma),                                                // only TPC
-//                                                                                o2::framework::expressions::ifnode(tofNSigma > defaultNSigma, o2::framework::expressions::nabs(tofNSigma),             // only TOF
-//                                                                                                                   1.f * tofNSigma)));                                                                 // no TPC nor TOF
-// }
-// } // namespace pid_tpc_tof_utils
-
-// namespace pid_tpc_tof_full
-// {
-// // Combined TPC and TOF NSigma
-// DECLARE_SOA_EXPRESSION_COLUMN(TpcTofNSigmaEl, tpcTofNSigmaEl, //! Combined NSigma separation with the TPC & TOF detectors for electron
-//                               float, pid_tpc_tof_utils::combineNSigma(o2::aod::pidtpc::tpcNSigmaEl, o2::aod::pidtof::tofNSigmaEl));
-// DECLARE_SOA_EXPRESSION_COLUMN(TpcTofNSigmaMu, tpcTofNSigmaMu, //! Combined NSigma separation with the TPC & TOF detectors for muon
-//                               float, pid_tpc_tof_utils::combineNSigma(o2::aod::pidtpc::tpcNSigmaMu, o2::aod::pidtof::tofNSigmaMu));
-// DECLARE_SOA_EXPRESSION_COLUMN(TpcTofNSigmaPi, tpcTofNSigmaPi, //! Combined NSigma separation with the TPC & TOF detectors for pion
-//                               float, pid_tpc_tof_utils::combineNSigma(o2::aod::pidtpc::tpcNSigmaPi, o2::aod::pidtof::tofNSigmaPi));
-// DECLARE_SOA_EXPRESSION_COLUMN(TpcTofNSigmaKa, tpcTofNSigmaKa, //! Combined NSigma separation with the TPC & TOF detectors for kaon
-//                               float, pid_tpc_tof_utils::combineNSigma(o2::aod::pidtpc::tpcNSigmaKa, o2::aod::pidtof::tofNSigmaKa));
-// DECLARE_SOA_EXPRESSION_COLUMN(TpcTofNSigmaPr, tpcTofNSigmaPr, //! Combined NSigma separation with the TPC & TOF detectors for proton
-//                               float, pid_tpc_tof_utils::combineNSigma(o2::aod::pidtpc::tpcNSigmaPr, o2::aod::pidtof::tofNSigmaPr));
-// } // namespace pid_tpc_tof_full
-
-// namespace pid_tpc_tof_tiny
-// {
-// // Combined binned TPC and TOF NSigma
-// DECLARE_SOA_EXPRESSION_COLUMN(TpcTofNSigmaEl, tpcTofNSigmaEl, //! Combined binned NSigma separation with the TPC & TOF detectors for electron
-//                               float, pid_tpc_tof_utils::combineNSigma<true>(o2::aod::pidtpc_tiny::tpcNSigmaStoreEl, o2::aod::pidtof_tiny::tofNSigmaStoreEl));
-// DECLARE_SOA_EXPRESSION_COLUMN(TpcTofNSigmaMu, tpcTofNSigmaMu, //! Combined binned NSigma separation with the TPC & TOF detectors for muon
-//                               float, pid_tpc_tof_utils::combineNSigma<true>(o2::aod::pidtpc_tiny::tpcNSigmaStoreMu, o2::aod::pidtof_tiny::tofNSigmaStoreMu));
-// DECLARE_SOA_EXPRESSION_COLUMN(TpcTofNSigmaPi, tpcTofNSigmaPi, //! Combined binned NSigma separation with the TPC & TOF detectors for pion
-//                               float, pid_tpc_tof_utils::combineNSigma<true>(o2::aod::pidtpc_tiny::tpcNSigmaStorePi, o2::aod::pidtof_tiny::tofNSigmaStorePi));
-// DECLARE_SOA_EXPRESSION_COLUMN(TpcTofNSigmaKa, tpcTofNSigmaKa, //! Combined binned NSigma separation with the TPC & TOF detectors for kaon
-//                               float, pid_tpc_tof_utils::combineNSigma<true>(o2::aod::pidtpc_tiny::tpcNSigmaStoreKa, o2::aod::pidtof_tiny::tofNSigmaStoreKa));
-// DECLARE_SOA_EXPRESSION_COLUMN(TpcTofNSigmaPr, tpcTofNSigmaPr, //! Combined binned NSigma separation with the TPC & TOF detectors for proton
-//                               float, pid_tpc_tof_utils::combineNSigma<true>(o2::aod::pidtpc_tiny::tpcNSigmaStorePr, o2::aod::pidtof_tiny::tofNSigmaStorePr));
-// } // namespace pid_tpc_tof_tiny
-
-// // Extension of per particle tables
-// DECLARE_SOA_EXTENDED_TABLE_USER(TracksPidElExt, TracksPidEl, "PIDELEXT", //! Table of the TPC & TOF Combined NSigma for electron
-//                                 pid_tpc_tof_full::TpcTofNSigmaEl);
-// DECLARE_SOA_EXTENDED_TABLE_USER(TracksPidMuExt, TracksPidMu, "PIDMUEXT", //! Table of the TPC & TOF Combined NSigma for muon
-//                                 pid_tpc_tof_full::TpcTofNSigmaMu);
-// DECLARE_SOA_EXTENDED_TABLE_USER(TracksPidPiExt, TracksPidPi, "PIDPIEXT", //! Table of the TPC & TOF Combined NSigma for pion
-//                                 pid_tpc_tof_full::TpcTofNSigmaPi);
-// DECLARE_SOA_EXTENDED_TABLE_USER(TracksPidKaExt, TracksPidKa, "PIDKAEXT", //! Table of the TPC & TOF Combined NSigma for kaon
-//                                 pid_tpc_tof_full::TpcTofNSigmaKa);
-// DECLARE_SOA_EXTENDED_TABLE_USER(TracksPidPrExt, TracksPidPr, "PIDPREXT", //! Table of the TPC & TOF Combined NSigma for proton
-//                                 pid_tpc_tof_full::TpcTofNSigmaPr);
-
-// // Extension of tiny size tables
-// DECLARE_SOA_EXTENDED_TABLE_USER(TracksPidTinyElExt, TracksPidTinyEl, "PIDTINYELEXT", //! Table of the TPC & TOF combined binned NSigma for electron
-//                                 pid_tpc_tof_tiny::TpcTofNSigmaEl);
-// DECLARE_SOA_EXTENDED_TABLE_USER(TracksPidTinyMuExt, TracksPidTinyMu, "PIDTINYMUEXT", //! Table of the TPC & TOF combined binned NSigma for muon
-//                                 pid_tpc_tof_tiny::TpcTofNSigmaMu);
-// DECLARE_SOA_EXTENDED_TABLE_USER(TracksPidTinyPiExt, TracksPidTinyPi, "PIDTINYPIEXT", //! Table of the TPC & TOF combined binned NSigma for pion
-//                                 pid_tpc_tof_tiny::TpcTofNSigmaPi);
-// DECLARE_SOA_EXTENDED_TABLE_USER(TracksPidTinyKaExt, TracksPidTinyKa, "PIDTINYKAEXT", //! Table of the TPC & TOF combined binned NSigma for kaon
-//                                 pid_tpc_tof_tiny::TpcTofNSigmaKa);
-// DECLARE_SOA_EXTENDED_TABLE_USER(TracksPidTinyPrExt, TracksPidTinyPr, "PIDTINYPREXT", //! Table of the TPC & TOF combined binned NSigma for proton
-//                                 pid_tpc_tof_tiny::TpcTofNSigmaPr);
-
 namespace pid_tpc_tof_static_full
 {
 // Combined TPC and TOF NSigma
@@ -156,6 +43,10 @@ DECLARE_SOA_COLUMN(TpcTofNSigmaMu, tpcTofNSigmaMu, float); //! Combined NSigma s
 DECLARE_SOA_COLUMN(TpcTofNSigmaPi, tpcTofNSigmaPi, float); //! Combined NSigma separation with the TPC & TOF detectors for pion
 DECLARE_SOA_COLUMN(TpcTofNSigmaKa, tpcTofNSigmaKa, float); //! Combined NSigma separation with the TPC & TOF detectors for kaon
 DECLARE_SOA_COLUMN(TpcTofNSigmaPr, tpcTofNSigmaPr, float); //! Combined NSigma separation with the TPC & TOF detectors for proton
+DECLARE_SOA_COLUMN(TpcTofNSigmaDe, tpcTofNSigmaDe, float); //! Combined NSigma separation with the TPC & TOF detectors for deuteron
+DECLARE_SOA_COLUMN(TpcTofNSigmaTr, tpcTofNSigmaTr, float); //! Combined NSigma separation with the TPC & TOF detectors for triton
+DECLARE_SOA_COLUMN(TpcTofNSigmaHe, tpcTofNSigmaHe, float); //! Combined NSigma separation with the TPC & TOF detectors for helium
+DECLARE_SOA_COLUMN(TpcTofNSigmaAl, tpcTofNSigmaAl, float); //! Combined NSigma separation with the TPC & TOF detectors for alpha
 } // namespace pid_tpc_tof_static_full
 
 namespace pid_tpc_tof_static_tiny
@@ -166,6 +57,10 @@ DECLARE_SOA_COLUMN(TpcTofNSigmaMu, tpcTofNSigmaMu, float); //! Combined NSigma s
 DECLARE_SOA_COLUMN(TpcTofNSigmaPi, tpcTofNSigmaPi, float); //! Combined NSigma separation with the TPC & TOF detectors for pion
 DECLARE_SOA_COLUMN(TpcTofNSigmaKa, tpcTofNSigmaKa, float); //! Combined NSigma separation with the TPC & TOF detectors for kaon
 DECLARE_SOA_COLUMN(TpcTofNSigmaPr, tpcTofNSigmaPr, float); //! Combined NSigma separation with the TPC & TOF detectors for proton
+DECLARE_SOA_COLUMN(TpcTofNSigmaDe, tpcTofNSigmaDe, float); //! Combined NSigma separation with the TPC & TOF detectors for deuteron
+DECLARE_SOA_COLUMN(TpcTofNSigmaTr, tpcTofNSigmaTr, float); //! Combined NSigma separation with the TPC & TOF detectors for triton
+DECLARE_SOA_COLUMN(TpcTofNSigmaHe, tpcTofNSigmaHe, float); //! Combined NSigma separation with the TPC & TOF detectors for helium
+DECLARE_SOA_COLUMN(TpcTofNSigmaAl, tpcTofNSigmaAl, float); //! Combined NSigma separation with the TPC & TOF detectors for alpha
 } // namespace pid_tpc_tof_static_tiny
 
 // Extension of per particle tables
@@ -179,7 +74,14 @@ DECLARE_SOA_TABLE(PidTpcTofFullKa, "AOD", "PIDTPCTOFFULLKA", //! Table of the TP
                   pid_tpc_tof_static_full::TpcTofNSigmaKa);
 DECLARE_SOA_TABLE(PidTpcTofFullPr, "AOD", "PIDTPCTOFFULLPR", //! Table of the TPC & TOF Combined NSigma for proton
                   pid_tpc_tof_static_full::TpcTofNSigmaPr);
-
+DECLARE_SOA_TABLE(PidTpcTofFullDe, "AOD", "PIDTPCTOFFULLDE", //! Table of the TPC & TOF Combined NSigma for deuteron
+                  pid_tpc_tof_static_full::TpcTofNSigmaDe);
+DECLARE_SOA_TABLE(PidTpcTofFullTr, "AOD", "PIDTPCTOFFULLTR", //! Table of the TPC & TOF Combined NSigma for triton
+                  pid_tpc_tof_static_full::TpcTofNSigmaTr);
+DECLARE_SOA_TABLE(PidTpcTofFullHe, "AOD", "PIDTPCTOFFULLHE", //! Table of the TPC & TOF Combined NSigma for helium
+                  pid_tpc_tof_static_full::TpcTofNSigmaHe);
+DECLARE_SOA_TABLE(PidTpcTofFullAl, "AOD", "PIDTPCTOFFULLAL", //! Table of the TPC & TOF Combined NSigma for alpha
+                  pid_tpc_tof_static_full::TpcTofNSigmaAl);
 // Extension of per particle tables
 DECLARE_SOA_TABLE(PidTpcTofTinyEl, "AOD", "PIDTPCTOFTINYEL", //! Table of the TPC & TOF Combined NSigma for electron
                   pid_tpc_tof_static_tiny::TpcTofNSigmaEl);
@@ -191,239 +93,14 @@ DECLARE_SOA_TABLE(PidTpcTofTinyKa, "AOD", "PIDTPCTOFTINYKA", //! Table of the TP
                   pid_tpc_tof_static_tiny::TpcTofNSigmaKa);
 DECLARE_SOA_TABLE(PidTpcTofTinyPr, "AOD", "PIDTPCTOFTINYPR", //! Table of the TPC & TOF Combined NSigma for proton
                   pid_tpc_tof_static_tiny::TpcTofNSigmaPr);
-
-namespace hf_sel_collision
-{
-DECLARE_SOA_COLUMN(WhyRejectColl, whyRejectColl, o2::hf_evsel::HfCollisionRejectionMask); //!
-} // namespace hf_sel_collision
-
-DECLARE_SOA_TABLE(HfSelCollision, "AOD", "HFSELCOLLISION", //!
-                  hf_sel_collision::WhyRejectColl);
-
-namespace hf_sel_track
-{
-DECLARE_SOA_COLUMN(IsSelProng, isSelProng, uint32_t);           //!
-DECLARE_SOA_COLUMN(IsIdentifiedPid, isIdentifiedPid, uint32_t); //!
-DECLARE_SOA_COLUMN(IsPositive, isPositive, bool);               //!
-} // namespace hf_sel_track
-
-DECLARE_SOA_TABLE(HfSelTrack, "AOD", "HFSELTRACK", //!
-                  hf_sel_track::IsSelProng,
-                  hf_sel_track::IsIdentifiedPid,
-                  hf_sel_track::IsPositive);
-
-namespace hf_pv_refit_track
-{
-DECLARE_SOA_COLUMN(PvRefitX, pvRefitX, float);             //!
-DECLARE_SOA_COLUMN(PvRefitY, pvRefitY, float);             //!
-DECLARE_SOA_COLUMN(PvRefitZ, pvRefitZ, float);             //!
-DECLARE_SOA_COLUMN(PvRefitSigmaX2, pvRefitSigmaX2, float); //!
-DECLARE_SOA_COLUMN(PvRefitSigmaXY, pvRefitSigmaXY, float); //!
-DECLARE_SOA_COLUMN(PvRefitSigmaY2, pvRefitSigmaY2, float); //!
-DECLARE_SOA_COLUMN(PvRefitSigmaXZ, pvRefitSigmaXZ, float); //!
-DECLARE_SOA_COLUMN(PvRefitSigmaYZ, pvRefitSigmaYZ, float); //!
-DECLARE_SOA_COLUMN(PvRefitSigmaZ2, pvRefitSigmaZ2, float); //!
-DECLARE_SOA_COLUMN(PvRefitDcaXY, pvRefitDcaXY, float);     //!
-DECLARE_SOA_COLUMN(PvRefitDcaZ, pvRefitDcaZ, float);       //!
-} // namespace hf_pv_refit_track
-
-DECLARE_SOA_TABLE(HfPvRefitTrack, "AOD", "HFPVREFITTRACK", //!
-                  hf_pv_refit_track::PvRefitX,
-                  hf_pv_refit_track::PvRefitY,
-                  hf_pv_refit_track::PvRefitZ,
-                  hf_pv_refit_track::PvRefitSigmaX2,
-                  hf_pv_refit_track::PvRefitSigmaXY,
-                  hf_pv_refit_track::PvRefitSigmaY2,
-                  hf_pv_refit_track::PvRefitSigmaXZ,
-                  hf_pv_refit_track::PvRefitSigmaYZ,
-                  hf_pv_refit_track::PvRefitSigmaZ2,
-                  hf_pv_refit_track::PvRefitDcaXY,
-                  hf_pv_refit_track::PvRefitDcaZ);
-
-namespace hf_track_index
-{
-DECLARE_SOA_INDEX_COLUMN(Collision, collision);                   //! Collision index
-DECLARE_SOA_INDEX_COLUMN_FULL(Prong0, prong0, int, Tracks, "_0"); //! Index to first prong
-DECLARE_SOA_INDEX_COLUMN_FULL(Prong1, prong1, int, Tracks, "_1"); //! Index to second prong
-DECLARE_SOA_INDEX_COLUMN_FULL(Prong2, prong2, int, Tracks, "_2"); //! Index to third prong
-DECLARE_SOA_INDEX_COLUMN_FULL(Prong3, prong3, int, Tracks, "_3"); //! Index to fourth prong
-DECLARE_SOA_INDEX_COLUMN_FULL(Prong4, prong4, int, Tracks, "_4"); //! Index to fifth prong
-DECLARE_SOA_INDEX_COLUMN(V0, v0);                                 //! Index to V0 prong
-DECLARE_SOA_INDEX_COLUMN(Cascade, cascade);                       //! Index to cascade prong
-DECLARE_SOA_COLUMN(HFflag, hfflag, uint8_t);                      //! Bitmap to store selection results, o2-linter: disable=name/o2-column (written to disk)
-
-DECLARE_SOA_COLUMN(FlagD0ToKPi, flagD0ToKPi, uint8_t);       //!
-DECLARE_SOA_COLUMN(FlagJpsiToEE, flagJpsiToEE, uint8_t);     //!
-DECLARE_SOA_COLUMN(FlagJpsiToMuMu, flagJpsiToMuMu, uint8_t); //!
-
-DECLARE_SOA_COLUMN(FlagDplusToPiKPi, flagDplusToPiKPi, uint8_t); //!
-DECLARE_SOA_COLUMN(FlagLcToPKPi, flagLcToPKPi, uint8_t);         //!
-DECLARE_SOA_COLUMN(FlagDsToKKPi, flagDsToKKPi, uint8_t);         //!
-DECLARE_SOA_COLUMN(FlagXicToPKPi, flagXicToPKPi, uint8_t);       //!
-
-DECLARE_SOA_COLUMN(FlagDstarToD0Pi, flagDstarToD0Pi, uint8_t); //!
-
-DECLARE_SOA_COLUMN(MlProbSkimD0ToKPi, mlProbSkimD0ToKPi, std::vector<float>);           //! ML probabilities (background, prompt, non-prompt) for D0->Kpi
-DECLARE_SOA_COLUMN(MlProbSkimDplusToPiKPi, mlProbSkimDplusToPiKPi, std::vector<float>); //! ML probabilities (background, prompt, non-prompt) for D+->Kpipi
-DECLARE_SOA_COLUMN(MlProbSkimDsToKKPi, mlProbSkimDsToKKPi, std::vector<float>);         //! ML probabilities (background, prompt, non-prompt) for Ds->KKpi
-DECLARE_SOA_COLUMN(MlProbSkimLcToPKPi, mlProbSkimLcToPKPi, std::vector<float>);         //! ML probabilities (background, prompt, non-prompt) for Lc->pKpi
-DECLARE_SOA_COLUMN(MlProbSkimXicToPKPi, mlProbSkimXicToPKPi, std::vector<float>);       //! ML probabilities (background, prompt, non-prompt) for Xic->pKpi
-} // namespace hf_track_index
-
-DECLARE_SOA_TABLE(Hf2Prongs_000, "AOD", "HF2PRONG", //! Table for HF 2 prong candidates (Run 2 converted format)
-                  o2::soa::Index<>,
-                  hf_track_index::Prong0Id,
-                  hf_track_index::Prong1Id,
-                  hf_track_index::HFflag);
-
-DECLARE_SOA_TABLE_VERSIONED(Hf2Prongs_001, "AOD", "HF2PRONG", 1, //! Table for HF 2 prong candidates (Run 3 format)
-                            o2::soa::Index<>,
-                            hf_track_index::CollisionId,
-                            hf_track_index::Prong0Id,
-                            hf_track_index::Prong1Id,
-                            hf_track_index::HFflag);
-
-using Hf2Prongs = Hf2Prongs_001;
-using Hf2Prong = Hf2Prongs::iterator;
-
-DECLARE_SOA_TABLE(HfCascades_000, "AOD", "HFCASCADE", //! Table for HF candidates with a V0 (Run 2 converted format)
-                  o2::soa::Index<>,
-                  hf_track_index::Prong0Id,
-                  hf_track_index::V0Id);
-
-DECLARE_SOA_TABLE_VERSIONED(HfCascades_001, "AOD", "HFCASCADE", 1, //! Table for HF candidates with a V0 (Run 3 format)
-                            o2::soa::Index<>,
-                            hf_track_index::CollisionId,
-                            hf_track_index::Prong0Id,
-                            hf_track_index::V0Id);
-
-using HfCascades = HfCascades_001;
-using HfCascade = HfCascades::iterator;
-
-DECLARE_SOA_TABLE(Hf3Prongs_000, "AOD", "HF3PRONG", //! Table for HF 3 prong candidates (Run 2 converted format)
-                  o2::soa::Index<>,
-                  hf_track_index::Prong0Id,
-                  hf_track_index::Prong1Id,
-                  hf_track_index::Prong2Id,
-                  hf_track_index::HFflag);
-
-DECLARE_SOA_TABLE_VERSIONED(Hf3Prongs_001, "AOD", "HF3PRONG", 1, //! Table for HF 3 prong candidates (Run 3 format)
-                            o2::soa::Index<>,
-                            hf_track_index::CollisionId,
-                            hf_track_index::Prong0Id,
-                            hf_track_index::Prong1Id,
-                            hf_track_index::Prong2Id,
-                            hf_track_index::HFflag);
-
-using Hf3Prongs = Hf3Prongs_001;
-using Hf3Prong = Hf3Prongs::iterator;
-
-DECLARE_SOA_TABLE(HfCascLf2Prongs, "AOD", "HFCASCLF2PRONG", //! Table for HF 2 prong candidates with a Cascade
-                  o2::soa::Index<>,
-                  hf_track_index::CollisionId,
-                  hf_track_index::CascadeId,
-                  hf_track_index::Prong0Id,
-                  hf_track_index::HFflag);
-using HfCascLf2Prong = HfCascLf2Prongs::iterator;
-
-DECLARE_SOA_TABLE(HfCascLf3Prongs, "AOD", "HFCASCLF3PRONG", //! Table for HF 3 prong candidates with a Cascade
-                  o2::soa::Index<>,
-                  hf_track_index::CollisionId,
-                  hf_track_index::CascadeId,
-                  hf_track_index::Prong0Id,
-                  hf_track_index::Prong1Id);
-using HfCascLf3Prong = HfCascLf3Prongs::iterator;
-
-namespace hf_track_index
-{
-DECLARE_SOA_INDEX_COLUMN_FULL(ProngD0, prongD0, int, Hf2Prongs, ""); //! Index to a D0 prong
-} // namespace hf_track_index
-
-DECLARE_SOA_TABLE(HfDstars_000, "AOD", "HFDSTAR", //! D* -> D0pi candidates (Run 2 converted format)
-                  o2::soa::Index<>,
-                  hf_track_index::Prong0Id,
-                  hf_track_index::ProngD0Id);
-
-DECLARE_SOA_TABLE_VERSIONED(HfDstars_001, "AOD", "HFDSTAR", 1, //! D* -> D0pi candidates (Run 3 format)
-                            o2::soa::Index<>,
-                            hf_track_index::CollisionId,
-                            hf_track_index::Prong0Id,
-                            hf_track_index::ProngD0Id);
-
-using HfDstars = HfDstars_001;
-using HfDstar = HfDstars::iterator;
-
-DECLARE_SOA_TABLE(HfCutStatus2Prong, "AOD", "HFCUTSTATUS2P", //!
-                  hf_track_index::FlagD0ToKPi,
-                  hf_track_index::FlagJpsiToEE,
-                  hf_track_index::FlagJpsiToMuMu);
-
-DECLARE_SOA_TABLE(HfCutStatus3Prong, "AOD", "HFCUTSTATUS3P", //!
-                  hf_track_index::FlagDplusToPiKPi,
-                  hf_track_index::FlagLcToPKPi,
-                  hf_track_index::FlagDsToKKPi,
-                  hf_track_index::FlagXicToPKPi);
-
-DECLARE_SOA_TABLE(HfCutStatusDstar, "AOD", "HFCUTSTATUSDST", //!
-                  hf_track_index::FlagDstarToD0Pi);
-
-DECLARE_SOA_TABLE(Hf2ProngMlProbs, "AOD", "HF2PRONGMLPROB", //! Table for ML scores of HF 2 prong candidates
-                  hf_track_index::MlProbSkimD0ToKPi);
-
-DECLARE_SOA_TABLE(Hf3ProngMlProbs, "AOD", "HF3PRONGMLPROB", //! Table for ML scores of HF 3 prong candidates
-                  hf_track_index::MlProbSkimDplusToPiKPi,
-                  hf_track_index::MlProbSkimLcToPKPi,
-                  hf_track_index::MlProbSkimDsToKKPi,
-                  hf_track_index::MlProbSkimXicToPKPi);
-
-namespace hf_pv_refit
-{
-DECLARE_SOA_COLUMN(PvRefitX, pvRefitX, float);             //!
-DECLARE_SOA_COLUMN(PvRefitY, pvRefitY, float);             //!
-DECLARE_SOA_COLUMN(PvRefitZ, pvRefitZ, float);             //!
-DECLARE_SOA_COLUMN(PvRefitSigmaX2, pvRefitSigmaX2, float); //!
-DECLARE_SOA_COLUMN(PvRefitSigmaXY, pvRefitSigmaXY, float); //!
-DECLARE_SOA_COLUMN(PvRefitSigmaY2, pvRefitSigmaY2, float); //!
-DECLARE_SOA_COLUMN(PvRefitSigmaXZ, pvRefitSigmaXZ, float); //!
-DECLARE_SOA_COLUMN(PvRefitSigmaYZ, pvRefitSigmaYZ, float); //!
-DECLARE_SOA_COLUMN(PvRefitSigmaZ2, pvRefitSigmaZ2, float); //!
-} // namespace hf_pv_refit
-
-DECLARE_SOA_TABLE(HfPvRefit2Prong, "AOD", "HFPVREFIT2PRONG", //!
-                  hf_pv_refit::PvRefitX,
-                  hf_pv_refit::PvRefitY,
-                  hf_pv_refit::PvRefitZ,
-                  hf_pv_refit::PvRefitSigmaX2,
-                  hf_pv_refit::PvRefitSigmaXY,
-                  hf_pv_refit::PvRefitSigmaY2,
-                  hf_pv_refit::PvRefitSigmaXZ,
-                  hf_pv_refit::PvRefitSigmaYZ,
-                  hf_pv_refit::PvRefitSigmaZ2);
-
-DECLARE_SOA_TABLE(HfPvRefit3Prong, "AOD", "HFPVREFIT3PRONG", //!
-                  hf_pv_refit::PvRefitX,
-                  hf_pv_refit::PvRefitY,
-                  hf_pv_refit::PvRefitZ,
-                  hf_pv_refit::PvRefitSigmaX2,
-                  hf_pv_refit::PvRefitSigmaXY,
-                  hf_pv_refit::PvRefitSigmaY2,
-                  hf_pv_refit::PvRefitSigmaXZ,
-                  hf_pv_refit::PvRefitSigmaYZ,
-                  hf_pv_refit::PvRefitSigmaZ2,
-                  o2::soa::Marker<1>);
-
-DECLARE_SOA_TABLE(HfPvRefitDstar, "AOD", "HFPVREFITDSTAR", //!
-                  hf_pv_refit::PvRefitX,
-                  hf_pv_refit::PvRefitY,
-                  hf_pv_refit::PvRefitZ,
-                  hf_pv_refit::PvRefitSigmaX2,
-                  hf_pv_refit::PvRefitSigmaXY,
-                  hf_pv_refit::PvRefitSigmaY2,
-                  hf_pv_refit::PvRefitSigmaXZ,
-                  hf_pv_refit::PvRefitSigmaYZ,
-                  hf_pv_refit::PvRefitSigmaZ2,
-                  o2::soa::Marker<2>);
-
+DECLARE_SOA_TABLE(PidTpcTofTinyDe, "AOD", "PIDTPCTOFTINYDE", //! Table of the TPC & TOF Combined NSigma for deuteron
+                  pid_tpc_tof_static_tiny::TpcTofNSigmaDe);
+DECLARE_SOA_TABLE(PidTpcTofTinyTr, "AOD", "PIDTPCTOFTINYTR", //! Table of the TPC & TOF Combined NSigma for triton
+                  pid_tpc_tof_static_tiny::TpcTofNSigmaTr);
+DECLARE_SOA_TABLE(PidTpcTofTinyHe, "AOD", "PIDTPCTOFTINYHE", //! Table of the TPC & TOF Combined NSigma for helium
+                  pid_tpc_tof_static_tiny::TpcTofNSigmaHe);
+DECLARE_SOA_TABLE(PidTpcTofTinyAl, "AOD", "PIDTPCTOFTINYAL", //! Table of the TPC & TOF Combined NSigma for alpha
+                  pid_tpc_tof_static_tiny::TpcTofNSigmaAl);
 // general decay properties
 namespace hf_cand
 {
@@ -517,6 +194,18 @@ DECLARE_SOA_COLUMN(NSigTpcKa2, nSigTpcKa2, float);           //! TPC nSigma for 
 DECLARE_SOA_COLUMN(NSigTpcPr0, nSigTpcPr0, float);           //! TPC nSigma for proton hypothesis - prong 0
 DECLARE_SOA_COLUMN(NSigTpcPr1, nSigTpcPr1, float);           //! TPC nSigma for proton hypothesis - prong 1
 DECLARE_SOA_COLUMN(NSigTpcPr2, nSigTpcPr2, float);           //! TPC nSigma for proton hypothesis - prong 2
+DECLARE_SOA_COLUMN(NSigTpcDe0, nSigTpcDe0, float);           //! TPC nSigma for deuteron hypothesis - prong 0
+DECLARE_SOA_COLUMN(NSigTpcDe1, nSigTpcDe1, float);           //! TPC nSigma for deuteron hypothesis - prong 1
+DECLARE_SOA_COLUMN(NSigTpcDe2, nSigTpcDe2, float);           //! TPC nSigma for deuteron hypothesis - prong 2
+DECLARE_SOA_COLUMN(NSigTpcTr0, nSigTpcTr0, float);           //! TPC nSigma for triton hypothesis - prong 0
+DECLARE_SOA_COLUMN(NSigTpcTr1, nSigTpcTr1, float);           //! TPC nSigma for triton hypothesis - prong 1
+DECLARE_SOA_COLUMN(NSigTpcTr2, nSigTpcTr2, float);           //! TPC nSigma for triton hypothesis - prong 2
+DECLARE_SOA_COLUMN(NSigTpcHe0, nSigTpcHe0, float);           //! TPC nSigma for helium hypothesis - prong 0
+DECLARE_SOA_COLUMN(NSigTpcHe1, nSigTpcHe1, float);           //! TPC nSigma for helium hypothesis - prong 1
+DECLARE_SOA_COLUMN(NSigTpcHe2, nSigTpcHe2, float);           //! TPC nSigma for helium hypothesis - prong 2
+DECLARE_SOA_COLUMN(NSigTpcAl0, nSigTpcAl0, float);           //! TPC nSigma for alpha hypothesis - prong 0
+DECLARE_SOA_COLUMN(NSigTpcAl1, nSigTpcAl1, float);           //! TPC nSigma for alpha hypothesis - prong 1
+DECLARE_SOA_COLUMN(NSigTpcAl2, nSigTpcAl2, float);           //! TPC nSigma for alpha hypothesis - prong 2
 DECLARE_SOA_COLUMN(NSigTofPi0, nSigTofPi0, float);           //! TOF nSigma for pion hypothesis - prong 0
 DECLARE_SOA_COLUMN(NSigTofPi1, nSigTofPi1, float);           //! TOF nSigma for pion hypothesis - prong 1
 DECLARE_SOA_COLUMN(NSigTofPi2, nSigTofPi2, float);           //! TOF nSigma for pion hypothesis - prong 2
@@ -526,6 +215,18 @@ DECLARE_SOA_COLUMN(NSigTofKa2, nSigTofKa2, float);           //! TOF nSigma for 
 DECLARE_SOA_COLUMN(NSigTofPr0, nSigTofPr0, float);           //! TOF nSigma for proton hypothesis - prong 0
 DECLARE_SOA_COLUMN(NSigTofPr1, nSigTofPr1, float);           //! TOF nSigma for proton hypothesis - prong 1
 DECLARE_SOA_COLUMN(NSigTofPr2, nSigTofPr2, float);           //! TOF nSigma for proton hypothesis - prong 2
+DECLARE_SOA_COLUMN(NSigTofDe0, nSigTofDe0, float);           //! TOF nSigma for deuteron hypothesis - prong 0
+DECLARE_SOA_COLUMN(NSigTofDe1, nSigTofDe1, float);           //! TOF nSigma for deuteron hypothesis - prong 1
+DECLARE_SOA_COLUMN(NSigTofDe2, nSigTofDe2, float);           //! TOF nSigma for deuteron hypothesis - prong 2
+DECLARE_SOA_COLUMN(NSigTofTr0, nSigTofTr0, float);           //! TOF nSigma for triton hypothesis - prong 0
+DECLARE_SOA_COLUMN(NSigTofTr1, nSigTofTr1, float);           //! TOF nSigma for triton hypothesis - prong 1
+DECLARE_SOA_COLUMN(NSigTofTr2, nSigTofTr2, float);           //! TOF nSigma for triton hypothesis - prong 2
+DECLARE_SOA_COLUMN(NSigTofHe0, nSigTofHe0, float);           //! TOF nSigma for helium hypothesis - prong 0
+DECLARE_SOA_COLUMN(NSigTofHe1, nSigTofHe1, float);           //! TOF nSigma for helium hypothesis - prong 1
+DECLARE_SOA_COLUMN(NSigTofHe2, nSigTofHe2, float);           //! TOF nSigma for helium hypothesis - prong 2
+DECLARE_SOA_COLUMN(NSigTofAl0, nSigTofAl0, float);           //! TOF nSigma for alpha hypothesis - prong 0
+DECLARE_SOA_COLUMN(NSigTofAl1, nSigTofAl1, float);           //! TOF nSigma for alpha hypothesis - prong 1
+DECLARE_SOA_COLUMN(NSigTofAl2, nSigTofAl2, float);           //! TOF nSigma for alpha hypothesis - prong 2
 DECLARE_SOA_DYNAMIC_COLUMN(TpcTofNSigmaPi0, tpcTofNSigmaPi0, //! Combined NSigma separation with the TPC & TOF detectors for pion - prong 0
                            [](float tpcNSigmaPi0, float tofNSigmaPi0) -> float { return pid_tpc_tof_utils::combineNSigma<false /*tiny*/>(tpcNSigmaPi0, tofNSigmaPi0); });
 DECLARE_SOA_DYNAMIC_COLUMN(TpcTofNSigmaPi1, tpcTofNSigmaPi1, //! Combined NSigma separation with the TPC & TOF detectors for pion - prong 1
@@ -544,6 +245,30 @@ DECLARE_SOA_DYNAMIC_COLUMN(TpcTofNSigmaPr1, tpcTofNSigmaPr1, //! Combined NSigma
                            [](float tpcNSigmaPr1, float tofNSigmaPr1) -> float { return pid_tpc_tof_utils::combineNSigma<false /*tiny*/>(tpcNSigmaPr1, tofNSigmaPr1); });
 DECLARE_SOA_DYNAMIC_COLUMN(TpcTofNSigmaPr2, tpcTofNSigmaPr2, //! Combined NSigma separation with the TPC & TOF detectors for proton - prong 2
                            [](float tpcNSigmaPr2, float tofNSigmaPr2) -> float { return pid_tpc_tof_utils::combineNSigma<false /*tiny*/>(tpcNSigmaPr2, tofNSigmaPr2); });
+DECLARE_SOA_DYNAMIC_COLUMN(TpcTofNSigmaDe0, tpcTofNSigmaDe0, //! Combined NSigma separation with the TPC & TOF detectors for deuteron - prong 0
+                           [](float tpcNSigmaDe0, float tofNSigmaDe0) -> float { return pid_tpc_tof_utils::combineNSigma<false /*tiny*/>(tpcNSigmaDe0, tofNSigmaDe0); });
+DECLARE_SOA_DYNAMIC_COLUMN(TpcTofNSigmaDe1, tpcTofNSigmaDe1, //! Combined NSigma separation with the TPC & TOF detectors for deuteron - prong 1
+                           [](float tpcNSigmaDe1, float tofNSigmaDe1) -> float { return pid_tpc_tof_utils::combineNSigma<false /*tiny*/>(tpcNSigmaDe1, tofNSigmaDe1); });
+DECLARE_SOA_DYNAMIC_COLUMN(TpcTofNSigmaDe2, tpcTofNSigmaDe2, //! Combined NSigma separation with the TPC & TOF detectors for deuteron - prong 2
+                           [](float tpcNSigmaDe2, float tofNSigmaDe2) -> float { return pid_tpc_tof_utils::combineNSigma<false /*tiny*/>(tpcNSigmaDe2, tofNSigmaDe2); });
+DECLARE_SOA_DYNAMIC_COLUMN(TpcTofNSigmaTr0, tpcTofNSigmaTr0, //! Combined NSigma separation with the TPC & TOF detectors for triton - prong 0
+                           [](float tpcNSigmaTr0, float tofNSigmaTr0) -> float { return pid_tpc_tof_utils::combineNSigma<false /*tiny*/>(tpcNSigmaTr0, tofNSigmaTr0); });
+DECLARE_SOA_DYNAMIC_COLUMN(TpcTofNSigmaTr1, tpcTofNSigmaTr1, //! Combined NSigma separation with the TPC & TOF detectors for triton - prong 1
+                           [](float tpcNSigmaTr1, float tofNSigmaTr1) -> float { return pid_tpc_tof_utils::combineNSigma<false /*tiny*/>(tpcNSigmaTr1, tofNSigmaTr1); });
+DECLARE_SOA_DYNAMIC_COLUMN(TpcTofNSigmaTr2, tpcTofNSigmaTr2, //! Combined NSigma separation with the TPC & TOF detectors for triton - prong 2
+                           [](float tpcNSigmaTr2, float tofNSigmaTr2) -> float { return pid_tpc_tof_utils::combineNSigma<false /*tiny*/>(tpcNSigmaTr2, tofNSigmaTr2); });
+DECLARE_SOA_DYNAMIC_COLUMN(TpcTofNSigmaHe0, tpcTofNSigmaHe0, //! Combined NSigma separation with the TPC & TOF detectors for helium - prong 0
+                           [](float tpcNSigmaHe0, float tofNSigmaHe0) -> float { return pid_tpc_tof_utils::combineNSigma<false /*tiny*/>(tpcNSigmaHe0, tofNSigmaHe0); });
+DECLARE_SOA_DYNAMIC_COLUMN(TpcTofNSigmaHe1, tpcTofNSigmaHe1, //! Combined NSigma separation with the TPC & TOF detectors for helium - prong 1
+                           [](float tpcNSigmaHe1, float tofNSigmaHe1) -> float { return pid_tpc_tof_utils::combineNSigma<false /*tiny*/>(tpcNSigmaHe1, tofNSigmaHe1); });
+DECLARE_SOA_DYNAMIC_COLUMN(TpcTofNSigmaHe2, tpcTofNSigmaHe2, //! Combined NSigma separation with the TPC & TOF detectors for helium - prong 2
+                           [](float tpcNSigmaHe2, float tofNSigmaHe2) -> float { return pid_tpc_tof_utils::combineNSigma<false /*tiny*/>(tpcNSigmaHe2, tofNSigmaHe2); });
+DECLARE_SOA_DYNAMIC_COLUMN(TpcTofNSigmaAl0, tpcTofNSigmaAl0, //! Combined NSigma separation with the TPC & TOF detectors for alpha - prong 0
+                           [](float tpcNSigmaAl0, float tofNSigmaAl0) -> float { return pid_tpc_tof_utils::combineNSigma<false /*tiny*/>(tpcNSigmaAl0, tofNSigmaAl0); });
+DECLARE_SOA_DYNAMIC_COLUMN(TpcTofNSigmaAl1, tpcTofNSigmaAl1, //! Combined NSigma separation with the TPC & TOF detectors for alpha - prong 1
+                           [](float tpcNSigmaAl1, float tofNSigmaAl1) -> float { return pid_tpc_tof_utils::combineNSigma<false /*tiny*/>(tpcNSigmaAl1, tofNSigmaAl1); });
+DECLARE_SOA_DYNAMIC_COLUMN(TpcTofNSigmaAl2, tpcTofNSigmaAl2, //! Combined NSigma separation with the TPC & TOF detectors for alpha - prong 2
+                           [](float tpcNSigmaAl2, float tofNSigmaAl2) -> float { return pid_tpc_tof_utils::combineNSigma<false /*tiny*/>(tpcNSigmaAl2, tofNSigmaAl2); });
 // tiny (binned) option
 DECLARE_SOA_DYNAMIC_COLUMN(TpcTofNSigmaTinyPi0, tpcTofNSigmaTinyPi0, //! Combined NSigma separation with the TPC & TOF detectors for pion - prong 0
                            [](float tpcNSigmaPi0, float tofNSigmaPi0) -> float { return pid_tpc_tof_utils::combineNSigma<true /*tiny*/>(tpcNSigmaPi0, tofNSigmaPi0); });
@@ -604,13 +329,6 @@ DECLARE_SOA_DYNAMIC_COLUMN(Ct, ct, //!
 DECLARE_SOA_DYNAMIC_COLUMN(ImpactParameterXY, impactParameterXY, //!
                            [](float xVtxP, float yVtxP, float zVtxP, float xVtxS, float yVtxS, float zVtxS, float px, float py, float pz) -> float { return RecoDecay::impParXY(std::array{xVtxP, yVtxP, zVtxP}, std::array{xVtxS, yVtxS, zVtxS}, std::array{px, py, pz}); });
 DECLARE_SOA_COLUMN(KfTopolChi2OverNdf, kfTopolChi2OverNdf, float); //! chi2overndf of the KFParticle topological constraint
-// B-hadron mother information
-DECLARE_SOA_COLUMN(PtBhadMotherPart, ptBhadMotherPart, float); //! pt of the first B-hadron mother particle (only in case of non-prompt)
-DECLARE_SOA_COLUMN(PdgBhadMotherPart, pdgBhadMotherPart, int); //! pdg of the first B-hadron mother particle (only in case of non-prompt)
-DECLARE_SOA_COLUMN(IdxBhadMotherPart, idxBhadMotherPart, int); //! index of the first B-hadron mother particle (only in case of non-prompt)
-// Kink topology and material interaction mc flags
-DECLARE_SOA_COLUMN(NTracksDecayed, nTracksDecayed, int8_t);                       //! number of tracks matched with kinked decay topology
-DECLARE_SOA_COLUMN(NInteractionsWithMaterial, nInteractionsWithMaterial, int8_t); //! number of tracks matched after interaction with material
 
 // method of secondary-vertex reconstruction
 enum VertexerType { DCAFitter = 0,
@@ -640,25 +358,32 @@ DECLARE_SOA_DYNAMIC_COLUMN(MaxNormalisedDeltaIP, maxNormalisedDeltaIP, //!
                            [](float xVtxP, float yVtxP, float xVtxS, float yVtxS, float errDlxy, float pxM, float pyM, float ip0, float errIp0, float ip1, float errIp1, float px0, float py0, float px1, float py1) -> float { return RecoDecay::maxNormalisedDeltaIP(std::array{xVtxP, yVtxP}, std::array{xVtxS, yVtxS}, errDlxy, std::array{pxM, pyM}, std::array{ip0, ip1}, std::array{errIp0, errIp1}, std::array{std::array{px0, py0}, std::array{px1, py1}}); });
 DECLARE_SOA_DYNAMIC_COLUMN(CtXY, ctXY, //!
                            [](float px0, float py0, float pz0, float px1, float py1, float pz1, float xVtxP, float yVtxP, float xVtxS, float yVtxS, const std::array<double, 2>& m) -> float { return RecoDecay::ctXY(std::array{xVtxP, yVtxP}, std::array{xVtxS, yVtxS}, std::array{std::array{px0, py0, pz0}, std::array{px1, py1, pz1}}, m); });
-// MC matching result:
-DECLARE_SOA_COLUMN(FlagMcMatchRec, flagMcMatchRec, int8_t);         //! reconstruction level
-DECLARE_SOA_COLUMN(FlagMcMatchGen, flagMcMatchGen, int8_t);         //! generator level
-DECLARE_SOA_COLUMN(OriginMcRec, originMcRec, int8_t);               //! particle origin, reconstruction level
-DECLARE_SOA_COLUMN(OriginMcGen, originMcGen, int8_t);               //! particle origin, generator level
-DECLARE_SOA_COLUMN(FlagMcDecayChanRec, flagMcDecayChanRec, int8_t); //! resonant decay channel flag, reconstruction level
-DECLARE_SOA_COLUMN(FlagMcDecayChanGen, flagMcDecayChanGen, int8_t); //! resonant decay channel flag, reconstruction level
 
 // KF related properties
 DECLARE_SOA_COLUMN(KfGeoMassD0, kfGeoMassD0, float);       //! mass of the D0 candidate from the KFParticle geometric fit
 DECLARE_SOA_COLUMN(KfGeoMassD0bar, kfGeoMassD0bar, float); //! mass of the D0bar candidate from the KFParticle geometric fit
 
-// mapping of decay types
-enum DecayType { D0ToPiK = 0,
-                 JpsiToEE,
-                 JpsiToMuMu,
-                 N2ProngDecays }; // always keep N2ProngDecays at the end
-
 } // namespace hf_cand_2prong
+
+// MC
+namespace hf_cand_mc_flag
+{
+DECLARE_SOA_COLUMN(FlagMcMatchRec, flagMcMatchRec, int8_t);         //! main decay channel, reconstruction level
+DECLARE_SOA_COLUMN(FlagMcMatchGen, flagMcMatchGen, int8_t);         //! main decay channel, generator level
+DECLARE_SOA_COLUMN(FlagMcDecayChanRec, flagMcDecayChanRec, int8_t); //! resonant decay channel, reconstruction level
+DECLARE_SOA_COLUMN(FlagMcDecayChanGen, flagMcDecayChanGen, int8_t); //! resonant decay channel, generator level
+DECLARE_SOA_COLUMN(OriginMcRec, originMcRec, int8_t);               //! particle origin, reconstruction level
+DECLARE_SOA_COLUMN(OriginMcGen, originMcGen, int8_t);               //! particle origin, generator level
+DECLARE_SOA_COLUMN(IsCandidateSwapped, isCandidateSwapped, int8_t); //! swapping of the prongs order
+DECLARE_SOA_COLUMN(DebugMcRec, debugMcRec, int8_t);                 //! debug flag for mis-association reconstruction level
+// B-hadron mother information
+DECLARE_SOA_COLUMN(PtBhadMotherPart, ptBhadMotherPart, float); //! pt of the first B-hadron mother particle (only in case of non-prompt)
+DECLARE_SOA_COLUMN(PdgBhadMotherPart, pdgBhadMotherPart, int); //! pdg of the first B-hadron mother particle (only in case of non-prompt)
+DECLARE_SOA_COLUMN(IdxBhadMotherPart, idxBhadMotherPart, int); //! index of the first B-hadron mother particle (only in case of non-prompt)
+// Kink topology and material interaction MC flags
+DECLARE_SOA_COLUMN(NTracksDecayed, nTracksDecayed, int8_t);                       //! number of tracks matched with kinked decay topology
+DECLARE_SOA_COLUMN(NInteractionsWithMaterial, nInteractionsWithMaterial, int8_t); //! number of tracks matched after interaction with material
+} // namespace hf_cand_mc_flag
 
 // general columns
 #define HFCAND_COLUMNS                                                                                                                                                                             \
@@ -744,20 +469,20 @@ DECLARE_SOA_TABLE(HfCand2ProngKF, "AOD", "HFCAND2PKF",
 
 // table with results of reconstruction level MC matching
 DECLARE_SOA_TABLE(HfCand2ProngMcRec, "AOD", "HFCAND2PMCREC", //!
-                  hf_cand_2prong::FlagMcMatchRec,
-                  hf_cand_2prong::OriginMcRec,
-                  hf_cand_2prong::FlagMcDecayChanRec,
-                  hf_cand::PtBhadMotherPart,
-                  hf_cand::PdgBhadMotherPart,
-                  hf_cand::NTracksDecayed,
-                  hf_cand::NInteractionsWithMaterial);
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::OriginMcRec,
+                  hf_cand_mc_flag::FlagMcDecayChanRec,
+                  hf_cand_mc_flag::PtBhadMotherPart,
+                  hf_cand_mc_flag::PdgBhadMotherPart,
+                  hf_cand_mc_flag::NTracksDecayed,
+                  hf_cand_mc_flag::NInteractionsWithMaterial);
 
 // table with results of generator level MC matching
 DECLARE_SOA_TABLE(HfCand2ProngMcGen, "AOD", "HFCAND2PMCGEN", //!
-                  hf_cand_2prong::FlagMcMatchGen,
-                  hf_cand_2prong::OriginMcGen,
-                  hf_cand_2prong::FlagMcDecayChanGen,
-                  hf_cand::IdxBhadMotherPart);
+                  hf_cand_mc_flag::FlagMcMatchGen,
+                  hf_cand_mc_flag::OriginMcGen,
+                  hf_cand_mc_flag::FlagMcDecayChanGen,
+                  hf_cand_mc_flag::IdxBhadMotherPart);
 
 // cascade decay candidate table
 
@@ -776,13 +501,11 @@ DECLARE_SOA_DYNAMIC_COLUMN(PtV0Neg, ptV0Neg, //! pt of the negative V0 daughter
                            [](float px, float py) { return RecoDecay::pt(px, py); });
 DECLARE_SOA_DYNAMIC_COLUMN(CtV0, ctV0, //! c*t of the V0
                            [](float xVtxP, float yVtxP, float zVtxP, float xVtxS, float yVtxS, float zVtxS, float px, float py, float pz, double m) -> float { return RecoDecay::ct(std::array{px, py, pz}, RecoDecay::distance(std::array{xVtxP, yVtxP, zVtxP}, std::array{xVtxS, yVtxS, zVtxS}), m); });
-DECLARE_SOA_COLUMN(FlagMcMatchRec, flagMcMatchRec, int8_t); //! reconstruction level
-DECLARE_SOA_COLUMN(FlagMcMatchGen, flagMcMatchGen, int8_t); //! generator level
-DECLARE_SOA_COLUMN(OriginMcRec, originMcRec, int8_t);       //! particle origin, reconstruction level
-DECLARE_SOA_COLUMN(OriginMcGen, originMcGen, int8_t);       //! particle origin, generator level
-DECLARE_SOA_COLUMN(V0X, v0X, float);                        //! X position of V0 decay
-DECLARE_SOA_COLUMN(V0Y, v0Y, float);                        //! Y position of V0 decay
-DECLARE_SOA_COLUMN(V0Z, v0Z, float);                        //! Z position of V0 decay
+DECLARE_SOA_DYNAMIC_COLUMN(DecayLengthV0, decayLengthV0, //!
+                           [](float xVtxP, float yVtxP, float zVtxP, float xVtxS, float yVtxS, float zVtxS) -> float { return RecoDecay::distance(std::array{xVtxP, yVtxP, zVtxP}, std::array{xVtxS, yVtxS, zVtxS}); });
+DECLARE_SOA_COLUMN(V0X, v0X, float); //! X position of V0 decay
+DECLARE_SOA_COLUMN(V0Y, v0Y, float); //! Y position of V0 decay
+DECLARE_SOA_COLUMN(V0Z, v0Z, float); //! Z position of V0 decay
 } // namespace hf_cand_casc
 
 DECLARE_SOA_TABLE(HfCandCascBase, "AOD", "HFCANDCASCBASE", //!
@@ -833,7 +556,8 @@ DECLARE_SOA_TABLE(HfCandCascBase, "AOD", "HFCANDCASCBASE", //!
                   v0data::legacy::MAntiLambda<v0data::PxPos, v0data::PyPos, v0data::PzPos, v0data::PxNeg, v0data::PyNeg, v0data::PzNeg>,
                   v0data::legacy::MK0Short<v0data::PxPos, v0data::PyPos, v0data::PzPos, v0data::PxNeg, v0data::PyNeg, v0data::PzNeg>,
                   v0data::MGamma<v0data::PxPos, v0data::PyPos, v0data::PzPos, v0data::PxNeg, v0data::PyNeg, v0data::PzNeg>,
-                  hf_cand_casc::CtV0<hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex, hf_cand::ZSecondaryVertex, hf_cand_casc::V0X, hf_cand_casc::V0Y, hf_cand_casc::V0Z, hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1>);
+                  hf_cand_casc::CtV0<hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex, hf_cand::ZSecondaryVertex, hf_cand_casc::V0X, hf_cand_casc::V0Y, hf_cand_casc::V0Z, hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1>,
+                  hf_cand_casc::DecayLengthV0<hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex, hf_cand::ZSecondaryVertex, hf_cand_casc::V0X, hf_cand_casc::V0Y, hf_cand_casc::V0Z>);
 //                  ,
 //                  v0data::MLambda<v0data::PxPos, v0data::PyPos, v0data::PzPos, v0data::PxNeg, v0data::PyNeg, v0data::PzNeg>,
 //                  v0data::MAntiLambda<v0data::PxPos, v0data::PyPos, v0data::PzPos, v0data::PxNeg, v0data::PyNeg, v0data::PzNeg>,
@@ -847,36 +571,25 @@ using HfCandCascade = HfCandCascExt;
 
 // table with results of reconstruction level MC matching for Cascade
 DECLARE_SOA_TABLE(HfCandCascadeMcRec, "AOD", "HFCANDCASCMCREC", //!
-                  hf_cand_casc::FlagMcMatchRec,
-                  hf_cand_casc::OriginMcRec,
-                  hf_cand::PtBhadMotherPart,
-                  hf_cand::PdgBhadMotherPart);
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::OriginMcRec,
+                  hf_cand_mc_flag::PtBhadMotherPart,
+                  hf_cand_mc_flag::PdgBhadMotherPart);
 
 // table with results of generator level MC matching
 DECLARE_SOA_TABLE(HfCandCascadeMcGen, "AOD", "HFCANDCASCMCGEN", //!
-                  hf_cand_casc::FlagMcMatchGen,
-                  hf_cand_casc::OriginMcGen,
-                  hf_cand::IdxBhadMotherPart);
+                  hf_cand_mc_flag::FlagMcMatchGen,
+                  hf_cand_mc_flag::OriginMcGen,
+                  hf_cand_mc_flag::IdxBhadMotherPart);
 
 // specific BPlus candidate properties
 namespace hf_cand_bplus
 {
-DECLARE_SOA_INDEX_COLUMN_FULL(Prong0, prong0, int, HfCand2Prong, "_0"); // D0 index
-// MC matching result:
-DECLARE_SOA_COLUMN(FlagMcMatchRec, flagMcMatchRec, int8_t);                // main decay channel, reconstruction level
-DECLARE_SOA_COLUMN(FlagMcMatchGen, flagMcMatchGen, int8_t);                // main decay channel, generator level
-DECLARE_SOA_COLUMN(FlagMcDecayChanRec, flagMcDecayChanRec, int8_t);        // resonant decay channel, reconstruction level
-DECLARE_SOA_COLUMN(FlagMcDecayChanGen, flagMcDecayChanGen, int8_t);        // resonant decay channel, generator level
-DECLARE_SOA_COLUMN(OriginMcRec, originMcRec, int8_t);                      // particle origin, reconstruction level
-DECLARE_SOA_COLUMN(OriginMcGen, originMcGen, int8_t);                      // particle origin, generator level
-DECLARE_SOA_COLUMN(FlagWrongCollision, flagWrongCollision, int8_t);        // reconstruction level
-DECLARE_SOA_COLUMN(DebugMcRec, debugMcRec, int8_t);                        // debug flag for mis-association reconstruction level
+DECLARE_SOA_INDEX_COLUMN_FULL(Prong0, prong0, int, HfCand2Prong, "_0");    // D0 index
 DECLARE_SOA_DYNAMIC_COLUMN(ImpactParameterProduct, impactParameterProduct, // Impact parameter product for B+ -> J/Psi K
                            [](float px0, float py0, float pz0, float px1, float py1, float pz1, float xVtxP, float yVtxP, float zVtxP, float xVtxS, float yVtxS, float zVtxS, float impParK) -> float { return impParK * RecoDecay::impParXY(std::array{xVtxP, yVtxP, zVtxP}, std::array{xVtxS, yVtxS, zVtxS}, RecoDecay::pVec(std::array{px0, py0, pz0}, std::array{px1, py1, pz1})); });
 DECLARE_SOA_DYNAMIC_COLUMN(ImpactParameterProductJpsi, impactParameterProductJpsi, // J/Psi impact parameter for B+ -> J/Psi K
                            [](float dcaDauPos, float dcaDauNeg) -> float { return dcaDauPos * dcaDauNeg; });
-
-enum DecayType { BplusToD0Pi = 0 };
 
 enum DecayTypeMc : uint8_t { BplusToD0PiToKPiPi = 0,
                              BplusToD0KToKPiK,
@@ -935,15 +648,15 @@ using HfCandBplus = soa::Join<HfCandBplusExt, HfCandBplusProngs>;
 
 // table with results of reconstruction level MC matching
 DECLARE_SOA_TABLE(HfCandBplusMcRec, "AOD", "HFCANDBPMCREC",
-                  hf_cand_bplus::FlagMcMatchRec,
-                  hf_cand_bplus::FlagMcDecayChanRec,
-                  hf_cand_bplus::OriginMcRec);
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::FlagMcDecayChanRec,
+                  hf_cand_mc_flag::OriginMcRec);
 
 // table with results of generator level MC matching
 DECLARE_SOA_TABLE(HfCandBplusMcGen, "AOD", "HFCANDBPMCGEN",
-                  hf_cand_bplus::FlagMcMatchGen,
-                  hf_cand_bplus::FlagMcDecayChanGen,
-                  hf_cand_bplus::OriginMcGen);
+                  hf_cand_mc_flag::FlagMcMatchGen,
+                  hf_cand_mc_flag::FlagMcDecayChanGen,
+                  hf_cand_mc_flag::OriginMcGen);
 
 // specific 3-prong decay properties
 namespace hf_cand_3prong
@@ -966,21 +679,6 @@ DECLARE_SOA_DYNAMIC_COLUMN(CtXY, ctXY, //!
                            [](float px0, float py0, float pz0, float px1, float py1, float pz1, float px2, float py2, float pz2, float xVtxP, float yVtxP, float xVtxS, float yVtxS, const std::array<double, 3>& m) -> float {
                              return RecoDecay::ctXY(std::array{xVtxP, yVtxP}, std::array{xVtxS, yVtxS}, std::array{std::array{px0, py0, pz0}, std::array{px1, py1, pz1}, std::array{px2, py2, pz2}}, m);
                            });
-// MC matching result:
-DECLARE_SOA_COLUMN(FlagMcMatchRec, flagMcMatchRec, int8_t);         //! reconstruction level
-DECLARE_SOA_COLUMN(FlagMcMatchGen, flagMcMatchGen, int8_t);         //! generator level
-DECLARE_SOA_COLUMN(OriginMcRec, originMcRec, int8_t);               //! particle origin, reconstruction level
-DECLARE_SOA_COLUMN(OriginMcGen, originMcGen, int8_t);               //! particle origin, generator level
-DECLARE_SOA_COLUMN(IsCandidateSwapped, isCandidateSwapped, int8_t); //! swapping of the prongs order
-DECLARE_SOA_COLUMN(FlagMcDecayChanRec, flagMcDecayChanRec, int8_t); //! resonant decay channel flag, reconstruction level
-DECLARE_SOA_COLUMN(FlagMcDecayChanGen, flagMcDecayChanGen, int8_t); //! resonant decay channel flag, generator level
-
-// mapping of decay types
-enum DecayType { DplusToPiKPi = 0,
-                 LcToPKPi,
-                 DsToKKPi,
-                 XicToPKPi,
-                 N3ProngDecays }; // always keep N3ProngDecays at the end
 
 // Ds± → K± K∓ π± or D± → K± K∓ π±
 
@@ -1099,10 +797,50 @@ DECLARE_SOA_TABLE(HfCand3Prong1PidPr, "AOD", "HFCAND3P1PIDPR", //!
 DECLARE_SOA_TABLE(HfCand3Prong2PidPr, "AOD", "HFCAND3P2PIDPR", //!
                   hf_cand::NSigTpcPr2, hf_cand::NSigTofPr2,
                   hf_cand::TpcTofNSigmaPr2<hf_cand::NSigTpcPr2, hf_cand::NSigTofPr2>);
+DECLARE_SOA_TABLE(HfCand3Prong0PidDe, "AOD", "HFCAND3P0PIDDE", //!
+                  hf_cand::NSigTpcDe0, hf_cand::NSigTofDe0,
+                  hf_cand::TpcTofNSigmaDe0<hf_cand::NSigTpcDe0, hf_cand::NSigTofDe0>);
+DECLARE_SOA_TABLE(HfCand3Prong1PidDe, "AOD", "HFCAND3P1PIDDE", //!
+                  hf_cand::NSigTpcDe1, hf_cand::NSigTofDe1,
+                  hf_cand::TpcTofNSigmaDe1<hf_cand::NSigTpcDe1, hf_cand::NSigTofDe1>);
+DECLARE_SOA_TABLE(HfCand3Prong2PidDe, "AOD", "HFCAND3P2PIDDE", //!
+                  hf_cand::NSigTpcDe2, hf_cand::NSigTofDe2,
+                  hf_cand::TpcTofNSigmaDe2<hf_cand::NSigTpcDe2, hf_cand::NSigTofDe2>);
+DECLARE_SOA_TABLE(HfCand3Prong0PidTr, "AOD", "HFCAND3P0PIDTR", //!
+                  hf_cand::NSigTpcTr0, hf_cand::NSigTofTr0,
+                  hf_cand::TpcTofNSigmaTr0<hf_cand::NSigTpcTr0, hf_cand::NSigTofTr0>);
+DECLARE_SOA_TABLE(HfCand3Prong1PidTr, "AOD", "HFCAND3P1PIDTR", //!
+                  hf_cand::NSigTpcTr1, hf_cand::NSigTofTr1,
+                  hf_cand::TpcTofNSigmaTr1<hf_cand::NSigTpcTr1, hf_cand::NSigTofTr1>);
+DECLARE_SOA_TABLE(HfCand3Prong2PidTr, "AOD", "HFCAND3P2PIDTR", //!
+                  hf_cand::NSigTpcTr2, hf_cand::NSigTofTr2,
+                  hf_cand::TpcTofNSigmaTr2<hf_cand::NSigTpcTr2, hf_cand::NSigTofTr2>);
+DECLARE_SOA_TABLE(HfCand3Prong0PidHe, "AOD", "HFCAND3P0PIDHE", //!
+                  hf_cand::NSigTpcHe0, hf_cand::NSigTofHe0,
+                  hf_cand::TpcTofNSigmaHe0<hf_cand::NSigTpcHe0, hf_cand::NSigTofHe0>);
+DECLARE_SOA_TABLE(HfCand3Prong1PidHe, "AOD", "HFCAND3P1PIDHE", //!
+                  hf_cand::NSigTpcHe1, hf_cand::NSigTofHe1,
+                  hf_cand::TpcTofNSigmaHe1<hf_cand::NSigTpcHe1, hf_cand::NSigTofHe1>);
+DECLARE_SOA_TABLE(HfCand3Prong2PidHe, "AOD", "HFCAND3P2PIDHE", //!
+                  hf_cand::NSigTpcHe2, hf_cand::NSigTofHe2,
+                  hf_cand::TpcTofNSigmaHe2<hf_cand::NSigTpcHe2, hf_cand::NSigTofHe2>);
+DECLARE_SOA_TABLE(HfCand3Prong0PidAl, "AOD", "HFCAND3P0PIDAL", //!
+                  hf_cand::NSigTpcAl0, hf_cand::NSigTofAl0,
+                  hf_cand::TpcTofNSigmaAl0<hf_cand::NSigTpcAl0, hf_cand::NSigTofAl0>);
+DECLARE_SOA_TABLE(HfCand3Prong1PidAl, "AOD", "HFCAND3P1PIDAL", //!
+                  hf_cand::NSigTpcAl1, hf_cand::NSigTofAl1,
+                  hf_cand::TpcTofNSigmaAl1<hf_cand::NSigTpcAl1, hf_cand::NSigTofAl1>);
+DECLARE_SOA_TABLE(HfCand3Prong2PidAl, "AOD", "HFCAND3P2PIDAL", //!
+                  hf_cand::NSigTpcAl2, hf_cand::NSigTofAl2,
+                  hf_cand::TpcTofNSigmaAl2<hf_cand::NSigTpcAl2, hf_cand::NSigTofAl2>);
 
 using HfCand3Prong = HfCand3ProngExt;
 using HfCand3ProngWPidPiKaPr = soa::Join<HfCand3Prong, HfCand3Prong0PidPi, HfCand3Prong0PidPr, HfCand3Prong0PidKa, HfCand3Prong1PidPi, HfCand3Prong1PidPr, HfCand3Prong1PidKa, HfCand3Prong2PidPi, HfCand3Prong2PidPr, HfCand3Prong2PidKa>;
 using HfCand3ProngWPidPiKa = soa::Join<HfCand3Prong, HfCand3Prong0PidPi, HfCand3Prong0PidKa, HfCand3Prong1PidPi, HfCand3Prong1PidKa, HfCand3Prong2PidPi, HfCand3Prong2PidKa>;
+using HfCand3ProngWPidPiKaDe = soa::Join<HfCand3Prong, HfCand3Prong0PidPi, HfCand3Prong0PidDe, HfCand3Prong0PidPr, HfCand3Prong0PidKa, HfCand3Prong1PidPi, HfCand3Prong1PidDe, HfCand3Prong1PidKa, HfCand3Prong2PidPi, HfCand3Prong2PidDe, HfCand3Prong2PidPr, HfCand3Prong2PidKa>;
+using HfCand3ProngWPidPiKaTr = soa::Join<HfCand3Prong, HfCand3Prong0PidPi, HfCand3Prong0PidTr, HfCand3Prong0PidKa, HfCand3Prong1PidPi, HfCand3Prong1PidTr, HfCand3Prong1PidKa, HfCand3Prong2PidPi, HfCand3Prong2PidTr, HfCand3Prong2PidKa>;
+using HfCand3ProngWPidPiKaHe = soa::Join<HfCand3Prong, HfCand3Prong0PidPi, HfCand3Prong0PidHe, HfCand3Prong0PidKa, HfCand3Prong1PidPi, HfCand3Prong1PidHe, HfCand3Prong1PidKa, HfCand3Prong2PidPi, HfCand3Prong2PidHe, HfCand3Prong2PidKa>;
+using HfCand3ProngWPidPiKaAl = soa::Join<HfCand3Prong, HfCand3Prong0PidPi, HfCand3Prong0PidAl, HfCand3Prong0PidKa, HfCand3Prong1PidPi, HfCand3Prong1PidAl, HfCand3Prong1PidKa, HfCand3Prong2PidPi, HfCand3Prong2PidAl, HfCand3Prong2PidKa>;
 
 DECLARE_SOA_TABLE(HfCand3ProngKF, "AOD", "HFCAND3PKF",
                   hf_cand_3prong::KfXError, hf_cand_3prong::KfYError, hf_cand_3prong::KfZError,
@@ -1117,21 +855,21 @@ DECLARE_SOA_TABLE(HfCand3ProngKF, "AOD", "HFCAND3PKF",
 
 // table with results of reconstruction level MC matching
 DECLARE_SOA_TABLE(HfCand3ProngMcRec, "AOD", "HFCAND3PMCREC", //!
-                  hf_cand_3prong::FlagMcMatchRec,
-                  hf_cand_3prong::OriginMcRec,
-                  hf_cand_3prong::IsCandidateSwapped,
-                  hf_cand_3prong::FlagMcDecayChanRec,
-                  hf_cand::PtBhadMotherPart,
-                  hf_cand::PdgBhadMotherPart,
-                  hf_cand::NTracksDecayed,
-                  hf_cand::NInteractionsWithMaterial);
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::OriginMcRec,
+                  hf_cand_mc_flag::IsCandidateSwapped,
+                  hf_cand_mc_flag::FlagMcDecayChanRec,
+                  hf_cand_mc_flag::PtBhadMotherPart,
+                  hf_cand_mc_flag::PdgBhadMotherPart,
+                  hf_cand_mc_flag::NTracksDecayed,
+                  hf_cand_mc_flag::NInteractionsWithMaterial);
 
 // table with results of generator level MC matching
 DECLARE_SOA_TABLE(HfCand3ProngMcGen, "AOD", "HFCAND3PMCGEN", //!
-                  hf_cand_3prong::FlagMcMatchGen,
-                  hf_cand_3prong::OriginMcGen,
-                  hf_cand_3prong::FlagMcDecayChanGen,
-                  hf_cand::IdxBhadMotherPart);
+                  hf_cand_mc_flag::FlagMcMatchGen,
+                  hf_cand_mc_flag::OriginMcGen,
+                  hf_cand_mc_flag::FlagMcDecayChanGen,
+                  hf_cand_mc_flag::IdxBhadMotherPart);
 
 // declare dedicated BPlus -> J/Psi K decay candidate table
 // convention: prongs 0 and 1 should be J/Psi decay products
@@ -1184,33 +922,14 @@ using HfCandBplusToJpsi = soa::Join<HfCandBpJPExt, HfCandBpJPDaus>;
 
 namespace hf_cand_casc_lf
 {
-// mapping of decay types
-enum DecayType2Prong { XiczeroOmegaczeroToXiPi = 0,
-                       OmegaczeroToOmegaPi,
-                       OmegaczeroToOmegaK,
-                       N2ProngDecays }; // always keep N2ProngDecays at the end
 // mapping of construct method
 enum ConstructMethod { DcaFitter = 0,
                        KfParticle };
-// mapping of decay types
-enum DecayType3Prong { XicplusToXiPiPi = 0,
-                       N3ProngDecays }; // always keep N3ProngDecays at the end
 } // namespace hf_cand_casc_lf
 
 namespace hf_cand_x
 {
 DECLARE_SOA_INDEX_COLUMN_FULL(Prong0, prong0, int, HfCand2Prong, "_0"); // Jpsi index
-// MC matching result:
-DECLARE_SOA_COLUMN(FlagMcMatchRec, flagMcMatchRec, int8_t);         // reconstruction level
-DECLARE_SOA_COLUMN(FlagMcMatchGen, flagMcMatchGen, int8_t);         // generator level
-DECLARE_SOA_COLUMN(OriginMcRec, originMcRec, int8_t);               // particle origin, reconstruction level
-DECLARE_SOA_COLUMN(OriginMcGen, originMcGen, int8_t);               // particle origin, generator level
-DECLARE_SOA_COLUMN(FlagMcDecayChanRec, flagMcDecayChanRec, int8_t); // resonant decay channel flag, reconstruction level
-DECLARE_SOA_COLUMN(FlagMcDecayChanGen, flagMcDecayChanGen, int8_t); // resonant decay channel flag, generator level
-
-// mapping of decay types
-enum DecayType { XToJpsiToEEPiPi = 0,
-                 XToJpsiToMuMuPiPi }; // move this to a dedicated cascade namespace in the future?
 } // namespace hf_cand_x
 
 // declare dedicated X candidate table
@@ -1257,28 +976,20 @@ using HfCandX = HfCandXExt;
 
 // table with results of reconstruction level MC matching
 DECLARE_SOA_TABLE(HfCandXMcRec, "AOD", "HFCANDXMCREC", //!
-                  hf_cand_x::FlagMcMatchRec,
-                  hf_cand_x::OriginMcRec,
-                  hf_cand_x::FlagMcDecayChanRec);
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::OriginMcRec,
+                  hf_cand_mc_flag::FlagMcDecayChanRec);
 
 // table with results of generator level MC matching
 DECLARE_SOA_TABLE(HfCandXMcGen, "AOD", "HFCANDXMCGEN", //!
-                  hf_cand_x::FlagMcMatchGen,
-                  hf_cand_x::OriginMcGen,
-                  hf_cand_x::FlagMcDecayChanGen);
+                  hf_cand_mc_flag::FlagMcMatchGen,
+                  hf_cand_mc_flag::OriginMcGen,
+                  hf_cand_mc_flag::FlagMcDecayChanGen);
 
 // specific Xicc candidate properties
 namespace hf_cand_xicc
 {
 DECLARE_SOA_INDEX_COLUMN_FULL(Prong0, prong0, int, HfCand3Prong, "_0"); // Xic index
-// MC matching result:
-DECLARE_SOA_COLUMN(FlagMcMatchRec, flagMcMatchRec, int8_t); // reconstruction level
-DECLARE_SOA_COLUMN(FlagMcMatchGen, flagMcMatchGen, int8_t); // generator level
-DECLARE_SOA_COLUMN(OriginMcRec, originMcRec, int8_t);       // particle origin, reconstruction level
-DECLARE_SOA_COLUMN(OriginMcGen, originMcGen, int8_t);       // particle origin, generator level
-DECLARE_SOA_COLUMN(DebugMcRec, debugMcRec, int8_t);         // debug flag for mis-association reconstruction level
-// mapping of decay types
-enum DecayType { XiccToXicPi = 0 }; // move this to a dedicated cascade namespace in the future?
 } // namespace hf_cand_xicc
 
 // declare dedicated Xicc candidate table
@@ -1321,14 +1032,14 @@ using HfCandXicc = HfCandXiccExt;
 
 // table with results of reconstruction level MC matching
 DECLARE_SOA_TABLE(HfCandXiccMcRec, "AOD", "HFCANDXICCMCREC", //!
-                  hf_cand_xicc::FlagMcMatchRec,
-                  hf_cand_xicc::OriginMcRec,
-                  hf_cand_xicc::DebugMcRec);
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::OriginMcRec,
+                  hf_cand_mc_flag::DebugMcRec);
 
 // table with results of generator level MC matching
 DECLARE_SOA_TABLE(HfCandXiccMcGen, "AOD", "HFCANDXICCMCGEN", //!
-                  hf_cand_xicc::FlagMcMatchGen,
-                  hf_cand_xicc::OriginMcGen);
+                  hf_cand_mc_flag::FlagMcMatchGen,
+                  hf_cand_mc_flag::OriginMcGen);
 
 // specific Omegac and Xic to Xi Pi candidate properties
 namespace hf_cand_xic0_omegac0
@@ -1572,16 +1283,10 @@ DECLARE_SOA_COLUMN(Xic0XError, xic0XError, float);
 DECLARE_SOA_COLUMN(Xic0YError, xic0YError, float);
 DECLARE_SOA_COLUMN(Xic0ZError, xic0ZError, float);
 
-// MC matching result:
-DECLARE_SOA_COLUMN(FlagMcMatchRec, flagMcMatchRec, int8_t); // reconstruction level
-DECLARE_SOA_COLUMN(DebugMcRec, debugMcRec, int8_t);         // debug flag for mis-association reconstruction level
-DECLARE_SOA_COLUMN(FlagMcMatchGen, flagMcMatchGen, int8_t); // generator level
 DECLARE_SOA_COLUMN(CollisionMatched, collisionMatched, bool);
 DECLARE_SOA_COLUMN(DebugGenCharmBar, debugGenCharmBar, int8_t);
 DECLARE_SOA_COLUMN(DebugGenCasc, debugGenCasc, int8_t);
 DECLARE_SOA_COLUMN(DebugGenLambda, debugGenLambda, int8_t);
-DECLARE_SOA_COLUMN(OriginMcRec, originMcRec, int8_t);
-DECLARE_SOA_COLUMN(OriginMcGen, originMcGen, int8_t);
 DECLARE_SOA_COLUMN(PtCharmBaryonGen, ptCharmBaryonGen, float);
 DECLARE_SOA_COLUMN(RapidityCharmBaryonGen, rapidityCharmBaryonGen, float);
 
@@ -1596,13 +1301,6 @@ DECLARE_SOA_DYNAMIC_COLUMN(PtPiFromCharmBaryon, ptPiFromCharmBaryon,
                            [](float px, float py) -> float { return RecoDecay::pt(px, py); });
 DECLARE_SOA_DYNAMIC_COLUMN(PtKaFromCasc, ptKaFromCasc,
                            [](float px, float py) -> float { return RecoDecay::pt(px, py); });
-
-// mapping of decay types
-enum DecayType { XiczeroToXiPi = 0,
-                 OmegaczeroToXiPi,
-                 OmegaczeroToOmegaPi,
-                 OmegaczeroToOmegaK,
-                 OmegaczeroToOmegaPiOneMu };
 
 } // end of namespace hf_cand_xic0_omegac0
 
@@ -1633,7 +1331,9 @@ DECLARE_SOA_TABLE(HfCandToXiPi, "AOD", "HFCANDTOXIPI",
                   hf_cand_xic0_omegac0::DcaXYToPvV0Dau0, hf_cand_xic0_omegac0::DcaXYToPvV0Dau1, hf_cand_xic0_omegac0::DcaXYToPvCascDau,
                   hf_cand_xic0_omegac0::DcaZToPvV0Dau0, hf_cand_xic0_omegac0::DcaZToPvV0Dau1, hf_cand_xic0_omegac0::DcaZToPvCascDau,
                   hf_cand_xic0_omegac0::DcaCascDau, hf_cand_xic0_omegac0::DcaV0Dau, hf_cand_xic0_omegac0::DcaCharmBaryonDau,
-                  hf_cand_xic0_omegac0::DecLenCharmBaryon, hf_cand_xic0_omegac0::DecLenCascade, hf_cand_xic0_omegac0::DecLenV0, hf_cand_xic0_omegac0::ErrorDecayLengthCharmBaryon, hf_cand_xic0_omegac0::ErrorDecayLengthXYCharmBaryon);
+                  hf_cand_xic0_omegac0::DecLenCharmBaryon, hf_cand_xic0_omegac0::DecLenCascade, hf_cand_xic0_omegac0::DecLenV0, hf_cand_xic0_omegac0::ErrorDecayLengthCharmBaryon, hf_cand_xic0_omegac0::ErrorDecayLengthXYCharmBaryon,
+                  // dynamic
+                  hf_cand::Y<hf_cand_xic0_omegac0::PxCharmBaryon, hf_cand_xic0_omegac0::PyCharmBaryon, hf_cand_xic0_omegac0::PzCharmBaryon>);
 
 DECLARE_SOA_TABLE(HfCandToOmegaPi, "AOD", "HFCANDTOOMEGAPI",
                   o2::soa::Index<>,
@@ -1668,8 +1368,7 @@ DECLARE_SOA_TABLE(HfCandToOmegaPi, "AOD", "HFCANDTOOMEGAPI",
                   hf_cand_xic0_omegac0::DcaXYToPvV0Dau0, hf_cand_xic0_omegac0::DcaXYToPvV0Dau1, hf_cand_xic0_omegac0::DcaXYToPvCascDau,
                   hf_cand_xic0_omegac0::DcaZToPvV0Dau0, hf_cand_xic0_omegac0::DcaZToPvV0Dau1, hf_cand_xic0_omegac0::DcaZToPvCascDau,
                   hf_cand_xic0_omegac0::DcaCascDau, hf_cand_xic0_omegac0::DcaV0Dau, hf_cand_xic0_omegac0::DcaCharmBaryonDau,
-                  hf_cand_xic0_omegac0::DecLenCharmBaryon, hf_cand_xic0_omegac0::DecLenCascade, hf_cand_xic0_omegac0::DecLenV0, hf_cand_xic0_omegac0::ErrorDecayLengthCharmBaryon, hf_cand_xic0_omegac0::ErrorDecayLengthXYCharmBaryon, hf_track_index::HFflag,
-                  o2::soa::Marker<1>);
+                  hf_cand_xic0_omegac0::DecLenCharmBaryon, hf_cand_xic0_omegac0::DecLenCascade, hf_cand_xic0_omegac0::DecLenV0, hf_cand_xic0_omegac0::ErrorDecayLengthCharmBaryon, hf_cand_xic0_omegac0::ErrorDecayLengthXYCharmBaryon, hf_track_index::HFflag);
 
 DECLARE_SOA_TABLE(HfCandToOmegaK, "AOD", "HFCANDTOOMEGAK",
                   o2::soa::Index<>,
@@ -1697,8 +1396,7 @@ DECLARE_SOA_TABLE(HfCandToOmegaK, "AOD", "HFCANDTOOMEGAK",
                   hf_cand_xic0_omegac0::DcaXYToPvV0Dau0, hf_cand_xic0_omegac0::DcaXYToPvV0Dau1, hf_cand_xic0_omegac0::DcaXYToPvCascDau,
                   hf_cand_xic0_omegac0::DcaZToPvV0Dau0, hf_cand_xic0_omegac0::DcaZToPvV0Dau1, hf_cand_xic0_omegac0::DcaZToPvCascDau,
                   hf_cand_xic0_omegac0::DcaCascDau, hf_cand_xic0_omegac0::DcaV0Dau, hf_cand_xic0_omegac0::DcaCharmBaryonDau,
-                  hf_cand_xic0_omegac0::DecLenCharmBaryon, hf_cand_xic0_omegac0::DecLenCascade, hf_cand_xic0_omegac0::DecLenV0, hf_cand_xic0_omegac0::ErrorDecayLengthCharmBaryon, hf_cand_xic0_omegac0::ErrorDecayLengthXYCharmBaryon,
-                  o2::soa::Marker<2>);
+                  hf_cand_xic0_omegac0::DecLenCharmBaryon, hf_cand_xic0_omegac0::DecLenCascade, hf_cand_xic0_omegac0::DecLenV0, hf_cand_xic0_omegac0::ErrorDecayLengthCharmBaryon, hf_cand_xic0_omegac0::ErrorDecayLengthXYCharmBaryon);
 
 // table with results of KFParticle
 DECLARE_SOA_TABLE(HfOmegacKf, "AOD", "HFOMEGACKF", //!
@@ -1802,51 +1500,47 @@ DECLARE_SOA_TABLE(HfCandToXiPiKfQa, "AOD", "HFCANDTOXIPIKFQA",
 
 // table with results of reconstruction level MC matching
 DECLARE_SOA_TABLE(HfXicToXiPiMCRec, "AOD", "HFXICXIPIMCREC", //!
-                  hf_cand_xic0_omegac0::FlagMcMatchRec,
-                  hf_cand_xic0_omegac0::DebugMcRec,
-                  hf_cand_xic0_omegac0::OriginMcRec,
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::DebugMcRec,
+                  hf_cand_mc_flag::OriginMcRec,
                   hf_cand_xic0_omegac0::CollisionMatched,
-                  hf_cand::PtBhadMotherPart,
-                  hf_cand::PdgBhadMotherPart,
-                  o2::soa::Marker<1>);
+                  hf_cand_mc_flag::PtBhadMotherPart,
+                  hf_cand_mc_flag::PdgBhadMotherPart);
 DECLARE_SOA_TABLE(HfOmegacToXiPiMCRec, "AOD", "HFOMCXIPIMCREC", //!
-                  hf_cand_xic0_omegac0::FlagMcMatchRec,
-                  hf_cand_xic0_omegac0::DebugMcRec,
-                  hf_cand_xic0_omegac0::OriginMcRec,
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::DebugMcRec,
+                  hf_cand_mc_flag::OriginMcRec,
                   hf_cand_xic0_omegac0::CollisionMatched,
-                  hf_cand::PtBhadMotherPart,
-                  hf_cand::PdgBhadMotherPart,
-                  o2::soa::Marker<2>);
+                  hf_cand_mc_flag::PtBhadMotherPart,
+                  hf_cand_mc_flag::PdgBhadMotherPart);
 DECLARE_SOA_TABLE(HfToOmegaPiMCRec, "AOD", "HFTOOMEPIMCREC", //!
-                  hf_cand_xic0_omegac0::FlagMcMatchRec,
-                  hf_cand_xic0_omegac0::DebugMcRec,
-                  hf_cand_xic0_omegac0::OriginMcRec,
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::DebugMcRec,
+                  hf_cand_mc_flag::OriginMcRec,
                   hf_cand_xic0_omegac0::CollisionMatched,
-                  hf_cand::PtBhadMotherPart,
-                  hf_cand::PdgBhadMotherPart,
-                  o2::soa::Marker<3>);
+                  hf_cand_mc_flag::PtBhadMotherPart,
+                  hf_cand_mc_flag::PdgBhadMotherPart);
 DECLARE_SOA_TABLE(HfToOmegaKMCRec, "AOD", "HFTOOMEKMCREC", //!
-                  hf_cand_xic0_omegac0::FlagMcMatchRec,
-                  hf_cand_xic0_omegac0::DebugMcRec,
-                  hf_cand_xic0_omegac0::OriginMcRec,
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::DebugMcRec,
+                  hf_cand_mc_flag::OriginMcRec,
                   hf_cand_xic0_omegac0::CollisionMatched,
-                  hf_cand::PtBhadMotherPart,
-                  hf_cand::PdgBhadMotherPart,
-                  o2::soa::Marker<4>);
+                  hf_cand_mc_flag::PtBhadMotherPart,
+                  hf_cand_mc_flag::PdgBhadMotherPart);
 
 // table with results of generator level MC matching
 DECLARE_SOA_TABLE(HfXicToXiPiMCGen, "AOD", "HFXICXIPIMCGEN", //!
-                  hf_cand_xic0_omegac0::FlagMcMatchGen, hf_cand_xic0_omegac0::DebugGenCharmBar, hf_cand_xic0_omegac0::DebugGenCasc, hf_cand_xic0_omegac0::DebugGenLambda,
-                  hf_cand_xic0_omegac0::PtCharmBaryonGen, hf_cand_xic0_omegac0::RapidityCharmBaryonGen, hf_cand_xic0_omegac0::OriginMcGen, hf_cand::IdxBhadMotherPart, o2::soa::Marker<1>);
+                  hf_cand_mc_flag::FlagMcMatchGen, hf_cand_xic0_omegac0::DebugGenCharmBar, hf_cand_xic0_omegac0::DebugGenCasc, hf_cand_xic0_omegac0::DebugGenLambda,
+                  hf_cand_xic0_omegac0::PtCharmBaryonGen, hf_cand_xic0_omegac0::RapidityCharmBaryonGen, hf_cand_mc_flag::OriginMcGen, hf_cand_mc_flag::IdxBhadMotherPart);
 DECLARE_SOA_TABLE(HfOmegacToXiPiMCGen, "AOD", "HFOMECXIPIMCGEN", //!
-                  hf_cand_xic0_omegac0::FlagMcMatchGen, hf_cand_xic0_omegac0::DebugGenCharmBar, hf_cand_xic0_omegac0::DebugGenCasc, hf_cand_xic0_omegac0::DebugGenLambda,
-                  hf_cand_xic0_omegac0::PtCharmBaryonGen, hf_cand_xic0_omegac0::RapidityCharmBaryonGen, hf_cand_xic0_omegac0::OriginMcGen, hf_cand::IdxBhadMotherPart, o2::soa::Marker<2>);
+                  hf_cand_mc_flag::FlagMcMatchGen, hf_cand_xic0_omegac0::DebugGenCharmBar, hf_cand_xic0_omegac0::DebugGenCasc, hf_cand_xic0_omegac0::DebugGenLambda,
+                  hf_cand_xic0_omegac0::PtCharmBaryonGen, hf_cand_xic0_omegac0::RapidityCharmBaryonGen, hf_cand_mc_flag::OriginMcGen, hf_cand_mc_flag::IdxBhadMotherPart);
 DECLARE_SOA_TABLE(HfToOmegaPiMCGen, "AOD", "HFTOOMEPIMCGEN", //!
-                  hf_cand_xic0_omegac0::FlagMcMatchGen, hf_cand_xic0_omegac0::DebugGenCharmBar, hf_cand_xic0_omegac0::DebugGenCasc, hf_cand_xic0_omegac0::DebugGenLambda,
-                  hf_cand_xic0_omegac0::PtCharmBaryonGen, hf_cand_xic0_omegac0::RapidityCharmBaryonGen, hf_cand_xic0_omegac0::OriginMcGen, hf_cand::IdxBhadMotherPart, o2::soa::Marker<3>);
+                  hf_cand_mc_flag::FlagMcMatchGen, hf_cand_xic0_omegac0::DebugGenCharmBar, hf_cand_xic0_omegac0::DebugGenCasc, hf_cand_xic0_omegac0::DebugGenLambda,
+                  hf_cand_xic0_omegac0::PtCharmBaryonGen, hf_cand_xic0_omegac0::RapidityCharmBaryonGen, hf_cand_mc_flag::OriginMcGen, hf_cand_mc_flag::IdxBhadMotherPart);
 DECLARE_SOA_TABLE(HfToOmegaKMCGen, "AOD", "HFTOOMEKMCGEN", //!
-                  hf_cand_xic0_omegac0::FlagMcMatchGen, hf_cand_xic0_omegac0::DebugGenCharmBar, hf_cand_xic0_omegac0::DebugGenCasc, hf_cand_xic0_omegac0::DebugGenLambda,
-                  hf_cand_xic0_omegac0::PtCharmBaryonGen, hf_cand_xic0_omegac0::RapidityCharmBaryonGen, hf_cand_xic0_omegac0::OriginMcGen, hf_cand::IdxBhadMotherPart, o2::soa::Marker<4>);
+                  hf_cand_mc_flag::FlagMcMatchGen, hf_cand_xic0_omegac0::DebugGenCharmBar, hf_cand_xic0_omegac0::DebugGenCasc, hf_cand_xic0_omegac0::DebugGenLambda,
+                  hf_cand_xic0_omegac0::PtCharmBaryonGen, hf_cand_xic0_omegac0::RapidityCharmBaryonGen, hf_cand_mc_flag::OriginMcGen, hf_cand_mc_flag::IdxBhadMotherPart);
 
 // specific Xic to Xi Pi Pi candidate properties
 namespace hf_cand_xic_to_xi_pi_pi
@@ -1911,11 +1605,7 @@ DECLARE_SOA_COLUMN(NSigTofPiFromXicPlus1, nSigTofPiFromXicPlus1, float);
 DECLARE_SOA_COLUMN(NSigTofBachelorPi, nSigTofBachelorPi, float);
 DECLARE_SOA_COLUMN(NSigTofPiFromLambda, nSigTofPiFromLambda, float);
 DECLARE_SOA_COLUMN(NSigTofPrFromLambda, nSigTofPrFromLambda, float);
-// MC matching result:
-DECLARE_SOA_COLUMN(FlagMcMatchRec, flagMcMatchRec, int8_t); // reconstruction level
-DECLARE_SOA_COLUMN(FlagMcMatchGen, flagMcMatchGen, int8_t); // generator level
-DECLARE_SOA_COLUMN(OriginMcRec, originMcRec, int8_t);
-DECLARE_SOA_COLUMN(OriginMcGen, originMcGen, int8_t);
+// MC
 DECLARE_SOA_COLUMN(DecayLengthMcGen, decayLengthMcGen, float);
 // Residuals and pulls
 DECLARE_SOA_COLUMN(PtResidual, ptResidual, float);
@@ -1940,10 +1630,6 @@ DECLARE_SOA_DYNAMIC_COLUMN(PProng1, pProng1, //!
 DECLARE_SOA_DYNAMIC_COLUMN(PProng2, pProng2, //!
                            [](float px, float py, float pz) -> float { return RecoDecay::p(px, py, pz); });
 
-// mapping of decay types
-enum DecayType { XicToXiPiPi = 0,      // Ξc± → Ξ∓ π± π±
-                 XicToXiResPiToXiPiPi, // Ξc± → Ξ(1530) π± → Ξ∓ π± π±
-                 NDecayType };
 } // end of namespace hf_cand_xic_to_xi_pi_pi
 
 // declare dedicated Xic to Xi Pi Pi candidate table
@@ -2017,19 +1703,19 @@ DECLARE_SOA_TABLE(HfCandXicKF, "AOD", "HFCANDXICKF",
 
 // table with results of reconstruction level MC matching
 DECLARE_SOA_TABLE(HfCandXicMcRec, "AOD", "HFCANDXICMCREC",
-                  hf_cand_xic_to_xi_pi_pi::FlagMcMatchRec,
-                  hf_cand_xic_to_xi_pi_pi::OriginMcRec);
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::OriginMcRec);
 
 // table with results of generator level MC matching
 DECLARE_SOA_TABLE(HfCandXicMcGen, "AOD", "HFCANDXICMCGEN",
-                  hf_cand_xic_to_xi_pi_pi::FlagMcMatchGen,
-                  hf_cand_xic_to_xi_pi_pi::OriginMcGen,
-                  hf_cand::PdgBhadMotherPart,
+                  hf_cand_mc_flag::FlagMcMatchGen,
+                  hf_cand_mc_flag::OriginMcGen,
+                  hf_cand_mc_flag::PdgBhadMotherPart,
                   hf_cand_xic_to_xi_pi_pi::DecayLengthMcGen);
 
 // table with residuals and pulls of PV
 DECLARE_SOA_TABLE(HfCandXicResid, "AOD", "HFCANDXICRESID",
-                  hf_cand_xic_to_xi_pi_pi::OriginMcGen,
+                  hf_cand_mc_flag::OriginMcGen,
                   hf_cand_xic_to_xi_pi_pi::PResidual,
                   hf_cand_xic_to_xi_pi_pi::PtResidual,
                   hf_cand_xic_to_xi_pi_pi::XPvResidual,
@@ -2046,91 +1732,70 @@ DECLARE_SOA_TABLE(HfCandXicResid, "AOD", "HFCANDXICRESID",
                   hf_cand_xic_to_xi_pi_pi::ZSvPull);
 
 // specific chic candidate properties
-namespace hf_cand_chic
-{
-DECLARE_SOA_INDEX_COLUMN_FULL(Prong0, prong0, int, HfCand2Prong, "_0"); // Jpsi index
-DECLARE_SOA_INDEX_COLUMN_FULL(Prong1, prong1, int, ECALs, "_1");
-// MC matching result:
-DECLARE_SOA_COLUMN(FlagMcMatchRec, flagMcMatchRec, int8_t);         // reconstruction level
-DECLARE_SOA_COLUMN(FlagMcMatchGen, flagMcMatchGen, int8_t);         // generator level
-DECLARE_SOA_COLUMN(OriginMcRec, originMcRec, int8_t);               // particle origin, reconstruction level
-DECLARE_SOA_COLUMN(OriginMcGen, originMcGen, int8_t);               // particle origin, generator level
-DECLARE_SOA_COLUMN(FlagMcDecayChanRec, flagMcDecayChanRec, int8_t); // resonant decay channel flag, reconstruction level
-DECLARE_SOA_COLUMN(FlagMcDecayChanGen, flagMcDecayChanGen, int8_t); // resonant decay channel flag, generator level
-DECLARE_SOA_COLUMN(JpsiToMuMuMass, jpsiToMuMuMass, float);          // Jpsi mass
-// mapping of decay types
-enum DecayType { ChicToJpsiToEEGamma = 0,
-                 ChicToJpsiToMuMuGamma }; // move this to a dedicated cascade namespace in the future?
-} // namespace hf_cand_chic
+// namespace hf_cand_chic
+// {
+// DECLARE_SOA_INDEX_COLUMN_FULL(Prong0, prong0, int, HfCand2Prong, "_0"); // Jpsi index
+// DECLARE_SOA_INDEX_COLUMN_FULL(Prong1, prong1, int, ECALs, "_1");
+// DECLARE_SOA_COLUMN(JpsiToMuMuMass, jpsiToMuMuMass, float); // Jpsi mass
+// } // namespace hf_cand_chic
 
-// declare dedicated chi_c candidate table
-DECLARE_SOA_TABLE(HfCandChicBase, "AOD", "HFCANDCHICBASE",
-                  // general columns
-                  HFCAND_COLUMNS,
-                  // 2-prong specific columns
-                  hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PzProng0,
-                  hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1,
-                  hf_cand::ImpactParameter0, hf_cand::ImpactParameter1,
-                  hf_cand::ErrorImpactParameter0, hf_cand::ErrorImpactParameter1,
-                  hf_cand_chic::Prong0Id, hf_cand_chic::Prong1Id,
-                  hf_track_index::HFflag, hf_cand_chic::JpsiToMuMuMass,
-                  /* dynamic columns */
-                  hf_cand_2prong::M<hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PzProng0, hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1>,
-                  hf_cand_2prong::M2<hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PzProng0, hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1>,
-                  /* prong 2 */
-                  //                  hf_cand::PtProng1<hf_cand::PxProng1, hf_cand::PyProng1>,
-                  //                  hf_cand::Pt2Prong1<hf_cand::PxProng1, hf_cand::PyProng1>,
-                  //                  hf_cand::PVectorProng1<hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1>,
-                  /* dynamic columns that use candidate momentum components */
-                  hf_cand::Pt<hf_cand_2prong::Px, hf_cand_2prong::Py>,
-                  hf_cand::Pt2<hf_cand_2prong::Px, hf_cand_2prong::Py>,
-                  hf_cand::P<hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>,
-                  hf_cand::P2<hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>,
-                  hf_cand::PVector<hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>,
-                  hf_cand::Cpa<collision::PosX, collision::PosY, collision::PosZ, hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex, hf_cand::ZSecondaryVertex, hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>,
-                  hf_cand::CpaXY<collision::PosX, collision::PosY, hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex, hf_cand_2prong::Px, hf_cand_2prong::Py>,
-                  hf_cand::Ct<collision::PosX, collision::PosY, collision::PosZ, hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex, hf_cand::ZSecondaryVertex, hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>,
-                  hf_cand::ImpactParameterXY<collision::PosX, collision::PosY, collision::PosZ, hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex, hf_cand::ZSecondaryVertex, hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>,
-                  hf_cand_2prong::MaxNormalisedDeltaIP<collision::PosX, collision::PosY, hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex, hf_cand::ErrorDecayLengthXY, hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand::ImpactParameter0, hf_cand::ErrorImpactParameter0, hf_cand::ImpactParameter1, hf_cand::ErrorImpactParameter1, hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PxProng1, hf_cand::PyProng1>,
-                  hf_cand::Eta<hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>,
-                  hf_cand::Phi<hf_cand_2prong::Px, hf_cand_2prong::Py>,
-                  hf_cand::Y<hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>,
-                  hf_cand::E<hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>,
-                  hf_cand::E2<hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>);
+// // declare dedicated chi_c candidate table
+// DECLARE_SOA_TABLE(HfCandChicBase, "AOD", "HFCANDCHICBASE",
+//                   // general columns
+//                   HFCAND_COLUMNS,
+//                   // 2-prong specific columns
+//                   hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PzProng0,
+//                   hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1,
+//                   hf_cand::ImpactParameter0, hf_cand::ImpactParameter1,
+//                   hf_cand::ErrorImpactParameter0, hf_cand::ErrorImpactParameter1,
+//                   hf_cand_chic::Prong0Id, hf_cand_chic::Prong1Id,
+//                   hf_track_index::HFflag, hf_cand_chic::JpsiToMuMuMass,
+//                   /* dynamic columns */
+//                   hf_cand_2prong::M<hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PzProng0, hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1>,
+//                   hf_cand_2prong::M2<hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PzProng0, hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1>,
+//                   /* prong 2 */
+//                   //                  hf_cand::PtProng1<hf_cand::PxProng1, hf_cand::PyProng1>,
+//                   //                  hf_cand::Pt2Prong1<hf_cand::PxProng1, hf_cand::PyProng1>,
+//                   //                  hf_cand::PVectorProng1<hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1>,
+//                   /* dynamic columns that use candidate momentum components */
+//                   hf_cand::Pt<hf_cand_2prong::Px, hf_cand_2prong::Py>,
+//                   hf_cand::Pt2<hf_cand_2prong::Px, hf_cand_2prong::Py>,
+//                   hf_cand::P<hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>,
+//                   hf_cand::P2<hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>,
+//                   hf_cand::PVector<hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>,
+//                   hf_cand::Cpa<collision::PosX, collision::PosY, collision::PosZ, hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex, hf_cand::ZSecondaryVertex, hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>,
+//                   hf_cand::CpaXY<collision::PosX, collision::PosY, hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex, hf_cand_2prong::Px, hf_cand_2prong::Py>,
+//                   hf_cand::Ct<collision::PosX, collision::PosY, collision::PosZ, hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex, hf_cand::ZSecondaryVertex, hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>,
+//                   hf_cand::ImpactParameterXY<collision::PosX, collision::PosY, collision::PosZ, hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex, hf_cand::ZSecondaryVertex, hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>,
+//                   hf_cand_2prong::MaxNormalisedDeltaIP<collision::PosX, collision::PosY, hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex, hf_cand::ErrorDecayLengthXY, hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand::ImpactParameter0, hf_cand::ErrorImpactParameter0, hf_cand::ImpactParameter1, hf_cand::ErrorImpactParameter1, hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PxProng1, hf_cand::PyProng1>,
+//                   hf_cand::Eta<hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>,
+//                   hf_cand::Phi<hf_cand_2prong::Px, hf_cand_2prong::Py>,
+//                   hf_cand::Y<hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>,
+//                   hf_cand::E<hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>,
+//                   hf_cand::E2<hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>);
 
-// extended table with expression columns that can be used as arguments of dynamic columns
-DECLARE_SOA_EXTENDED_TABLE_USER(HfCandChicExt, HfCandChicBase, "HFCANDCHICEXT",
-                                hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz);
+// // extended table with expression columns that can be used as arguments of dynamic columns
+// DECLARE_SOA_EXTENDED_TABLE_USER(HfCandChicExt, HfCandChicBase, "HFCANDCHICEXT",
+//                                 hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz);
 
-using HfCandChic = HfCandChicExt;
+// using HfCandChic = HfCandChicExt;
 
-// table with results of reconstruction level MC matching
-DECLARE_SOA_TABLE(HfCandChicMcRec, "AOD", "HFCANDCHICMCREC", //!
-                  hf_cand_chic::FlagMcMatchRec,
-                  hf_cand_chic::OriginMcRec,
-                  hf_cand_chic::FlagMcDecayChanRec);
+// // table with results of reconstruction level MC matching
+// DECLARE_SOA_TABLE(HfCandChicMcRec, "AOD", "HFCANDCHICMCREC", //!
+//                   hf_cand_mc_flag::FlagMcMatchRec,
+//                   hf_cand_mc_flag::OriginMcRec,
+//                   hf_cand_mc_flag::FlagMcDecayChanRec);
 
-// table with results of generator level MC matching
-DECLARE_SOA_TABLE(HfCandChicMcGen, "AOD", "HFCANDCHICMCGEN", //!
-                  hf_cand_chic::FlagMcMatchGen,
-                  hf_cand_chic::OriginMcGen,
-                  hf_cand_chic::FlagMcDecayChanGen);
+// // table with results of generator level MC matching
+// DECLARE_SOA_TABLE(HfCandChicMcGen, "AOD", "HFCANDCHICMCGEN", //!
+//                   hf_cand_mc_flag::FlagMcMatchGen,
+//                   hf_cand_mc_flag::OriginMcGen,
+//                   hf_cand_mc_flag::FlagMcDecayChanGen);
 
 // specific Lb candidate properties
 namespace hf_cand_lb
 {
 DECLARE_SOA_INDEX_COLUMN_FULL(Prong0, prong0, int, HfCand3Prong, "_0"); // Lb index
-// MC matching result:
-DECLARE_SOA_COLUMN(FlagMcMatchRec, flagMcMatchRec, int8_t);         // main decay channel, reconstruction level
-DECLARE_SOA_COLUMN(FlagMcMatchGen, flagMcMatchGen, int8_t);         // main decay channel, generator level
-DECLARE_SOA_COLUMN(FlagMcDecayChanRec, flagMcDecayChanRec, int8_t); // resonant decay channel, reconstruction level
-DECLARE_SOA_COLUMN(FlagMcDecayChanGen, flagMcDecayChanGen, int8_t); // resonant decay channel, generator level
-DECLARE_SOA_COLUMN(OriginMcRec, originMcRec, int8_t);               // particle origin, reconstruction level
-DECLARE_SOA_COLUMN(OriginMcGen, originMcGen, int8_t);               // particle origin, generator level
-DECLARE_SOA_COLUMN(FlagWrongCollision, flagWrongCollision, int8_t); // reconstruction level
-DECLARE_SOA_COLUMN(DebugMcRec, debugMcRec, int8_t);                 // debug flag for mis-association reconstruction level
-// mapping of decay types
-enum DecayType { LbToLcPi }; // move this to a dedicated cascade namespace in the future?
 
 enum DecayTypeMc : uint8_t { LbToLcPiToPKPiPi = 0,
                              LbToLcKToPKPiK,
@@ -2181,34 +1846,21 @@ using HfCandLb = soa::Join<HfCandLbExt, HfCandLbProngs>;
 
 // table with results of reconstruction level MC matching
 DECLARE_SOA_TABLE(HfCandLbMcRec, "AOD", "HFCANDLBMCREC", //!
-                  hf_cand_lb::FlagMcMatchRec,
-                  hf_cand_lb::FlagMcDecayChanRec,
-                  hf_cand_lb::OriginMcRec,
-                  hf_cand_lb::DebugMcRec);
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::FlagMcDecayChanRec,
+                  hf_cand_mc_flag::OriginMcRec,
+                  hf_cand_mc_flag::DebugMcRec);
 
 // table with results of generator level MC matching
 DECLARE_SOA_TABLE(HfCandLbMcGen, "AOD", "HFCANDLBMCGEN", //!
-                  hf_cand_lb::FlagMcMatchGen,
-                  hf_cand_lb::FlagMcDecayChanGen,
-                  hf_cand_lb::OriginMcGen);
+                  hf_cand_mc_flag::FlagMcMatchGen,
+                  hf_cand_mc_flag::FlagMcDecayChanGen,
+                  hf_cand_mc_flag::OriginMcGen);
 
 // specific B0 candidate properties
 namespace hf_cand_b0
 {
 DECLARE_SOA_INDEX_COLUMN_FULL(Prong0, prong0, int, HfCand3Prong, "_0"); // D index
-// MC matching result:
-DECLARE_SOA_COLUMN(FlagMcMatchRec, flagMcMatchRec, int8_t);         // main decay channel, reconstruction level
-DECLARE_SOA_COLUMN(FlagMcMatchGen, flagMcMatchGen, int8_t);         // main decay channel, generator level
-DECLARE_SOA_COLUMN(FlagMcDecayChanRec, flagMcDecayChanRec, int8_t); // resonant decay channel, reconstruction level
-DECLARE_SOA_COLUMN(FlagMcDecayChanGen, flagMcDecayChanGen, int8_t); // resonant decay channel, generator level
-DECLARE_SOA_COLUMN(OriginMcRec, originMcRec, int8_t);               // particle origin, reconstruction level
-DECLARE_SOA_COLUMN(OriginMcGen, originMcGen, int8_t);               // particle origin, generator level
-DECLARE_SOA_COLUMN(FlagWrongCollision, flagWrongCollision, int8_t); // reconstruction level
-DECLARE_SOA_COLUMN(DebugMcRec, debugMcRec, int8_t);                 // debug flag for mis-association reconstruction level
-
-// mapping of decay types
-enum DecayType { B0ToDPi = 0,
-                 B0ToDstarPi };
 
 enum DecayTypeMc : uint8_t { B0ToDplusPiToPiKPiPi = 0,
                              B0ToDsPiToKKPiPi,
@@ -2303,30 +1955,21 @@ DECLARE_SOA_EXTENDED_TABLE_USER(HfCandB0DStExt, HfCandB0DStar, "HFCANDB0DSTEXT",
 
 // table with results of reconstruction level MC matching
 DECLARE_SOA_TABLE(HfCandB0McRec, "AOD", "HFCANDB0MCREC",
-                  hf_cand_b0::FlagMcMatchRec,
-                  hf_cand_b0::FlagMcDecayChanRec,
-                  hf_cand_b0::OriginMcRec,
-                  hf_cand_b0::DebugMcRec);
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::FlagMcDecayChanRec,
+                  hf_cand_mc_flag::OriginMcRec,
+                  hf_cand_mc_flag::DebugMcRec);
 
 // table with results of generator level MC matching
 DECLARE_SOA_TABLE(HfCandB0McGen, "AOD", "HFCANDB0MCGEN",
-                  hf_cand_b0::FlagMcMatchGen,
-                  hf_cand_b0::FlagMcDecayChanGen,
-                  hf_cand_b0::OriginMcGen);
+                  hf_cand_mc_flag::FlagMcMatchGen,
+                  hf_cand_mc_flag::FlagMcDecayChanGen,
+                  hf_cand_mc_flag::OriginMcGen);
 
 // specific Bs candidate properties
 namespace hf_cand_bs
 {
-DECLARE_SOA_INDEX_COLUMN_FULL(Prong0, prong0, int, HfCand3Prong, "_0"); // Ds index
-// MC matching result:
-DECLARE_SOA_COLUMN(FlagMcMatchRec, flagMcMatchRec, int8_t);                // main decay channel, reconstruction level
-DECLARE_SOA_COLUMN(FlagMcMatchGen, flagMcMatchGen, int8_t);                // main decay channel, generator level
-DECLARE_SOA_COLUMN(FlagMcDecayChanRec, flagMcDecayChanRec, int8_t);        // resonant decay channel, reconstruction level
-DECLARE_SOA_COLUMN(FlagMcDecayChanGen, flagMcDecayChanGen, int8_t);        // resonant decay channel, generator level
-DECLARE_SOA_COLUMN(OriginMcRec, originMcRec, int8_t);                      // particle origin, reconstruction level
-DECLARE_SOA_COLUMN(OriginMcGen, originMcGen, int8_t);                      // particle origin, generator level
-DECLARE_SOA_COLUMN(FlagWrongCollision, flagWrongCollision, int8_t);        // reconstruction level
-DECLARE_SOA_COLUMN(DebugMcRec, debugMcRec, int8_t);                        // debug flag for mis-association reconstruction level
+DECLARE_SOA_INDEX_COLUMN_FULL(Prong0, prong0, int, HfCand3Prong, "_0");    // Ds index
 DECLARE_SOA_DYNAMIC_COLUMN(ImpactParameterProduct, impactParameterProduct, // Impact parameter product for Bs -> J/Psi phi
                            [](float pxJpsiDauPos, float pyJpsiDauPos, float pzJpsiDauPos, float pxJpsiDauNeg, float pyJpsiDauNeg, float pzJpsiDauNeg, float pxLfTrack0, float pyLfTrack0, float pzLfTrack0, float pxLfTrack1, float pyLfTrack1, float pzLfTrack1, float xVtxP, float yVtxP, float zVtxP, float xVtxS, float yVtxS, float zVtxS) -> float {
                              float impParJpsi = RecoDecay::impParXY(std::array{xVtxP, yVtxP, zVtxP}, std::array{xVtxS, yVtxS, zVtxS}, RecoDecay::pVec(std::array{pxJpsiDauPos, pyJpsiDauPos, pzJpsiDauPos}, std::array{pxJpsiDauNeg, pyJpsiDauNeg, pzJpsiDauNeg}));
@@ -2337,9 +1980,6 @@ DECLARE_SOA_DYNAMIC_COLUMN(ImpactParameterProductJpsi, impactParameterProductJps
                            [](float dcaDauPos, float dcaDauNeg) -> float { return dcaDauPos * dcaDauNeg; });
 DECLARE_SOA_DYNAMIC_COLUMN(ImpactParameterProductPhi, impactParameterProductPhi, // J/Psi impact parameter for Bs -> J/Psi phi
                            [](float dcaLfTrack0, float dcaLfTrack1) -> float { return dcaLfTrack0 * dcaLfTrack1; });
-
-// mapping of decay types
-enum DecayType { BsToDsPi = 0 };
 
 enum DecayTypeMc : uint8_t { BsToDsPiToPhiPiPiToKKPiPi = 0, // Bs(bar) → Ds∓ π± → (Phi π∓) π± → (K- K+ π∓) π±
                              BsToDsPiToK0starKPiToKKPiPi,   // Bs(bar) → Ds∓ π± → (K0* K∓) π± → (K- K+ π∓) π±
@@ -2389,8 +2029,7 @@ DECLARE_SOA_TABLE(HfCandBsBase, "AOD", "HFCANDBSBASE",
                   hf_cand::Y<hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>,
                   hf_cand::E<hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>,
                   hf_cand::E2<hf_cand_2prong::Px, hf_cand_2prong::Py, hf_cand_2prong::Pz>,
-                  hf_cand_2prong::CtXY<hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PzProng0, hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1, collision::PosX, collision::PosY, hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex>,
-                  o2::soa::Marker<1>);
+                  hf_cand_2prong::CtXY<hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PzProng0, hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1, collision::PosX, collision::PosY, hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex>);
 
 // extended table with expression columns that can be used as arguments of dynamic columns
 DECLARE_SOA_EXTENDED_TABLE_USER(HfCandBsExt, HfCandBsBase, "HFCANDBSEXT",
@@ -2403,13 +2042,13 @@ using HfCandBs = soa::Join<HfCandBsExt, HfCandBsProngs>;
 
 // table with results of reconstruction level MC matching
 DECLARE_SOA_TABLE(HfCandBsMcRec, "AOD", "HFCANDBSMCREC",
-                  hf_cand_bs::FlagMcMatchRec,
-                  hf_cand_bs::FlagMcDecayChanRec);
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::FlagMcDecayChanRec);
 
 // table with results of generator level MC matching
 DECLARE_SOA_TABLE(HfCandBsMcGen, "AOD", "HFCANDBSMCGEN",
-                  hf_cand_bs::FlagMcMatchGen,
-                  hf_cand_bs::FlagMcDecayChanGen);
+                  hf_cand_mc_flag::FlagMcMatchGen,
+                  hf_cand_mc_flag::FlagMcDecayChanGen);
 
 namespace hf_cand_4prong
 {
@@ -2475,8 +2114,7 @@ DECLARE_SOA_TABLE(HfCandBsJPBase, "AOD", "HFCANDBSJPBASE",
                   hf_cand::Y<hf_cand_4prong::Px, hf_cand_4prong::Py, hf_cand_4prong::Pz>,
                   hf_cand::E<hf_cand_4prong::Px, hf_cand_4prong::Py, hf_cand_4prong::Pz>,
                   hf_cand::E2<hf_cand_4prong::Px, hf_cand_4prong::Py, hf_cand_4prong::Pz>,
-                  hf_cand_4prong::CtXY<hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PzProng0, hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1, hf_cand::PxProng2, hf_cand::PyProng2, hf_cand::PzProng2, hf_cand::PxProng3, hf_cand::PyProng3, hf_cand::PzProng3, collision::PosX, collision::PosY, hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex>,
-                  o2::soa::Marker<1>);
+                  hf_cand_4prong::CtXY<hf_cand::PxProng0, hf_cand::PyProng0, hf_cand::PzProng0, hf_cand::PxProng1, hf_cand::PyProng1, hf_cand::PzProng1, hf_cand::PxProng2, hf_cand::PyProng2, hf_cand::PzProng2, hf_cand::PxProng3, hf_cand::PyProng3, hf_cand::PzProng3, collision::PosX, collision::PosY, hf_cand::XSecondaryVertex, hf_cand::YSecondaryVertex>);
 
 // extended table with expression columns that can be used as arguments of dynamic columns
 DECLARE_SOA_EXTENDED_TABLE_USER(HfCandBsJPExt, HfCandBsJPBase, "HFCANDBSJPEXT",
@@ -2498,17 +2136,8 @@ DECLARE_SOA_COLUMN(SoftPiDcaXY, softPiDcaXY, float);                            
 DECLARE_SOA_COLUMN(SoftPiDcaZ, softPiDcaZ, float);                                     //! soft-pion impact parameter in z
 DECLARE_SOA_INDEX_COLUMN_FULL(Prong0, prong0, int, HfCand3Prong, "_0");                //! Λc index
 // MC matching result:
-DECLARE_SOA_COLUMN(FlagMcMatchRec, flagMcMatchRec, int8_t);             //! reconstruction level
-DECLARE_SOA_COLUMN(FlagMcMatchGen, flagMcMatchGen, int8_t);             //! generator level
-DECLARE_SOA_COLUMN(OriginMcRec, originMcRec, int8_t);                   //! particle origin, reconstruction level
-DECLARE_SOA_COLUMN(OriginMcGen, originMcGen, int8_t);                   //! particle origin, generator level
 DECLARE_SOA_COLUMN(ParticleAntiparticle, particleAntiparticle, int8_t); //! particle or antiparticle
 
-// mapping of decay types
-enum DecayType { Sc0ToPKPiPi = 0,
-                 ScplusplusToPKPiPi,
-                 ScStar0ToPKPiPi,
-                 ScStarPlusPlusToPKPiPi };
 enum Species : int { Sc2455 = 0,
                      Sc2520,
                      NSpecies };
@@ -2572,17 +2201,17 @@ using HfCandSc = HfCandScExt;
 
 // table with results of reconstruction level MC matching
 DECLARE_SOA_TABLE(HfCandScMcRec, "AOD", "HFCANDSCMCREC", //!
-                  hf_cand_sigmac::FlagMcMatchRec,
-                  hf_cand_sigmac::OriginMcRec,
-                  hf_cand::PtBhadMotherPart,
-                  hf_cand::PdgBhadMotherPart,
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::OriginMcRec,
+                  hf_cand_mc_flag::PtBhadMotherPart,
+                  hf_cand_mc_flag::PdgBhadMotherPart,
                   hf_cand_sigmac::ParticleAntiparticle);
 
 // table with results of generation level MC matching
 DECLARE_SOA_TABLE(HfCandScMcGen, "AOD", "HFCANDSCMCGEN", //!
-                  hf_cand_sigmac::FlagMcMatchGen,
-                  hf_cand_sigmac::OriginMcGen,
-                  hf_cand::IdxBhadMotherPart,
+                  hf_cand_mc_flag::FlagMcMatchGen,
+                  hf_cand_mc_flag::OriginMcGen,
+                  hf_cand_mc_flag::IdxBhadMotherPart,
                   hf_cand_sigmac::ParticleAntiparticle);
 
 // specific Σc0,++ candidate properties in cascade channel
@@ -2594,11 +2223,6 @@ DECLARE_SOA_COLUMN(ChargeLc, chargeLc, int8_t);                                 
 DECLARE_SOA_COLUMN(ChargeSoftPi, chargeSoftPi, int8_t);                                //! // pion charge(either - or +)
 DECLARE_SOA_COLUMN(StatusSpreadLcMinvKs0PFromPDG, statusSpreadLcMinvKs0PFromPDG, int); //! // Λc Minv spread from PDG Λc mass
 DECLARE_SOA_INDEX_COLUMN_FULL(Prong0, prong0, int, HfCandCascade, "_0");               //! Λc index
-// MC matching result:
-DECLARE_SOA_COLUMN(FlagMcMatchRec, flagMcMatchRec, int8_t); //! reconstruction level
-DECLARE_SOA_COLUMN(FlagMcMatchGen, flagMcMatchGen, int8_t); //! generator level
-DECLARE_SOA_COLUMN(OriginMcRec, originMcRec, int8_t);       //! particle origin, reconstruction level
-DECLARE_SOA_COLUMN(OriginMcGen, originMcGen, int8_t);       //! particle origin, generator level
 } // namespace hf_cand_sigmac_to_cascade
 
 // declare dedicated Σc0,++ decay candidate table
@@ -2756,22 +2380,8 @@ DECLARE_SOA_DYNAMIC_COLUMN(PVecSoftPi, pVecSoftPi, [](float px, float py, float 
 DECLARE_SOA_DYNAMIC_COLUMN(TPCTOFNSigmaPiSoftPi, tpcTofNSigmaPiSoftPi, //! Combination of NsigmaTPC and NsigmaTOF, o2-linter: disable=name/o2-column (written to disk)
                            [](float tpcNSigmaPiSoftPi, float TOFNSigmaPiSoftPi) -> float { return pid_tpc_tof_utils::combineNSigma<false /*tiny*/>(tpcNSigmaPiSoftPi, TOFNSigmaPiSoftPi); });
 // MC matching result:
-DECLARE_SOA_COLUMN(FlagMcMatchRec, flagMcMatchRec, int8_t);     //! reconstruction level
-DECLARE_SOA_COLUMN(FlagMcMatchGen, flagMcMatchGen, int8_t);     //! generator level
 DECLARE_SOA_COLUMN(FlagMcMatchRecD0, flagMcMatchRecD0, int8_t); //! reconstruction level
 DECLARE_SOA_COLUMN(FlagMcMatchGenD0, flagMcMatchGenD0, int8_t); //! generator level
-
-DECLARE_SOA_COLUMN(OriginMcRec, originMcRec, int8_t); //! particle origin, reconstruction level
-DECLARE_SOA_COLUMN(OriginMcGen, originMcGen, int8_t); //! particle origin, generator level
-
-enum DecayType {
-  DstarToD0Pi = 0,
-  D0ToPiK,
-  DstarToD0PiPi0,
-  D0ToPiKPi0,
-  NDstarDecayType
-};
-
 } // namespace hf_cand_dstar
 
 /// D0 (table) from DStar
@@ -2902,20 +2512,20 @@ using HfCandDstarsWPid = soa::Join<HfCandDstars, HfCandDstarProng0PidPi, HfCandD
 
 // table with results of reconstruction level MC matching
 DECLARE_SOA_TABLE(HfCandDstarMcRec, "AOD", "HFCANDDSTRMCREC",
-                  hf_cand_dstar::FlagMcMatchRec,
+                  hf_cand_mc_flag::FlagMcMatchRec,
                   hf_cand_dstar::FlagMcMatchRecD0,
-                  hf_cand_dstar::OriginMcRec,
-                  hf_cand::PtBhadMotherPart,
-                  hf_cand::PdgBhadMotherPart,
-                  hf_cand::NTracksDecayed,
-                  hf_cand::NInteractionsWithMaterial);
+                  hf_cand_mc_flag::OriginMcRec,
+                  hf_cand_mc_flag::PtBhadMotherPart,
+                  hf_cand_mc_flag::PdgBhadMotherPart,
+                  hf_cand_mc_flag::NTracksDecayed,
+                  hf_cand_mc_flag::NInteractionsWithMaterial);
 
 // table with results of generator level MC matching
 DECLARE_SOA_TABLE(HfCandDstarMcGen, "AOD", "HFCANDDSTRMCGEN",
-                  hf_cand_dstar::FlagMcMatchGen,
+                  hf_cand_mc_flag::FlagMcMatchGen,
                   hf_cand_dstar::FlagMcMatchGenD0,
-                  hf_cand_dstar::OriginMcGen,
-                  hf_cand::IdxBhadMotherPart);
+                  hf_cand_mc_flag::OriginMcGen,
+                  hf_cand_mc_flag::IdxBhadMotherPart);
 
 #undef HFCAND_COLUMNS
 

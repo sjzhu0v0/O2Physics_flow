@@ -18,6 +18,7 @@
 
 #include "PWGHF/Core/DecayChannels.h"
 #include "PWGHF/Core/HfHelper.h"
+#include "PWGHF/DataModel/AliasTables.h"
 #include "PWGHF/DataModel/CandidateReconstructionTables.h"
 #include "PWGHF/DataModel/CandidateSelectionTables.h"
 
@@ -95,8 +96,8 @@ DECLARE_SOA_TABLE(HfCandB0Lites, "AOD", "HFCANDB0LITE",
                   full::Eta,
                   full::Phi,
                   full::Y,
-                  hf_cand_3prong::FlagMcMatchRec,
-                  hf_cand_3prong::OriginMcRec);
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::OriginMcRec);
 
 DECLARE_SOA_TABLE(HfCandB0Fulls, "AOD", "HFCANDB0FULL",
                   collision::BCId,
@@ -145,8 +146,8 @@ DECLARE_SOA_TABLE(HfCandB0Fulls, "AOD", "HFCANDB0FULL",
                   full::Phi,
                   full::Y,
                   full::E,
-                  hf_cand_3prong::FlagMcMatchRec,
-                  hf_cand_3prong::OriginMcRec);
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::OriginMcRec);
 
 DECLARE_SOA_TABLE(HfCandB0FullEvs, "AOD", "HFCANDB0FULLEV",
                   collision::BCId,
@@ -163,8 +164,8 @@ DECLARE_SOA_TABLE(HfCandB0FullPs, "AOD", "HFCANDB0FULLP",
                   full::Eta,
                   full::Phi,
                   full::Y,
-                  hf_cand_3prong::FlagMcMatchRec,
-                  hf_cand_3prong::OriginMcGen);
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::OriginMcGen);
 } // namespace o2::aod
 
 /// Writes the full information in an output TTree
@@ -182,15 +183,13 @@ struct HfTreeCreatorB0ToDPi {
   Configurable<float> downSampleBkgFactor{"downSampleBkgFactor", 1., "Fraction of background candidates to keep for ML trainings"};
   Configurable<float> ptMaxForDownSample{"ptMaxForDownSample", 10., "Maximum pt for the application of the downsampling factor"};
 
-  HfHelper hfHelper;
-
   using SelectedCandidatesMc = soa::Filtered<soa::Join<aod::HfCandB0, aod::HfCandB0McRec, aod::HfSelB0ToDPi>>;
   using TracksWPid = soa::Join<aod::Tracks, aod::TracksPidPi>;
 
   Filter filterSelectCandidates = aod::hf_sel_candidate_b0::isSelB0ToDPi >= selectionFlagB0;
 
-  Partition<SelectedCandidatesMc> recSig = nabs(aod::hf_cand_b0::flagMcMatchRec) == static_cast<int8_t>(DecayChannelMain::B0ToDminusPi);
-  Partition<SelectedCandidatesMc> recBg = nabs(aod::hf_cand_b0::flagMcMatchRec) != static_cast<int8_t>(DecayChannelMain::B0ToDminusPi);
+  Partition<SelectedCandidatesMc> recSig = nabs(aod::hf_cand_mc_flag::flagMcMatchRec) == static_cast<int8_t>(DecayChannelMain::B0ToDminusPi);
+  Partition<SelectedCandidatesMc> recBg = nabs(aod::hf_cand_mc_flag::flagMcMatchRec) != static_cast<int8_t>(DecayChannelMain::B0ToDminusPi);
 
   void init(InitContext const&)
   {
@@ -209,12 +208,12 @@ struct HfTreeCreatorB0ToDPi {
       runNumber);
   }
 
-  template <bool doMc = false, typename T, typename U>
+  template <bool DoMc = false, typename T, typename U>
   void fillCandidateTable(const T& candidate, const U& prong1)
   {
     int8_t flagMc = 0;
     int8_t originMc = 0;
-    if constexpr (doMc) {
+    if constexpr (DoMc) {
       flagMc = candidate.flagMcMatchRec();
       originMc = candidate.originMcRec();
     }
@@ -232,14 +231,14 @@ struct HfTreeCreatorB0ToDPi {
         prong1.tpcNSigmaPi(),
         prong1.tofNSigmaPi(),
         candidate.isSelB0ToDPi(),
-        hfHelper.invMassB0ToDPi(candidate),
+        HfHelper::invMassB0ToDPi(candidate),
         candidate.pt(),
         candidate.cpa(),
         candidate.cpaXY(),
         candidate.maxNormalisedDeltaIP(),
         candidate.eta(),
         candidate.phi(),
-        hfHelper.yB0(candidate),
+        HfHelper::yB0(candidate),
         flagMc,
         originMc);
     } else {
@@ -279,17 +278,17 @@ struct HfTreeCreatorB0ToDPi {
         prong1.tpcNSigmaPi(),
         prong1.tofNSigmaPi(),
         candidate.isSelB0ToDPi(),
-        hfHelper.invMassB0ToDPi(candidate),
+        HfHelper::invMassB0ToDPi(candidate),
         candidate.pt(),
         candidate.p(),
         candidate.cpa(),
         candidate.cpaXY(),
         candidate.maxNormalisedDeltaIP(),
-        hfHelper.ctB0(candidate),
+        HfHelper::ctB0(candidate),
         candidate.eta(),
         candidate.phi(),
-        hfHelper.yB0(candidate),
-        hfHelper.eB0(candidate),
+        HfHelper::yB0(candidate),
+        HfHelper::eB0(candidate),
         flagMc,
         originMc);
     }
@@ -312,7 +311,7 @@ struct HfTreeCreatorB0ToDPi {
     }
     for (const auto& candidate : candidates) {
       if (fillOnlyBackground) {
-        float pseudoRndm = candidate.ptProng1() * 1000. - static_cast<int64_t>(candidate.ptProng1() * 1000);
+        float const pseudoRndm = candidate.ptProng1() * 1000. - static_cast<int64_t>(candidate.ptProng1() * 1000);
         if (candidate.pt() < ptMaxForDownSample && pseudoRndm >= downSampleBkgFactor) {
           continue;
         }
@@ -352,7 +351,7 @@ struct HfTreeCreatorB0ToDPi {
         rowCandidateLite.reserve(recBg.size());
       }
       for (const auto& candidate : recBg) {
-        float pseudoRndm = candidate.ptProng1() * 1000. - static_cast<int64_t>(candidate.ptProng1() * 1000);
+        float const pseudoRndm = candidate.ptProng1() * 1000. - static_cast<int64_t>(candidate.ptProng1() * 1000);
         if (candidate.pt() < ptMaxForDownSample && pseudoRndm >= downSampleBkgFactor) {
           continue;
         }

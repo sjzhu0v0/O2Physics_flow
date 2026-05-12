@@ -14,11 +14,12 @@
 /// \brief Slim hypernuclei tables
 ///
 
-#include "Framework/ASoAHelpers.h"
-#include "Framework/AnalysisDataModel.h"
-
 #ifndef PWGLF_DATAMODEL_LFHYPERNUCLEITABLES_H_
 #define PWGLF_DATAMODEL_LFHYPERNUCLEITABLES_H_
+
+#include <Framework/AnalysisDataModel.h>
+
+#include <cstdint>
 
 namespace o2::aod
 {
@@ -36,6 +37,7 @@ DECLARE_SOA_COLUMN(PsiTPC, psiTPC, float);                 // Psi with TPC estim
 DECLARE_SOA_COLUMN(MultTPC, multTPC, float);               // Multiplicity with TPC estimator
 DECLARE_SOA_COLUMN(CollisionId, collisionId, int64_t);     // CollisionID
 
+DECLARE_SOA_COLUMN(RunNumber, runNumber, int32_t);                    // Run number
 DECLARE_SOA_COLUMN(IsMatter, isMatter, bool);                         // bool: true for matter
 DECLARE_SOA_COLUMN(PtHe3, ptHe3, float);                              // Pt of the He daughter
 DECLARE_SOA_COLUMN(PhiHe3, phiHe3, float);                            // Phi of the He daughter
@@ -58,6 +60,8 @@ DECLARE_SOA_COLUMN(NTPCclusHe, nTPCclusHe, uint8_t);                  // Number 
 DECLARE_SOA_COLUMN(NTPCclusPi, nTPCclusPi, uint8_t);                  // Number of TPC clusters of the Pi daughter
 DECLARE_SOA_COLUMN(NTPCpidClusHe, nTPCpidClusHe, uint8_t);            // Number of TPC clusters with PID information of the He daughter
 DECLARE_SOA_COLUMN(NTPCpidClusPi, nTPCpidClusPi, uint8_t);            // Number of TPC clusters with PID information of the Pi daughter
+DECLARE_SOA_COLUMN(NTPCCrossedRowsHe, nTPCCrossedRowsHe, uint8_t);    // Number of TPC crossed rows of the He daughter
+DECLARE_SOA_COLUMN(NTPCCrossedRowsPi, nTPCCrossedRowsPi, uint8_t);    // Number of TPC crossed rows of the Pi daughter
 DECLARE_SOA_COLUMN(TPCsignalHe, tpcSignalHe, uint16_t);               // TPC signal of the He daughter
 DECLARE_SOA_COLUMN(TPCsignalPi, tpcSignalPi, uint16_t);               // TPC signal of the Pi daughter
 DECLARE_SOA_COLUMN(TPCChi2He, tpcChi2He, float);                      // TPC chi2 of the He daughter
@@ -85,6 +89,7 @@ DECLARE_SOA_COLUMN(IsFakeHeOnITSLayer, isFakeHeOnITSLayer, uint8_t);  // uint8_t
 DECLARE_SOA_COLUMN(IsSignal, isSignal, bool);                         // bool: true for signal
 DECLARE_SOA_COLUMN(IsRecoMCCollision, isRecoMCCollision, bool);       // bool: true for reco MC collision
 DECLARE_SOA_COLUMN(IsSurvEvSel, isSurvEvSel, bool);                   // bool: true for survived event selection
+DECLARE_SOA_COLUMN(IsTwoBodyDecay, isTwoBodyDecay, bool);             // bool: true for two body decay
 } // namespace hyperrec
 
 DECLARE_SOA_TABLE(DataHypCands, "AOD", "HYPCANDS",
@@ -92,12 +97,12 @@ DECLARE_SOA_TABLE(DataHypCands, "AOD", "HYPCANDS",
                   hyperrec::CentralityFT0A, hyperrec::CentralityFT0C, hyperrec::CentralityFT0M,
                   hyperrec::XPrimVtx, hyperrec::YPrimVtx, hyperrec::ZPrimVtx,
 
-                  hyperrec::IsMatter,
+                  hyperrec::RunNumber, hyperrec::IsMatter,
                   hyperrec::PtHe3, hyperrec::PhiHe3, hyperrec::EtaHe3,
                   hyperrec::PtPi, hyperrec::PhiPi, hyperrec::EtaPi,
                   hyperrec::XDecVtx, hyperrec::YDecVtx, hyperrec::ZDecVtx,
                   hyperrec::DcaV0Daug, hyperrec::DcaHe, hyperrec::DcaPi,
-                  hyperrec::NSigmaHe, hyperrec::NTPCclusHe, hyperrec::NTPCclusPi, hyperrec::NTPCpidClusHe, hyperrec::NTPCpidClusPi,
+                  hyperrec::NSigmaHe, hyperrec::NTPCclusHe, hyperrec::NTPCclusPi, hyperrec::NTPCpidClusHe, hyperrec::NTPCpidClusPi, hyperrec::NTPCCrossedRowsHe, hyperrec::NTPCCrossedRowsPi,
                   hyperrec::TPCmomHe, hyperrec::TPCmomPi, hyperrec::TPCsignalHe, hyperrec::TPCsignalPi, hyperrec::TPCChi2He, hyperrec::ITSChi2He, hyperrec::ITSChi2Pi,
                   hyperrec::TOFMass,
                   hyperrec::ITSclusterSizesHe, hyperrec::ITSclusterSizesPi,
@@ -111,12 +116,12 @@ DECLARE_SOA_TABLE(DataHypCandsFlow, "AOD", "HYPCANDSFLOW",
                   hyperrec::PsiTPC, hyperrec::MultTPC,
                   hyperrec::XPrimVtx, hyperrec::YPrimVtx, hyperrec::ZPrimVtx,
 
-                  hyperrec::IsMatter,
+                  hyperrec::RunNumber, hyperrec::IsMatter,
                   hyperrec::PtHe3, hyperrec::PhiHe3, hyperrec::EtaHe3,
                   hyperrec::PtPi, hyperrec::PhiPi, hyperrec::EtaPi,
                   hyperrec::XDecVtx, hyperrec::YDecVtx, hyperrec::ZDecVtx,
                   hyperrec::DcaV0Daug, hyperrec::DcaHe, hyperrec::DcaPi,
-                  hyperrec::NSigmaHe, hyperrec::NTPCclusHe, hyperrec::NTPCclusPi, hyperrec::NTPCpidClusHe, hyperrec::NTPCpidClusPi,
+                  hyperrec::NSigmaHe, hyperrec::NTPCclusHe, hyperrec::NTPCclusPi, hyperrec::NTPCpidClusHe, hyperrec::NTPCpidClusPi, hyperrec::NTPCCrossedRowsHe, hyperrec::NTPCCrossedRowsPi,
                   hyperrec::TPCmomHe, hyperrec::TPCmomPi, hyperrec::TPCsignalHe, hyperrec::TPCsignalPi, hyperrec::TPCChi2He, hyperrec::ITSChi2He, hyperrec::ITSChi2Pi,
                   hyperrec::TOFMass,
                   hyperrec::ITSclusterSizesHe, hyperrec::ITSclusterSizesPi,
@@ -127,12 +132,12 @@ DECLARE_SOA_TABLE(MCHypCands, "AOD", "MCHYPCANDS",
                   hyperrec::CentralityFT0A, hyperrec::CentralityFT0C, hyperrec::CentralityFT0M,
                   hyperrec::XPrimVtx, hyperrec::YPrimVtx, hyperrec::ZPrimVtx,
 
-                  hyperrec::IsMatter,
+                  hyperrec::RunNumber, hyperrec::IsMatter,
                   hyperrec::PtHe3, hyperrec::PhiHe3, hyperrec::EtaHe3,
                   hyperrec::PtPi, hyperrec::PhiPi, hyperrec::EtaPi,
                   hyperrec::XDecVtx, hyperrec::YDecVtx, hyperrec::ZDecVtx,
                   hyperrec::DcaV0Daug, hyperrec::DcaHe, hyperrec::DcaPi,
-                  hyperrec::NSigmaHe, hyperrec::NTPCclusHe, hyperrec::NTPCclusPi, hyperrec::NTPCpidClusHe, hyperrec::NTPCpidClusPi,
+                  hyperrec::NSigmaHe, hyperrec::NTPCclusHe, hyperrec::NTPCclusPi, hyperrec::NTPCpidClusHe, hyperrec::NTPCpidClusPi, hyperrec::NTPCCrossedRowsHe, hyperrec::NTPCCrossedRowsPi,
                   hyperrec::TPCmomHe, hyperrec::TPCmomPi, hyperrec::TPCsignalHe, hyperrec::TPCsignalPi, hyperrec::TPCChi2He, hyperrec::ITSChi2He, hyperrec::ITSChi2Pi,
                   hyperrec::TOFMass,
                   hyperrec::ITSclusterSizesHe, hyperrec::ITSclusterSizesPi,
@@ -148,19 +153,20 @@ DECLARE_SOA_TABLE(MCHypCands, "AOD", "MCHYPCANDS",
                   hyperrec::IsFakeHeOnITSLayer,
                   hyperrec::IsSignal,
                   hyperrec::IsRecoMCCollision,
-                  hyperrec::IsSurvEvSel);
+                  hyperrec::IsSurvEvSel,
+                  hyperrec::IsTwoBodyDecay, aod::mcparticle::StatusCode);
 
 DECLARE_SOA_TABLE(DataHypCandsWColl, "AOD", "HYPCANDSWCOLL",
                   o2::soa::Index<>,
                   hyperrec::CollisionId, hyperrec::CentralityFT0A, hyperrec::CentralityFT0C, hyperrec::CentralityFT0M,
                   hyperrec::XPrimVtx, hyperrec::YPrimVtx, hyperrec::ZPrimVtx,
 
-                  hyperrec::IsMatter,
+                  hyperrec::RunNumber, hyperrec::IsMatter,
                   hyperrec::PtHe3, hyperrec::PhiHe3, hyperrec::EtaHe3,
                   hyperrec::PtPi, hyperrec::PhiPi, hyperrec::EtaPi,
                   hyperrec::XDecVtx, hyperrec::YDecVtx, hyperrec::ZDecVtx,
                   hyperrec::DcaV0Daug, hyperrec::DcaHe, hyperrec::DcaPi,
-                  hyperrec::NSigmaHe, hyperrec::NTPCclusHe, hyperrec::NTPCclusPi, hyperrec::NTPCpidClusHe, hyperrec::NTPCpidClusPi,
+                  hyperrec::NSigmaHe, hyperrec::NTPCclusHe, hyperrec::NTPCclusPi, hyperrec::NTPCpidClusHe, hyperrec::NTPCpidClusPi, hyperrec::NTPCCrossedRowsHe, hyperrec::NTPCCrossedRowsPi,
                   hyperrec::TPCmomHe, hyperrec::TPCmomPi, hyperrec::TPCsignalHe, hyperrec::TPCsignalPi, hyperrec::TPCChi2He, hyperrec::ITSChi2He, hyperrec::ITSChi2Pi,
                   hyperrec::TOFMass,
                   hyperrec::ITSclusterSizesHe, hyperrec::ITSclusterSizesPi,

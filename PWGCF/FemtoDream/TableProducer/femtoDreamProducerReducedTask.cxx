@@ -15,29 +15,39 @@
 /// \author Georgios Mantzaridis, TU München, georgios.mantzaridis@tum.de
 /// \author Anton Riedel, TU München, anton.riedel@tum.de
 
-#include <vector>
-#include "TMath.h"
-#include "CCDB/BasicCCDBManager.h"
+#include "PWGCF/DataModel/FemtoDerived.h"
 #include "PWGCF/FemtoDream/Core/femtoDreamCollisionSelection.h"
+#include "PWGCF/FemtoDream/Core/femtoDreamSelection.h"
 #include "PWGCF/FemtoDream/Core/femtoDreamTrackSelection.h"
 #include "PWGCF/FemtoDream/Core/femtoDreamUtils.h"
-#include "PWGCF/DataModel/FemtoDerived.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/runDataProcessing.h"
-#include "Framework/HistogramRegistry.h"
-#include "Framework/ASoAHelpers.h"
-#include "Common/DataModel/TrackSelectionTables.h"
-#include "Common/DataModel/PIDResponse.h"
-#include "Common/DataModel/PIDResponseITS.h"
+
+#include "Common/CCDB/TriggerAliases.h"
+#include "Common/DataModel/Centrality.h"
 #include "Common/DataModel/EventSelection.h"
 #include "Common/DataModel/Multiplicity.h"
-#include "ReconstructionDataFormats/Track.h"
-#include "Common/Core/trackUtilities.h"
-#include "PWGLF/DataModel/LFStrangenessTables.h"
-#include "DataFormatsParameters/GRPObject.h"
-#include "DataFormatsParameters/GRPMagField.h"
-#include "Math/Vector4D.h"
+#include "Common/DataModel/PIDResponseITS.h"
+#include "Common/DataModel/PIDResponseTOF.h"
+#include "Common/DataModel/PIDResponseTPC.h"
+#include "Common/DataModel/TrackSelectionTables.h"
+
+#include <CCDB/BasicCCDBManager.h>
+#include <DataFormatsParameters/GRPMagField.h>
+#include <DataFormatsParameters/GRPObject.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/OutputObjHeader.h>
+#include <Framework/runDataProcessing.h>
+#include <ReconstructionDataFormats/PID.h>
+
+#include <chrono>
+#include <cmath>
+#include <cstdint>
+#include <vector>
 
 using namespace o2;
 using namespace o2::analysis::femtoDream;

@@ -17,21 +17,27 @@
 /// \brief  Task to produce the PID QA information for the TPC for the purpose of the Light flavor PWG
 ///
 
-#include <string_view>
-
-#include "Framework/runDataProcessing.h"
-#include "Framework/StaticFor.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/HistogramRegistry.h"
-#include "Common/DataModel/PIDResponse.h"
-#include "Common/DataModel/Multiplicity.h"
-#include "Common/DataModel/Centrality.h"
-#include "Common/DataModel/TrackSelectionTables.h"
-#include "Common/DataModel/EventSelection.h"
-#include "Common/Core/TrackSelection.h"
 #include "PWGLF/DataModel/LFParticleIdentification.h"
-#include "Framework/ASoAHelpers.h"
+
+#include "Common/DataModel/EventSelection.h"
+#include "Common/DataModel/PIDResponseTPC.h"
+#include "Common/DataModel/TrackSelectionTables.h"
+
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/OutputObjHeader.h>
+#include <Framework/StaticFor.h>
+#include <Framework/runDataProcessing.h>
+#include <ReconstructionDataFormats/PID.h>
+
+#include <TString.h>
+
+#include <cstdint>
+#include <string_view>
 
 using namespace o2;
 using namespace o2::framework;

@@ -118,17 +118,16 @@ constexpr bool isMatchedCandidate(T const& candidate)
  *
  * @param track track that is being checked
  * @param candidate candidate that is being checked
- * @param tracks the track table
  */
-template <typename T, typename U, typename V>
-bool isDaughterTrack(T& track, U& candidate, V const& tracks)
+template <typename T, typename U>
+bool isDaughterTrack(T& track, U& candidate)
 {
   if constexpr (jethfutilities::isHFCandidate<U>()) {
-    return jethfutilities::isHFDaughterTrack(track, candidate, tracks);
+    return jethfutilities::isHFDaughterTrack(track, candidate);
   } else if constexpr (jetv0utilities::isV0Candidate<U>()) {
-    return jetv0utilities::isV0DaughterTrack(track, candidate, tracks);
+    return jetv0utilities::isV0DaughterTrack(track, candidate);
   } else if constexpr (jetdqutilities::isDielectronCandidate<U>()) {
-    return jetdqutilities::isDielectronDaughterTrack(track, candidate, tracks);
+    return jetdqutilities::isDielectronDaughterTrack(track, candidate);
   } else {
     return false;
   }
@@ -189,13 +188,15 @@ template <typename T, typename U, typename V>
 auto matchedParticle(const T& candidate, const U& tracks, const V& particles)
 {
   if constexpr (jethfutilities::isHFCandidate<T>()) {
-    return jethfutilities::matchedHFParticle(candidate, tracks, particles);
+    bool isMatched = false;
+    return jethfutilities::matchedHFParticle(candidate, tracks, particles, isMatched);
   } else if constexpr (jetv0utilities::isV0Candidate<T>()) {
     return jetv0utilities::matchedV0Particle(candidate, tracks, particles);
   } else if constexpr (jetdqutilities::isDielectronCandidate<T>()) {
     return jetdqutilities::matchedDielectronParticle(candidate, tracks, particles);
   } else {
-    return jethfutilities::matchedHFParticle(candidate, tracks, particles); // this is a dummy output which should never be triggered
+    bool isMatched = false;
+    return jethfutilities::matchedHFParticle(candidate, tracks, particles, isMatched); // this is a dummy output which should never be triggered
   }
 }
 
@@ -378,7 +379,7 @@ void fillCandidateTable(T const& candidate, int32_t collisionIndex, U& BaseTable
   if constexpr (jethfutilities::isHFCandidate<T>()) {
     jethfutilities::fillHFCandidateTable<isMc>(candidate, collisionIndex, BaseTable, HFParTable, HFParETable, HFParDaughterTable, HFSelectionFlagTable, HFMlTable, HFMlDaughterTable, HFMCDTable);
   } else if constexpr (jetdqutilities::isDielectronCandidate<T>()) {
-    jetdqutilities::fillDielectronCandidateTable(candidate, collisionIndex, BaseTable);
+    jetdqutilities::fillDielectronCandidateTable(candidate, collisionIndex, BaseTable, HFParTable);
   }
 }
 

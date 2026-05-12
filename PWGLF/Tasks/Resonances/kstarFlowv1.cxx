@@ -14,59 +14,42 @@
 /// \author  Prottay Das <prottay.das@cern.ch>, Dukhishyam Mallick <dukhishyam.mallick@cern.ch>
 ///
 
-#include <TH1F.h>
-#include <TDirectory.h>
-#include <THn.h>
-#include <TLorentzVector.h>
-#include <TMath.h>
-#include <TObjArray.h>
-#include <TFile.h>
-#include <TH2F.h>
-#include <TLorentzVector.h>
-#include <TPDGCode.h>
+#include "PWGLF/DataModel/SPCalibrationTables.h"
+
+#include "Common/CCDB/EventSelectionParams.h"
+#include "Common/DataModel/Centrality.h"
+#include "Common/DataModel/EventSelection.h"
+#include "Common/DataModel/Multiplicity.h"
+#include "Common/DataModel/PIDResponseTOF.h"
+#include "Common/DataModel/PIDResponseTPC.h"
+#include "Common/DataModel/TrackSelectionTables.h"
+
+#include <CCDB/BasicCCDBManager.h>
+#include <CommonConstants/MathConstants.h>
+#include <CommonConstants/PhysicsConstants.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/OutputObjHeader.h>
+#include <Framework/runDataProcessing.h>
+
+#include <Math/Vector4D.h> // IWYU pragma: keep (do not replace with Math/Vector4Dfwd.h)
+#include <Math/Vector4Dfwd.h>
+
+#include <cmath>
+#include <cstdlib>
 #include <string>
 #include <vector>
-// #include <TDatabasePDG.h>
-#include <cmath>
-#include <array>
-#include <cstdlib>
-
-#include "TRandom3.h"
-#include "Math/Vector3D.h"
-#include "Math/Vector4D.h"
-#include "Math/GenVector/Boost.h"
-#include "TF1.h"
-
-#include "Common/Core/trackUtilities.h"
-#include "Common/Core/TrackSelection.h"
-#include "Common/Core/RecoDecay.h"
-
-#include "PWGLF/DataModel/SPCalibrationTables.h"
-#include "Framework/runDataProcessing.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/HistogramRegistry.h"
-#include "Framework/StepTHn.h"
-#include "Framework/O2DatabasePDGPlugin.h"
-#include "Common/DataModel/PIDResponse.h"
-#include "Common/DataModel/Multiplicity.h"
-#include "Common/DataModel/Centrality.h"
-#include "Common/DataModel/TrackSelectionTables.h"
-#include "Common/DataModel/EventSelection.h"
-#include "Common/Core/trackUtilities.h"
-#include "CommonConstants/PhysicsConstants.h"
-#include "Common/Core/TrackSelection.h"
-#include "Framework/ASoAHelpers.h"
-#include "ReconstructionDataFormats/Track.h"
-#include "DataFormatsParameters/GRPObject.h"
-#include "DataFormatsParameters/GRPMagField.h"
-#include "CCDB/BasicCCDBManager.h"
 
 using namespace o2;
 using namespace o2::framework;
 using namespace o2::framework::expressions;
-using std::array;
 using namespace o2::constants::physics;
+
 struct KstarFlowv1 {
 
   Service<o2::ccdb::BasicCCDBManager> ccdb;

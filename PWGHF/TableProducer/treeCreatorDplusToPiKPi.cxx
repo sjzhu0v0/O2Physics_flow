@@ -19,8 +19,10 @@
 #include "PWGHF/Core/CentralityEstimation.h"
 #include "PWGHF/Core/DecayChannels.h"
 #include "PWGHF/Core/HfHelper.h"
+#include "PWGHF/DataModel/AliasTables.h"
 #include "PWGHF/DataModel/CandidateReconstructionTables.h"
 #include "PWGHF/DataModel/CandidateSelectionTables.h"
+#include "PWGHF/Utils/utilsAnalysis.h"
 
 #include "Common/Core/RecoDecay.h"
 #include "Common/DataModel/Centrality.h"
@@ -146,9 +148,10 @@ DECLARE_SOA_TABLE(HfCandDpLites, "AOD", "HFCANDDPLITE",
                   full::Y,
                   full::Centrality,
                   collision::NumContrib,
-                  hf_cand_3prong::FlagMcMatchRec,
-                  hf_cand_3prong::OriginMcRec,
-                  hf_cand_3prong::FlagMcDecayChanRec)
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::OriginMcRec,
+                  hf_cand_mc_flag::FlagMcDecayChanRec,
+                  hf_cand_mc_flag::PdgBhadMotherPart)
 
 DECLARE_SOA_TABLE(HfCandDpFulls, "AOD", "HFCANDDPFULL",
                   collision::NumContrib,
@@ -227,9 +230,10 @@ DECLARE_SOA_TABLE(HfCandDpFulls, "AOD", "HFCANDDPFULL",
                   full::Y,
                   full::E,
                   full::Centrality,
-                  hf_cand_3prong::FlagMcMatchRec,
-                  hf_cand_3prong::OriginMcRec,
-                  hf_cand_3prong::FlagMcDecayChanRec);
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::OriginMcRec,
+                  hf_cand_mc_flag::FlagMcDecayChanRec,
+                  hf_cand_mc_flag::PdgBhadMotherPart);
 
 DECLARE_SOA_TABLE(HfCandDpFullEvs, "AOD", "HFCANDDPFULLEV",
                   collision::NumContrib,
@@ -244,9 +248,9 @@ DECLARE_SOA_TABLE(HfCandDpFullPs, "AOD", "HFCANDDPFULLP",
                   full::Eta,
                   full::Phi,
                   full::Y,
-                  hf_cand_3prong::FlagMcMatchGen,
-                  hf_cand_3prong::FlagMcDecayChanGen,
-                  hf_cand_3prong::OriginMcGen);
+                  hf_cand_mc_flag::FlagMcMatchGen,
+                  hf_cand_mc_flag::FlagMcDecayChanGen,
+                  hf_cand_mc_flag::OriginMcGen);
 } // namespace o2::aod
 
 /// Writes the full information in an output TTree
@@ -268,8 +272,6 @@ struct HfTreeCreatorDplusToPiKPi {
   Configurable<std::vector<int>> classMlIndexes{"classMlIndexes", {0, 2}, "Indexes of ML bkg and non-prompt scores."};
   Configurable<int> centEstimator{"centEstimator", 0, "Centrality estimation (None: 0, FT0C: 2, FT0M: 3)"};
 
-  HfHelper hfHelper;
-
   using SelectedCandidatesMc = soa::Filtered<soa::Join<aod::HfCand3ProngWPidPiKa, aod::HfCand3ProngMcRec, aod::HfSelDplusToPiKPi>>;
   using MatchedGenCandidatesMc = soa::Filtered<soa::Join<aod::McParticles, aod::HfCand3ProngMcGen>>;
   using SelectedCandidatesMcWithMl = soa::Filtered<soa::Join<aod::HfCand3ProngWPidPiKa, aod::HfCand3ProngMcRec, aod::HfSelDplusToPiKPi, aod::HfMlDplusToPiKPi>>;
@@ -278,11 +280,11 @@ struct HfTreeCreatorDplusToPiKPi {
   using CollisionsCent = soa::Join<aod::Collisions, aod::CentFT0Cs, aod::CentFT0Ms>;
 
   Filter filterSelectCandidates = aod::hf_sel_candidate_dplus::isSelDplusToPiKPi >= selectionFlagDplus;
-  Filter filterMcGenMatching = (nabs(o2::aod::hf_cand_3prong::flagMcMatchGen) == static_cast<int8_t>(hf_decay::hf_cand_3prong::DecayChannelMain::DplusToPiKPi)) || (fillCorrBkgs && (nabs(o2::aod::hf_cand_3prong::flagMcMatchGen) != 0));
+  Filter filterMcGenMatching = (nabs(o2::aod::hf_cand_mc_flag::flagMcMatchGen) == static_cast<int8_t>(hf_decay::hf_cand_3prong::DecayChannelMain::DplusToPiKPi)) || (fillCorrBkgs && (nabs(o2::aod::hf_cand_mc_flag::flagMcMatchGen) != 0));
 
-  Partition<SelectedCandidatesMc> reconstructedCandSig = (nabs(aod::hf_cand_3prong::flagMcMatchRec) == static_cast<int8_t>(hf_decay::hf_cand_3prong::DecayChannelMain::DplusToPiKPi)) || (fillCorrBkgs && (nabs(o2::aod::hf_cand_3prong::flagMcMatchRec) != 0));
-  Partition<SelectedCandidatesMc> reconstructedCandBkg = nabs(aod::hf_cand_3prong::flagMcMatchRec) != static_cast<int8_t>(hf_decay::hf_cand_3prong::DecayChannelMain::DplusToPiKPi);
-  Partition<SelectedCandidatesMcWithMl> reconstructedCandSigMl = (nabs(aod::hf_cand_3prong::flagMcMatchRec) == static_cast<int8_t>(hf_decay::hf_cand_3prong::DecayChannelMain::DplusToPiKPi)) || (fillCorrBkgs && (nabs(o2::aod::hf_cand_3prong::flagMcMatchRec) != 0));
+  Partition<SelectedCandidatesMc> reconstructedCandSig = (nabs(aod::hf_cand_mc_flag::flagMcMatchRec) == static_cast<int8_t>(hf_decay::hf_cand_3prong::DecayChannelMain::DplusToPiKPi)) || (fillCorrBkgs && (nabs(o2::aod::hf_cand_mc_flag::flagMcMatchRec) != 0));
+  Partition<SelectedCandidatesMc> reconstructedCandBkg = nabs(aod::hf_cand_mc_flag::flagMcMatchRec) != static_cast<int8_t>(hf_decay::hf_cand_3prong::DecayChannelMain::DplusToPiKPi);
+  Partition<SelectedCandidatesMcWithMl> reconstructedCandSigMl = (nabs(aod::hf_cand_mc_flag::flagMcMatchRec) == static_cast<int8_t>(hf_decay::hf_cand_3prong::DecayChannelMain::DplusToPiKPi)) || (fillCorrBkgs && (nabs(o2::aod::hf_cand_mc_flag::flagMcMatchRec) != 0));
 
   void init(InitContext const&)
   {
@@ -300,20 +302,22 @@ struct HfTreeCreatorDplusToPiKPi {
       runNumber);
   }
 
-  template <typename Coll, bool doMc = false, bool doMl = false, typename T>
+  template <typename Coll, bool DoMc = false, bool DoMl = false, typename T>
   void fillCandidateTable(const T& candidate)
   {
     int8_t flagMc = 0;
     int8_t originMc = 0;
     int8_t channelMc = 0;
-    if constexpr (doMc) {
+    int8_t bMotherFlag = -1;
+    if constexpr (DoMc) {
       flagMc = candidate.flagMcMatchRec();
       originMc = candidate.originMcRec();
       channelMc = candidate.flagMcDecayChanRec();
+      bMotherFlag = o2::analysis::getBHadMotherFlag(candidate.pdgBhadMotherPart());
     }
 
     std::vector<float> outputMl = {-999., -999.};
-    if constexpr (doMl) {
+    if constexpr (DoMl) {
       for (unsigned int iclass = 0; iclass < classMlIndexes->size(); iclass++) {
         outputMl[iclass] = candidate.mlProbDplusToPiKPi()[classMlIndexes->at(iclass)];
       }
@@ -363,19 +367,20 @@ struct HfTreeCreatorDplusToPiKPi {
         candidate.tpcTofNSigmaPi2(),
         candidate.tpcTofNSigmaKa2(),
         candidate.isSelDplusToPiKPi(),
-        hfHelper.invMassDplusToPiKPi(candidate),
+        HfHelper::invMassDplusToPiKPi(candidate),
         candidate.pt(),
         candidate.cpa(),
         candidate.cpaXY(),
         candidate.maxNormalisedDeltaIP(),
         candidate.eta(),
         candidate.phi(),
-        hfHelper.yDplus(candidate),
-        coll.numContrib(),
+        HfHelper::yDplus(candidate),
         cent,
+        coll.numContrib(),
         flagMc,
         originMc,
-        channelMc);
+        channelMc,
+        bMotherFlag);
     } else {
       rowCandidateFull(
         coll.numContrib(),
@@ -442,21 +447,22 @@ struct HfTreeCreatorDplusToPiKPi {
         candidate.tpcTofNSigmaPi2(),
         candidate.tpcTofNSigmaKa2(),
         candidate.isSelDplusToPiKPi(),
-        hfHelper.invMassDplusToPiKPi(candidate),
+        HfHelper::invMassDplusToPiKPi(candidate),
         candidate.pt(),
         candidate.p(),
         candidate.cpa(),
         candidate.cpaXY(),
         candidate.maxNormalisedDeltaIP(),
-        hfHelper.ctDplus(candidate),
+        HfHelper::ctDplus(candidate),
         candidate.eta(),
         candidate.phi(),
-        hfHelper.yDplus(candidate),
-        hfHelper.eDplus(candidate),
+        HfHelper::yDplus(candidate),
+        HfHelper::eDplus(candidate),
         cent,
         flagMc,
         originMc,
-        channelMc);
+        channelMc,
+        bMotherFlag);
     }
   }
 
@@ -478,7 +484,7 @@ struct HfTreeCreatorDplusToPiKPi {
     }
     for (const auto& candidate : candidates) {
       if (downSampleBkgFactor < 1.) {
-        float pseudoRndm = candidate.ptProng0() * 1000. - static_cast<int64_t>(candidate.ptProng0() * 1000);
+        float const pseudoRndm = candidate.ptProng0() * 1000. - static_cast<int64_t>(candidate.ptProng0() * 1000);
         if (candidate.pt() < ptMaxForDownSample && pseudoRndm >= downSampleBkgFactor) {
           continue;
         }
@@ -507,7 +513,7 @@ struct HfTreeCreatorDplusToPiKPi {
     }
     for (const auto& candidate : candidates) {
       if (downSampleBkgFactor < 1.) {
-        float pseudoRndm = candidate.ptProng0() * 1000. - static_cast<int64_t>(candidate.ptProng0() * 1000);
+        float const pseudoRndm = candidate.ptProng0() * 1000. - static_cast<int64_t>(candidate.ptProng0() * 1000);
         if (candidate.pt() < ptMaxForDownSample && pseudoRndm >= downSampleBkgFactor) {
           continue;
         }
@@ -518,7 +524,7 @@ struct HfTreeCreatorDplusToPiKPi {
 
   PROCESS_SWITCH(HfTreeCreatorDplusToPiKPi, processDataWCent, "Process data with cent", false);
 
-  template <bool applyMl = false, typename CandTypeMcRec, typename CandTypeMcGen, typename CollType>
+  template <bool ApplyMl = false, typename CandTypeMcRec, typename CandTypeMcGen, typename CollType>
   void fillMcTables(CollType const& collisions,
                     aod::McCollisions const&,
                     CandTypeMcRec const& candidates,
@@ -539,12 +545,12 @@ struct HfTreeCreatorDplusToPiKPi {
     }
     for (const auto& candidate : candidates) {
       if (downSampleBkgFactor < 1.) {
-        float pseudoRndm = candidate.ptProng0() * 1000. - static_cast<int64_t>(candidate.ptProng0() * 1000);
+        float const pseudoRndm = candidate.ptProng0() * 1000. - static_cast<int64_t>(candidate.ptProng0() * 1000);
         if (candidate.pt() < ptMaxForDownSample && pseudoRndm >= downSampleBkgFactor) {
           continue;
         }
       }
-      fillCandidateTable<CollType, true, applyMl>(candidate);
+      fillCandidateTable<CollType, true, ApplyMl>(candidate);
     }
 
     // Filling particle properties

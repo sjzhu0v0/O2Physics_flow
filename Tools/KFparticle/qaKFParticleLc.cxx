@@ -15,47 +15,40 @@
 /// \brief  Task to test the performance of the KFParticle package on the Lc to pKpi decay
 ///
 
+#ifndef HomogeneousField
+#define HomogeneousField
+#endif
+
 #include "Tools/KFparticle/qaKFParticleLc.h"
-#include <CCDB/BasicCCDBManager.h>
-#include <string>
-#include <TDatabasePDG.h>
-#include <TPDGCode.h>
-#include "TableHelper.h"
 
-/// includes O2
-#include "Framework/AnalysisTask.h"
-#include "Framework/HistogramRegistry.h"
-#include "Framework/AnalysisDataModel.h"
-#include "Framework/runDataProcessing.h"
-#include "ReconstructionDataFormats/DCA.h"
-#include "ReconstructionDataFormats/Track.h"
-#include "DataFormatsParameters/GRPObject.h"
-#include "DataFormatsParameters/GRPMagField.h"
-#include "DetectorsBase/GeometryManager.h"
-#include "DetectorsBase/Propagator.h"
-
-/// includes O2Physics
 #include "Common/DataModel/EventSelection.h"
+#include "Common/DataModel/PIDResponseTOF.h"
+#include "Common/DataModel/PIDResponseTPC.h"
 #include "Common/DataModel/TrackSelectionTables.h"
-#include "Common/DataModel/PIDResponse.h"
-#include "Common/Core/trackUtilities.h"
-#include "Common/Core/TrackSelection.h"
-#include "Common/Core/TrackSelectionDefaults.h"
-#include "Common/Core/RecoDecay.h"
 #include "Tools/KFparticle/KFUtilities.h"
 
-/// includes KFParticle
-#include "KFParticle.h"
-#include "KFPTrack.h"
-#include "KFPVertex.h"
-#include "KFParticleBase.h"
-#include "KFVertex.h"
+#include <CCDB/BasicCCDBManager.h>
+#include <DataFormatsParameters/GRPMagField.h>
+#include <DataFormatsParameters/GRPObject.h>
+#include <DetectorsBase/MatLayerCylSet.h>
+#include <DetectorsBase/Propagator.h>
+#include <Framework/ASoAHelpers.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/InitContext.h>
+#include <Framework/runDataProcessing.h>
 
-#ifndef HomogeneousField
+#include <TPDGCode.h>
 
-#define HomogeneousField
+#include <KFPTrack.h>
+#include <KFPVertex.h>
+#include <KFParticle.h>
 
-#endif
+#include <cmath>
+#include <cstdint>
+#include <string>
 
 using namespace o2;
 using namespace o2::framework;

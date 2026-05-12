@@ -48,9 +48,15 @@ enum class Mode : uint32_t {
   kAnalysis = BIT(0),
   kQa = BIT(1),
   kMc = BIT(2),
+  kSe = BIT(3),
+  kMe = BIT(4),
   kAnalysis_Qa = kAnalysis | kQa,
   kAnalysis_Mc = kAnalysis | kMc,
   kAnalysis_Qa_Mc = kAnalysis | kQa | kMc,
+  kSe_Analysis = kAnalysis | kSe,
+  kMe_Analysis = kAnalysis | kMe,
+  kSe_Analysis_Mc = kAnalysis | kSe | kMc,
+  kMe_Analysis_Mc = kAnalysis | kMe | kMc,
 };
 
 enum class System : uint32_t {
@@ -59,25 +65,82 @@ enum class System : uint32_t {
   kMC = BIT(2),
   kRun3 = BIT(3),
   kRun2 = BIT(4),
-  kNoCentCal = BIT(5),
   kPP_Run3 = kPP | kRun3,
+  kPP_Run3_MC = kPP | kRun3 | kMC,
   kPP_Run2 = kPP | kRun2,
-  kPP_NoCentCal_Run3 = kPP | kRun3 | kNoCentCal,
   kPbPb_Run3 = kPbPb | kRun3,
   kPbPb_Run2 = kPbPb | kRun2,
 };
 
+enum class MomentumType : o2::aod::femtodatatypes::MomentumType {
+  kPt = 0,    // transverse momentum
+  kPAtPv = 1, // momentum at primary vertex
+  kPTpc = 2,  // momentum at inner wall of tpc
+};
+
+enum class TransverseMassType : o2::aod::femtodatatypes::TransverseMassType {
+  kAveragePdgMass = 0,
+  kReducedPdgMass = 1,
+  kMt4Vector = 2
+};
+
+enum class Particle : o2::aod::femtodatatypes::ParticleType {
+  kTrack = 0,
+  kTwoTrackResonance = 1,
+  kV0 = 2,
+  kKink = 3,
+  kCascade = 4,
+};
+
+enum class McOrigin : o2::aod::femtodatatypes::McOriginType {
+  kNoMcParticle = 0,       // no associated mc particle normally indicated a wrongly reconstruced partilce
+  kFromWrongCollision = 1, // partilce originates from the wrong collision or a collision which was wrongly reconstructed (like a split vertex)
+  kPhysicalPrimary = 2,    // primary particle
+  kFromSecondaryDecay = 3, // particle from secondary decay
+  kFromMaterial = 4,       // partilce orginates from material
+  kMissidentified = 5,     // partilce was kMissidentified (also know as fake)
+  kMcOriginLast = 6
+  // kFromFakeRecoCollision,
+  // kFromUnkown
+};
+
+constexpr const char* mcOriginToString(McOrigin origin)
+{
+  switch (origin) {
+    case McOrigin::kNoMcParticle:
+      return "NoMcParticle";
+    case McOrigin::kFromWrongCollision:
+      return "FromWrongCollision";
+    case McOrigin::kPhysicalPrimary:
+      return "PhysicalPrimary";
+    case McOrigin::kFromSecondaryDecay:
+      return "FromSecondaryDecay";
+    case McOrigin::kFromMaterial:
+      return "FromMaterial";
+    case McOrigin::kMissidentified:
+      return "Missidentified";
+    default:
+      return "UnknownMcOrigin";
+  }
+}
+
 enum class Track : o2::aod::femtodatatypes::TrackType {
-  kPrimaryTrack,
+  kTrack,
   kV0Daughter,
   kCascadeBachelor,
-  kResonanceDaughter
+  kResonanceDaughter,
+  kKinkDaughter
 };
 
 enum class V0 : o2::aod::femtodatatypes::V0Type {
   kLambda,
   kAntiLambda,
   kK0short
+};
+
+enum class Kink : o2::aod::femtodatatypes::KinkType {
+  kSigma,
+  kSigmaPlus
 };
 
 enum class Cascade : o2::aod::femtodatatypes::CascadeType {
@@ -91,20 +154,6 @@ enum class TwoTrackResonance : o2::aod::femtodatatypes::TwoTrackResonanceType {
   kPhi,
   kKstar0,
   kKstar0Bar
-};
-
-enum class Pairs : o2::aod::femtodatatypes::PairType {
-  kTrackTrack,
-  kTrackV0,
-  kTrackResonance,
-  kTrackCascade
-};
-
-enum class TrackPairs : o2::aod::femtodatatypes::PairType {
-  kTrackTrack,
-  kTrackPosDaughter,
-  kTrackNegDaughter,
-  kTrackBachelor
 };
 
 }; // namespace modes

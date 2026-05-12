@@ -14,22 +14,26 @@
 /// \since  Feb/21/2025
 /// \brief  This task is to calculate V0s and cascades local density efficiency
 
-#include <vector>
-#include "Common/DataModel/Centrality.h"
-#include "Common/DataModel/Multiplicity.h"
-#include "Common/DataModel/TrackSelectionTables.h"
-#include "Common/DataModel/EventSelection.h"
-#include "Framework/runDataProcessing.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/ASoAHelpers.h"
-#include "Common/Core/TrackSelection.h"
-#include "Common/Core/TrackSelectionDefaults.h"
-#include "Common/DataModel/PIDResponse.h"
-#include "PWGLF/DataModel/cascqaanalysis.h"
-#include "PWGLF/DataModel/LFStrangenessTables.h"
 #include "PWGLF/DataModel/LFStrangenessPIDTables.h"
-#include "CommonConstants/PhysicsConstants.h"
+#include "PWGLF/DataModel/LFStrangenessTables.h"
+
+#include "Common/CCDB/EventSelectionParams.h"
+#include "Common/CCDB/TriggerAliases.h"
+
+#include <CommonConstants/PhysicsConstants.h>
+#include <Framework/ASoA.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/runDataProcessing.h>
+
 #include <TPDGCode.h>
+
+#include <cmath>
+#include <cstdlib>
+#include <vector>
 
 using namespace o2;
 using namespace o2::framework;

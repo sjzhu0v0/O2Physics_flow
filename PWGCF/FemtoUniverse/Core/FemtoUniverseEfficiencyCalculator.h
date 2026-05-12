@@ -16,14 +16,22 @@
 #ifndef PWGCF_FEMTOUNIVERSE_CORE_FEMTOUNIVERSEEFFICIENCYCALCULATOR_H_
 #define PWGCF_FEMTOUNIVERSE_CORE_FEMTOUNIVERSEEFFICIENCYCALCULATOR_H_
 
-#include "FemtoUniverseParticleHisto.h"
+#include <CCDB/BasicCCDBManager.h>
+#include <Framework/Configurable.h>
+#include <Framework/Logger.h>
 
-#include "PWGCF/FemtoUniverse/DataModel/FemtoDerived.h"
+#include <TH1.h>
+#include <TH2.h>
+#include <TH3.h>
 
-#include "CCDB/BasicCCDBManager.h"
-#include "Framework/Configurable.h"
+#include <fmt/format.h>
 
 #include <algorithm>
+#include <array>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <exception>
 #include <map>
 #include <string>
 #include <vector>
@@ -36,7 +44,7 @@ enum ParticleNo : size_t {
 };
 
 template <size_t T>
-concept isOneOrTwo = T == ParticleNo::ONE || T == ParticleNo::TWO;
+concept IsOneOrTwo = T == ParticleNo::ONE || T == ParticleNo::TWO;
 
 template <typename T>
 consteval auto getHistDim() -> int
@@ -51,14 +59,14 @@ consteval auto getHistDim() -> int
     return -1;
 }
 
-struct EfficiencyConfigurableGroup : ConfigurableGroup {
-  Configurable<bool> confEfficiencyApplyCorrections{"confEfficiencyApplyCorrections", false, "Should apply corrections from efficiency"};
-  Configurable<int> confEfficiencyCCDBTrainNumber{"confEfficiencyCCDBTrainNumber", 0, "Train number for which to query CCDB objects (set 0 to ignore)"};
-  Configurable<std::vector<std::string>> confEfficiencyCCDBTimestamps{"confEfficiencyCCDBTimestamps", {}, "Timestamps of efficiency histograms in CCDB, to query for specific objects (default: [], set 0 to ignore, useful when running subwagons)"};
+struct EfficiencyConfigurableGroup : framework::ConfigurableGroup {
+  framework::Configurable<bool> confEfficiencyApplyCorrections{"confEfficiencyApplyCorrections", false, "Should apply corrections from efficiency"};
+  framework::Configurable<int> confEfficiencyCCDBTrainNumber{"confEfficiencyCCDBTrainNumber", 0, "Train number for which to query CCDB objects (set 0 to ignore)"};
+  framework::Configurable<std::vector<std::string>> confEfficiencyCCDBTimestamps{"confEfficiencyCCDBTimestamps", {}, "Timestamps of efficiency histograms in CCDB, to query for specific objects (default: [], set 0 to ignore, useful when running subwagons)"};
 
   // NOTE: in the future we might move the below configurables to a separate struct, eg. CCDBConfigurableGroup
-  Configurable<std::string> confCCDBUrl{"confCCDBUrl", "http://alice-ccdb.cern.ch", "CCDB URL to be used"};
-  Configurable<std::string> confCCDBPath{"confCCDBPath", "", "CCDB base path to where to upload objects"};
+  framework::Configurable<std::string> confCCDBUrl{"confCCDBUrl", "http://alice-ccdb.cern.ch", "CCDB URL to be used"};
+  framework::Configurable<std::string> confCCDBPath{"confCCDBPath", "", "CCDB base path to where to upload objects"};
 };
 
 template <typename HistType>
@@ -104,7 +112,7 @@ class EfficiencyCalculator
     auto hEff = hLoaded[partNo - 1];
 
     if (shouldApplyCorrections && hEff) {
-      auto bin = hEff->FindBin(binVars...);
+      auto bin = hEff->FindBin(static_cast<double>(binVars)...);
       auto eff = hEff->GetBinContent(bin);
       weight /= eff > 0 ? eff : 1.0f;
     }
@@ -149,8 +157,11 @@ class EfficiencyCalculator
       LOGF(warn, notify("Histogram \"%s/%ld\" has been loaded, but it is empty"), config->confCCDBPath.value, timestamp);
     }
 
+    auto clonedEffHist = static_cast<HistType*>(hEff->Clone());
+    clonedEffHist->SetDirectory(nullptr);
+
     LOGF(info, notify("Successfully loaded %ld"), timestamp);
-    return hEff;
+    return clonedEffHist;
   }
 
   EfficiencyConfigurableGroup* config{};
@@ -158,7 +169,7 @@ class EfficiencyCalculator
   bool shouldApplyCorrections = false;
 
   o2::ccdb::BasicCCDBManager& ccdb{o2::ccdb::BasicCCDBManager::instance()};
-  std::array<HistType*, 2> hLoaded{};
+  std::array<HistType*, 2> hLoaded{nullptr, nullptr};
 };
 
 } // namespace o2::analysis::femto_universe::efficiency

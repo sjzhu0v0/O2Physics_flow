@@ -248,10 +248,9 @@ template <typename T, typename U>
 int jetParticleFromHFShower(T const& jet, U const& particles, typename U::iterator& hfparticle, bool searchUpToQuark)
 {
 
-  int origin = -1;
   for (const auto& particle : jet.template tracks_as<U>()) {
     hfparticle = particle; // for init if origin is 1 or 2, the particle is not hfparticle
-    origin = RecoDecay::getParticleOrigin(particles, particle, searchUpToQuark);
+    int origin = RecoDecay::getParticleOrigin(particles, particle, searchUpToQuark);
     if (origin == RecoDecay::OriginType::Prompt || origin == RecoDecay::OriginType::NonPrompt) { // 1=charm , 2=beauty
       hfparticle = particle;
       if (origin == RecoDecay::OriginType::Prompt) {
@@ -542,7 +541,7 @@ bool svAcceptance(T const& sv, float svDispersionMax)
  * positive value is expected from secondary vertex
  *
  * @param jet
- * @param track which is needed aod::JTrackExtras
+ * @param track which is needed o2::aod::JTrackExtras
  */
 template <typename T, typename U>
 int getGeoSign(T const& jet, U const& track)
@@ -991,12 +990,16 @@ int vertexClustering(AnyCollision const& collision, AnalysisJet const& jet, AnyT
   int trkIdx = 0;
   for (auto const& constituent : jet.template tracks_as<AnyTracks>()) {
     if (!constituent.has_mcParticle() || !constituent.template mcParticle_as<AnyParticles>().isPhysicalPrimary() || constituent.pt() < trackPtMin) {
-      trkLabels["trkOrigin"].push_back(0);
+      trkLabels["trkOrigin"].push_back(0); // fake track, non-physical primary track
     } else {
       const auto& particle = constituent.template mcParticle_as<AnyParticles>();
-      int orig = RecoDecay::getParticleOrigin(particles, particle, searchUpToQuark);
-      trkLabels["trkOrigin"].push_back((orig > 0) ? orig : (trkLabels["trkVtxIndex"][trkIdx] == 0) ? 3
-                                                                                                   : 4);
+      if (particle.mcCollisionId() != collision.globalIndex()) {
+        trkLabels["trkOrigin"].push_back(0); // mismatched coll track
+      } else {
+        int orig = RecoDecay::getParticleOrigin(particles, particle, searchUpToQuark);
+        trkLabels["trkOrigin"].push_back((orig != RecoDecay::OriginType::None) ? static_cast<int>(orig) : (trkLabels["trkVtxIndex"][trkIdx] == 0) ? 3
+                                                                                                                                                  : 4); // 1: charm, 2: beauty, 3: primary, 4: other secondary
+      }
     }
 
     trkIdx++;
@@ -1063,7 +1066,7 @@ void analyzeJetTrackInfo4ML(AnalysisJet const& analysisJet, AnyTracks const& /*a
     tracksParams.emplace_back(BJetTrackParams{constituent.pt(), constituent.eta(), dotProduct, dotProduct / analysisJet.p(), deltaRJetTrack, std::abs(constituent.dcaXY()) * sign, constituent.sigmadcaXY(), std::abs(constituent.dcaZ()) * sign, constituent.sigmadcaZ(), std::abs(constituent.dcaXYZ()) * sign, constituent.sigmadcaXYZ(), constituent.p() / analysisJet.p(), rClosestSV});
   }
 
-  auto compare = [](BJetTrackParams& tr1, BJetTrackParams& tr2) {
+  auto compare = [](const BJetTrackParams& tr1, const BJetTrackParams& tr2) {
     return (tr1.signedIP2D / tr1.signedIP2DSign) > (tr2.signedIP2D / tr2.signedIP2DSign);
   };
 
@@ -1088,7 +1091,7 @@ void analyzeJetTrackInfo4MLnoSV(AnalysisJet const& analysisJet, AnyTracks const&
     tracksParams.emplace_back(BJetTrackParams{constituent.pt(), constituent.eta(), dotProduct, dotProduct / analysisJet.p(), deltaRJetTrack, std::abs(constituent.dcaXY()) * sign, constituent.sigmadcaXY(), std::abs(constituent.dcaZ()) * sign, constituent.sigmadcaZ(), std::abs(constituent.dcaXYZ()) * sign, constituent.sigmadcaXYZ(), constituent.p() / analysisJet.p(), 0.0});
   }
 
-  auto compare = [](BJetTrackParams& tr1, BJetTrackParams& tr2) {
+  auto compare = [](const BJetTrackParams& tr1, const BJetTrackParams& tr2) {
     return (tr1.signedIP2D / tr1.signedIP2DSign) > (tr2.signedIP2D / tr2.signedIP2DSign);
   };
 
@@ -1096,13 +1099,13 @@ void analyzeJetTrackInfo4MLnoSV(AnalysisJet const& analysisJet, AnyTracks const&
   std::sort(tracksParams.begin(), tracksParams.end(), compare);
 }
 
-// Looping over the track info and putting them in the input vector (for GNN b-jet tagging)
+// Looping over the track info and putting them in the input vector, with extra input features (for GNN b-jet tagging)
 template <typename AnalysisJet, typename AnyTracks, typename AnyOriginalTracks>
-void analyzeJetTrackInfo4GNN(AnalysisJet const& analysisJet, AnyTracks const& /*allTracks*/, AnyOriginalTracks const& /*origTracks*/, std::vector<std::vector<float>>& tracksParams, float trackPtMin = 0.5, int64_t nMaxConstit = 40)
+void analyzeJetTrackInfo4GNNwExtra(AnalysisJet const& analysisJet, AnyTracks const& /*allTracks*/, AnyOriginalTracks const& /*origTracks*/, std::vector<std::vector<float>>& tracksParams, float trackPtMin = 0.5, float trackDcaXYMax = 10.0, float trackDcaZMax = 10.0, int64_t nMaxConstit = 40)
 {
   for (const auto& constituent : analysisJet.template tracks_as<AnyTracks>()) {
 
-    if (constituent.pt() < trackPtMin) {
+    if (constituent.pt() < trackPtMin || !trackAcceptanceWithDca(constituent, trackDcaXYMax, trackDcaZMax)) {
       continue;
     }
 
@@ -1121,6 +1124,33 @@ void analyzeJetTrackInfo4GNN(AnalysisJet const& analysisJet, AnyTracks const& /*
       }
       if (std::abs(constituent.dcaXY()) * sign / constituent.sigmadcaXY() > tracksParams[minIdx][4] / tracksParams[minIdx][5])
         tracksParams[minIdx] = std::vector<float>{constituent.pt(), origConstit.phi(), constituent.eta(), static_cast<float>(constituent.sign()), std::abs(constituent.dcaXY()) * sign, constituent.sigmadcaXY(), std::abs(constituent.dcaZ()) * sign, constituent.sigmadcaZ(), static_cast<float>(origConstit.itsNCls()), static_cast<float>(origConstit.tpcNClsFound()), static_cast<float>(origConstit.tpcNClsCrossedRows()), origConstit.itsChi2NCl(), origConstit.tpcChi2NCl()};
+    }
+  }
+}
+
+// Looping over the track info and putting them in the input vector (for GNN b-jet tagging)
+template <typename AnalysisJet, typename AnyTracks>
+void analyzeJetTrackInfo4GNN(AnalysisJet const& analysisJet, AnyTracks const& /*allTracks*/, std::vector<std::vector<float>>& tracksParams, float trackPtMin = 0.5, float trackDcaXYMax = 10.0, float trackDcaZMax = 10.0, int64_t nMaxConstit = 40)
+{
+  for (const auto& constituent : analysisJet.template tracks_as<AnyTracks>()) {
+
+    if (constituent.pt() < trackPtMin || !trackAcceptanceWithDca(constituent, trackDcaXYMax, trackDcaZMax)) {
+      continue;
+    }
+
+    int sign = getGeoSign(analysisJet, constituent);
+
+    if (static_cast<int64_t>(tracksParams.size()) < nMaxConstit) {
+      tracksParams.emplace_back(std::vector<float>{constituent.pt(), constituent.phi(), constituent.eta(), static_cast<float>(constituent.sign()), std::abs(constituent.dcaXY()) * sign, constituent.sigmadcaXY(), std::abs(constituent.dcaZ()) * sign, constituent.sigmadcaZ()});
+    } else {
+      // If there are more than nMaxConstit constituents in the jet, select only nMaxConstit constituents with the highest DCA_XY significance.
+      size_t minIdx = 0;
+      for (size_t i = 0; i < tracksParams.size(); ++i) {
+        if (tracksParams[i][4] / tracksParams[i][5] < tracksParams[minIdx][4] / tracksParams[minIdx][5])
+          minIdx = i;
+      }
+      if (std::abs(constituent.dcaXY()) * sign / constituent.sigmadcaXY() > tracksParams[minIdx][4] / tracksParams[minIdx][5])
+        tracksParams[minIdx] = std::vector<float>{constituent.pt(), constituent.phi(), constituent.eta(), static_cast<float>(constituent.sign()), std::abs(constituent.dcaXY()) * sign, constituent.sigmadcaXY(), std::abs(constituent.dcaZ()) * sign, constituent.sigmadcaZ()};
     }
   }
 }

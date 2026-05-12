@@ -18,23 +18,41 @@
 /// \author David Dobrigkeit Chinellato (david.dobrigkeit.chinellato@cern.ch)
 /// \author Zhongbao Yin (Zhong-Bao.Yin@cern.ch)
 
-#include "Framework/runDataProcessing.h"
-#include "Framework/AnalysisTask.h"
-#include "Common/DataModel/TrackSelectionTables.h"
-#include "PWGLF/DataModel/LFStrangenessTables.h"
 #include "PWGLF/DataModel/LFHStrangeCorrelationTables.h"
-#include "Common/DataModel/EventSelection.h"
-#include "Common/DataModel/PIDResponse.h"
-#include "Framework/ASoAHelpers.h"
-#include "Common/DataModel/Multiplicity.h"
+#include "PWGLF/DataModel/LFStrangenessTables.h"
+
+#include "Common/CCDB/EventSelectionParams.h"
+#include "Common/Core/Zorro.h"
+#include "Common/Core/ZorroSummary.h"
 #include "Common/DataModel/Centrality.h"
-#include "CCDB/BasicCCDBManager.h"
-#include "TF1.h"
-#include <string>
+#include "Common/DataModel/EventSelection.h"
+#include "Common/DataModel/Multiplicity.h"
+#include "Common/DataModel/PIDResponseTOF.h"
+#include "Common/DataModel/PIDResponseTPC.h"
+#include "Common/DataModel/TrackSelectionTables.h"
+
+#include <CCDB/BasicCCDBManager.h>
+#include <CommonConstants/PhysicsConstants.h>
+#include <Framework/ASoA.h>
+#include <Framework/AnalysisDataModel.h>
+#include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
+#include <Framework/Configurable.h>
+#include <Framework/Expressions.h>
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/InitContext.h>
+#include <Framework/OutputObjHeader.h>
+#include <Framework/runDataProcessing.h>
+
+#include <TF1.h>
+#include <TH1.h>
+#include <TList.h>
 #include <TPDGCode.h>
 
-#include "EventFiltering/Zorro.h"
-#include "EventFiltering/ZorroSummary.h"
+#include <cmath>
+#include <string>
+#include <vector>
 
 using namespace o2;
 using namespace o2::constants::math;
@@ -45,8 +63,8 @@ using namespace o2::framework::expressions;
 #define BIT_CHECK(var, nbit) ((var) & (1 << (nbit)))
 
 struct HStrangeCorrelationFilter {
-  const float ctauxiPDG = 4.91;     // from PDG
-  const float ctauomegaPDG = 2.461; // from PDG
+  const float ctauxi = 4.91;     // from PDG
+  const float ctauomega = 2.461; // from PDG
 
   Service<o2::ccdb::BasicCCDBManager> ccdb;
 
@@ -54,134 +72,138 @@ struct HStrangeCorrelationFilter {
 
   // master analysis switches
   Configurable<bool> doPPAnalysis{"doPPAnalysis", true, "if in pp, set to true"};
+  Configurable<bool> useParameterization{"useParameterization", true, "ture for parameterization method, false for hist method"};
+  Configurable<float> minPtForParam{"minPtForParam", 0.2f, "min pt for parameterization method"};
+  Configurable<float> maxPtForParam{"maxPtForParam", 14.5f, "max pt for parameterization method"};
   // Operational
   Configurable<bool> fillTableOnlyWithCompatible{"fillTableOnlyWithCompatible", true, "pre-apply dE/dx, broad mass window in table filling"};
   Configurable<float> strangedEdxNSigmaLoose{"strangedEdxNSigmaLoose", 5, "Nsigmas for strange decay daughters"};
   Configurable<float> strangedEdxNSigma{"strangedEdxNSigma", 4, "Nsigmas for strange decay daughters"};
   Configurable<float> strangedEdxNSigmaTight{"strangedEdxNSigmaTight", 3, "Nsigmas for strange decay daughters"};
+  Configurable<std::string> zorroMask{"zorroMask", "", "zorro trigger class to select on (empty: none)"};
+  Configurable<float> nSigmaNearXiMassCenter{"nSigmaNearXiMassCenter", 0, "for Oemga analysis only, to check if candidate mass is around Xi"};
 
   // used for event selections in Pb-Pb
   Configurable<int> cfgCutOccupancyHigh{"cfgCutOccupancyHigh", 3000, "High cut on TPC occupancy"};
   Configurable<int> cfgCutOccupancyLow{"cfgCutOccupancyLow", 0, "Low cut on TPC occupancy"};
 
-  // event filtering
-  Configurable<std::string> zorroMask{"zorroMask", "", "zorro trigger class to select on (empty: none)"};
-
-  // Trigger particle selections in phase space
-  Configurable<float> triggerEtaMin{"triggerEtaMin", -0.8, "triggeretamin"};
-  Configurable<float> triggerEtaMax{"triggerEtaMax", 0.8, "triggeretamax"};
-  Configurable<float> triggerPtCutMin{"triggerPtCutMin", 3, "triggerptmin"};
-  Configurable<float> triggerPtCutMax{"triggerPtCutMax", 20, "triggerptmax"};
-
-  // Track quality
-  Configurable<int> minTPCNCrossedRows{"minTPCNCrossedRows", 70, "Minimum TPC crossed rows"};
-  Configurable<bool> triggerRequireITS{"triggerRequireITS", true, "require ITS signal in trigger tracks"};
-  Configurable<bool> assocRequireITS{"assocRequireITS", true, "require ITS signal in assoc tracks"};
-  Configurable<int> triggerMaxTPCSharedClusters{"triggerMaxTPCSharedClusters", 200, "maximum number of shared TPC clusters (inclusive)"};
-  Configurable<bool> triggerRequireL0{"triggerRequireL0", false, "require ITS L0 cluster for trigger"};
-
-  // Associated particle selections in phase space
-  Configurable<float> assocEtaMin{"assocEtaMin", -0.8, "triggeretamin"};
-  Configurable<float> assocEtaMax{"assocEtaMax", 0.8, "triggeretamax"};
-  Configurable<float> assocPtCutMin{"assocPtCutMin", 0.2, "assocptmin"};
-  Configurable<float> assocPtCutMax{"assocPtCutMax", 10, "assocptmax"};
-
-  // Associated pion identification
-  Configurable<float> pionMinBayesProb{"pionMinBayesProb", 0.95, "minimal Bayesian probability for pion ID"};
-  Configurable<float> assocPionNSigmaTPCFOF{"assocPionNSigmaTPCFOF", 3, "minimal n sigma in TOF and TPC for Pion ID"};
-  Configurable<float> rejectSigma{"rejectSigma", 1, "n sigma for rejecting pion candidates"};
-
-  // V0 selections
-  Configurable<double> v0Cospa{"v0Cospa", 0.97, "V0 CosPA"}; // double -> N.B. dcos(x)/dx = 0 at x=0)
-  Configurable<float> dcaV0dau{"dcaV0dau", 1.0, "DCA V0 Daughters"};
-  Configurable<float> dcaNegtopv{"dcaNegtopv", 0.06, "DCA Neg To PV"};
-  Configurable<float> dcaPostopv{"dcaPostopv", 0.06, "DCA Pos To PV"};
-  Configurable<float> v0RadiusMin{"v0RadiusMin", 0.5, "v0radius"};
-  Configurable<float> v0RadiusMax{"v0RadiusMax", 200, "v0radius"};
-  // more V0 selections in PbPb
-  Configurable<float> lifetimecutK0S{"lifetimecutK0S", 20, "lifetimecutK0S"};
-  Configurable<float> lifetimecutLambda{"lifetimecutLambda", 30, "lifetimecutLambda"};
-  Configurable<float> dcanegtopvK0S{"dcanegtopvK0S", 0.1, "DCA Neg To PV"};
-  Configurable<float> dcapostopvK0S{"dcapostopvK0S", 0.1, "DCA Pos To PV"};
-  Configurable<float> dcanegtopvLambda{"dcanegtopvLambda", 0.05, "DCA Neg To PV"};
-  Configurable<float> dcapostopvLambda{"dcapostopvLambda", 0.2, "DCA Pos To PV"};
-  Configurable<float> dcanegtopvAntiLambda{"dcanegtopvAntiLambda", 0.2, "DCA Neg To PV"};
-  Configurable<float> dcapostopvAntiLambda{"dcapostopvAntiLambda", 0.05, "DCA Pos To PV"};
-  // original equation: lArmPt*2>TMath::Abs(lArmAlpha) only for K0S
-  Configurable<float> armPodCut{"armPodCut", 5.0f, "pT * (cut) > |alpha|, AP cut. Negative: no cut"};
-
-  // specific selections
-  Configurable<double> lambdaCospa{"lambdaCospa", 0.995, "CosPA for lambda"}; // allows for tighter selection for Lambda
-
-  // primary particle DCAxy selections
-  // formula: |DCAxy| <  0.004f + (0.013f / pt)
-  Configurable<float> dcaXYconstant{"dcaXYconstant", 0.004, "[0] in |DCAxy| < [0]+[1]/pT"};
-  Configurable<float> dcaXYpTdep{"dcaXYpTdep", 0.013, "[1] in |DCAxy| < [0]+[1]/pT"};
-
-  // cascade selections
-  Configurable<double> cascadeSettingCospa{"cascadeSettingCospa", 0.95, "cascadeSettingCospa"};
-  Configurable<float> cascadeSettingDcacascdau{"cascadeSettingDcacascdau", 1.0, "cascadeSettingDcacascdau"};
-  Configurable<float> cascadeSettingDcabachtopv{"cascadeSettingDcabachtopv", 0.1, "cascadeSettingDcabachtopv"};
-  Configurable<float> cascadeSettingCascradius{"cascadeSettingCascradius", 0.5, "cascadeSettingCascradius"};
-  Configurable<float> cascadeSettingV0masswindow{"cascadeSettingV0masswindow", 0.01, "cascadeSettingV0masswindow"};
-  Configurable<float> cascadeSettingMindcav0topv{"cascadeSettingMindcav0topv", 0.01, "cascadeSettingMindcav0topv"};
   struct : ConfigurableGroup {
-    // cascade selections in PbPb
-    Configurable<double> cascCospa{"cascCospa", 0.95, "cascCospa"};
-    Configurable<float> cascDcacascdau{"cascDcacascdau", 1.0, "cascDcacascdau"};
-    Configurable<float> cascDcabachtopv{"cascDcabachtopv", 0.1, "cascDcabachtopv"};
-    Configurable<float> cascRadius{"cascRadius", 0.5, "cascRadius"};
-    Configurable<float> cascV0masswindow{"cascV0masswindow", 0.01, "cascV0masswindow"};
-    Configurable<float> cascMindcav0topv{"cascMindcav0topv", 0.01, "cascMindcav0topv"};
+    std::string prefix = "eventSelections";
+    // event filtering
+    Configurable<float> zVertexCut{"zVertexCut", 10, "Cut on PV position"};
+    Configurable<bool> selectINELgtZERO{"selectINELgtZERO", true, "select INEL>0 events"};
+    Configurable<bool> requireAllGoodITSLayers{"requireAllGoodITSLayers", false, " require that in the event all ITS are good"};
+    Configurable<bool> requireGoodTriggerTVX{"requireGoodTriggerTVX", false, " require acceptable FT0C-FT0A time difference"};
+    Configurable<bool> requireGoodZvtxFT0vsPV{"requireGoodZvtxFT0vsPV", false, " require small difference between z-vertex from PV and from FT0"};
+    Configurable<float> minCentPercent{"minCentPercent", 0, "minimum centrality percentage"};
+    Configurable<float> maxCentPercent{"maxCentPercent", 100, "maximum centrality percentage"};
+  } eventSelections;
+
+  struct : ConfigurableGroup {
+    std::string prefix = "generalSelections";
+
+    // Associated particle selections in phase space
+    Configurable<float> assocEtaMin{"assocEtaMin", -0.8, "triggeretamin"};
+    Configurable<float> assocEtaMax{"assocEtaMax", 0.8, "triggeretamax"};
+    Configurable<float> assocPtCutMin{"assocPtCutMin", 0.2, "assocptmin"};
+    Configurable<float> assocPtCutMax{"assocPtCutMax", 10, "assocptmax"};
+
+    // Trigger particle selections in phase space
+    Configurable<float> triggerEtaMin{"triggerEtaMin", -0.8, "triggeretamin"};
+    Configurable<float> triggerEtaMax{"triggerEtaMax", 0.8, "triggeretamax"};
+    Configurable<float> triggerPtCutMin{"triggerPtCutMin", 3, "triggerptmin"};
+    Configurable<float> triggerPtCutMax{"triggerPtCutMax", 20, "triggerptmax"};
+  } generalSelections;
+
+  struct : ConfigurableGroup {
+    std::string prefix = "trackSelections";
+    // Track quality
+    Configurable<int> minTPCNCrossedRows{"minTPCNCrossedRows", 70, "Minimum TPC crossed rows"};
+    Configurable<bool> triggerRequireITS{"triggerRequireITS", true, "require ITS signal in trigger tracks"};
+    Configurable<bool> assocRequireITS{"assocRequireITS", true, "require ITS signal in assoc tracks"};
+    Configurable<int> triggerMaxTPCSharedClusters{"triggerMaxTPCSharedClusters", 200, "maximum number of shared TPC clusters (inclusive)"};
+    Configurable<bool> triggerRequireL0{"triggerRequireL0", false, "require ITS L0 cluster for trigger"};
+
+    // Associated pion identification
+    Configurable<float> pionMinBayesProb{"pionMinBayesProb", 0.95, "minimal Bayesian probability for pion ID"};
+    Configurable<float> assocPionNSigmaTPCFOF{"assocPionNSigmaTPCFOF", 3, "minimal n sigma in TOF and TPC for Pion ID"};
+    Configurable<float> rejectSigma{"rejectSigma", 1, "n sigma for rejecting pion candidates"};
+
+    // primary particle DCAxy selections
+    // formula: |DCAxy| <  0.004f + (0.013f / pt)
+    Configurable<float> dcaXYconstant{"dcaXYconstant", 0.004, "[0] in |DCAxy| < [0]+[1]/pT"};
+    Configurable<float> dcaXYpTdep{"dcaXYpTdep", 0.013, "[1] in |DCAxy| < [0]+[1]/pT"};
+  } trackSelections;
+  struct : ConfigurableGroup {
+    // V0 selections
+    std::string prefix = "v0Selection";
+    Configurable<float> v0Cospa{"v0Cospa", 0.97, "V0 CosPA"}; // double -> N.B. dcos(x)/dx = 0 at x=0)
+    Configurable<float> dcaV0dau{"dcaV0dau", 1.0, "DCA V0 Daughters"};
+    Configurable<float> dcaNegtopv{"dcaNegtopv", 0.06, "DCA Neg To PV"};
+    Configurable<float> dcaPostopv{"dcaPostopv", 0.06, "DCA Pos To PV"};
+    Configurable<float> dcaBaryonToPV{"dcaBaryonToPV", 0.2, "DCA of baryon daughter track To PV"};
+    Configurable<float> dcaMesonToPV{"dcaMesonToPV", 0.05, "DCA of meson daughter track To PV"};
+    Configurable<float> v0RadiusMin{"v0RadiusMin", 0.5, "v0radius"};
+    Configurable<float> v0RadiusMax{"v0RadiusMax", 200, "v0radius"};
+
+    Configurable<float> lifetimecutK0S{"lifetimecutK0S", 20, "lifetimecutK0S"};
+    Configurable<float> lifetimecutLambda{"lifetimecutLambda", 30, "lifetimecutLambda"};
+    Configurable<float> armPodCut{"armPodCut", 5.0f, "pT * (cut) > |alpha|, AP cut. Negative: no cut"};
+    // specific selections
+    Configurable<float> lambdaCospa{"lambdaCospa", 0.995, "Lambda CosPA, if needed to be stricter"}; // allows for tighter selection for Lambda
+  } v0Selection;
+  struct : ConfigurableGroup {
+    // cascade selections
+    std::string prefix = "cascSelection";
     Configurable<float> bachBaryonCosPA{"bachBaryonCosPA", 0.9999, "Bachelor baryon CosPA"};
     Configurable<float> bachBaryonDCAxyToPV{"bachBaryonDCAxyToPV", 0.08, "DCA bachelor baryon to PV"};
-    Configurable<float> dcaBaryonToPV{"dcaBaryonToPV", 0.05, "DCA of baryon doughter track To PV"};
-    Configurable<float> dcaMesonToPV{"dcaMesonToPV", 0.1, "DCA of meson doughter track To PV"};
     Configurable<float> dcaBachToPV{"dcaBachToPV", 0.07, "DCA Bach To PV"};
+    Configurable<float> cascDcaBaryonToPV{"cascDcaBaryonToPV", 0.2, "DCA of baryon daughter track To PV"};
+    Configurable<float> cascDcaMesonToPV{"cascDcaMesonToPV", 0.05, "DCA of meson daughter track To PV"};
     Configurable<float> cascdcaV0dau{"cascdcaV0dau", 0.5, "DCA V0 Daughters"};
     Configurable<float> dcaCacsDauPar0{"dcaCacsDauPar0", 0.8, " par for pt dep DCA cascade daughter cut, p_T < 1 GeV/c"};
     Configurable<float> dcaCacsDauPar1{"dcaCacsDauPar1", 0.5, " par for pt dep DCA cascade daughter cut, 1< p_T < 4 GeV/c"};
     Configurable<float> dcaCacsDauPar2{"dcaCacsDauPar2", 0.2, " par for pt dep DCA cascade daughter cut, p_T > 4 GeV/c"};
-    Configurable<float> cascdcaV0ToPV{"cascdcaV0ToPV", 0.06, "DCA V0 To PV"};
-    Configurable<double> cascv0cospa{"cascv0cospa", 0.98, "V0 CosPA"};
+    Configurable<float> cascv0cospa{"cascv0cospa", 0.98, "V0 CosPA"};
     Configurable<float> cascv0RadiusMin{"cascv0RadiusMin", 2.5, "v0radius"};
     Configurable<float> proplifetime{"proplifetime", 3, "ctau/<ctau>"};
     Configurable<float> lambdaMassWin{"lambdaMassWin", 0.005, "V0 Mass window limit"};
     Configurable<float> rejcomp{"rejcomp", 0.008, "Competing Cascade rejection"};
     Configurable<float> rapCut{"rapCut", 0.8, "Rapidity acceptance"};
-  } MorePbPbsystCuts;
-  // invariant mass parametrizations
-  Configurable<std::vector<float>> massParsK0Mean{"massParsK0Mean", {0.495, 0.000250, 0.0, 0.0}, "pars in [0]+[1]*x+[2]*std::exp(-[3]*x)"};
-  Configurable<std::vector<float>> massParsK0Width{"massParsK0Width", {0.00354, 0.000609, 0.0, 0.0}, "pars in [0]+[1]*x+[2]*std::exp(-[3]*x)"};
-
-  Configurable<std::vector<float>> massParsLambdaMean{"massParsLambdaMean", {1.114, 0.000314, 0.140, 11.9}, "pars in [0]+[1]*x+[2]*std::exp(-[3]*x)"};
-  Configurable<std::vector<float>> massParsLambdaWidth{"massParsLambdaWidth", {0.00127, 0.000172, 0.00261, 2.02}, "pars in [0]+[1]*x+[2]*std::exp(-[3]*x)"};
-
-  Configurable<std::vector<float>> massParsCascadeMean{"massParsCascadeMean", {1.32, 0.000278, 0.0, 0.0}, "pars in [0]+[1]*x+[2]*std::exp(-[3]*x)"};
-  Configurable<std::vector<float>> massParsCascadeWidth{"massParsCascadeWidth", {0.00189, 0.000227, 0.00370, 1.635}, "pars in [0]+[1]*x+[2]*std::exp(-[3]*x)"};
-
-  Configurable<std::vector<float>> massParsOmegaMean{"massParsOmegaMean", {1.67, 0.000298, 0.0, 0.0}, "pars in [0]+[1]*x+[2]*std::exp(-[3]*x)"};
-  Configurable<std::vector<float>> massParsOmegaWidth{"massParsOmegaWidth", {0.00189, 0.000325, 0.00606, 1.77}, "pars in [0]+[1]*x+[2]*std::exp(-[3]*x)"};
+    Configurable<float> cascCospa{"cascCospa", 0.95, "cascCospa"};
+    Configurable<float> cascRadius{"cascRadius", 0.5, "cascRadius"};
+    Configurable<float> dcaCascdau{"dcaCascdau", 1.0, "DCA between V0 and bachelor track"};
+    Configurable<float> dcaBachtopv{"dcaBachtopv", 0.1, "DCA bachelor track to PV"};
+    Configurable<float> cascV0masswindow{"cascV0masswindow", 0.01, "V0 Mass window"};
+    Configurable<float> cascMindcav0topv{"cascMindcav0topv", 0.01, "Minimum DCA V0 to PV"};
+    // pt Range for pt dep cuts
+    Configurable<float> highPtForCascDaugPtDep{"highPtForCascDaugPtDep", 4.0, "high pt range for pt dep cuts"};
+    Configurable<float> lowPtForCascDaugPtDep{"lowPtForCascDaugPtDep", 1.0, "low pt range for pt dep cuts"};
+  } cascSelection;
+  Configurable<std::string> ccdburl{"ccdburl", "http://alice-ccdb.cern.ch", "url of the ccdb repository to use"};
+  Configurable<std::string> parameterCCDBPath{"parameterCCDBPath", "Users/k/kcui/LHC25b4a/parameter", "Path of the mean and sigma"};
 
   // must include windows for background and peak
   Configurable<float> maxMassNSigma{"maxMassNSigma", 12.0f, "max mass region to be considered for further analysis"};
 
   // For extracting strangeness mass QA plots
-  ConfigurableAxis axisPtQA{"axisPtQA", {VARIABLE_WIDTH, 0.0f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f, 1.6f, 1.7f, 1.8f, 1.9f, 2.0f, 2.2f, 2.4f, 2.6f, 2.8f, 3.0f, 3.2f, 3.4f, 3.6f, 3.8f, 4.0f, 4.4f, 4.8f, 5.2f, 5.6f, 6.0f, 6.5f, 7.0f, 7.5f, 8.0f, 9.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.0f, 15.0f, 17.0f, 19.0f, 21.0f, 23.0f, 25.0f, 30.0f, 35.0f, 40.0f, 50.0f}, "pt axis for QA histograms"};
-  ConfigurableAxis axisK0ShortMass{"axisK0ShortMass", {200, 0.400f, 0.600f}, "Inv. Mass (GeV/c^{2})"};
-  ConfigurableAxis axisLambdaMass{"axisLambdaMass", {200, 1.01f, 1.21f}, "Inv. Mass (GeV/c^{2})"};
-  ConfigurableAxis axisXiMass{"axisXiMass", {200, 1.22f, 1.42f}, "Inv. Mass (GeV/c^{2})"};
-  ConfigurableAxis axisOmegaMass{"axisOmegaMass", {200, 1.57f, 1.77f}, "Inv. Mass (GeV/c^{2})"};
-  ConfigurableAxis axisMult{"axisMult", {VARIABLE_WIDTH, 0.0f, 0.01f, 1.0f, 10.0f, 20.0f, 30.0f, 40.0f, 50.0f, 70.0f, 100.0f}, "Centrality percentile bins"};
+  struct : ConfigurableGroup {
+    ConfigurableAxis axisPtQA{"axisPtQA", {VARIABLE_WIDTH, 0.0f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f, 1.6f, 1.7f, 1.8f, 1.9f, 2.0f, 2.2f, 2.4f, 2.6f, 2.8f, 3.0f, 3.2f, 3.4f, 3.6f, 3.8f, 4.0f, 4.4f, 4.8f, 5.2f, 5.6f, 6.0f, 6.5f, 7.0f, 7.5f, 8.0f, 9.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.0f, 15.0f, 17.0f, 19.0f, 21.0f, 23.0f, 25.0f, 30.0f, 35.0f, 40.0f, 50.0f}, "pt axis for QA histograms"};
+    ConfigurableAxis axisK0ShortMass{"axisK0ShortMass", {200, 0.400f, 0.600f}, "Inv. Mass (GeV/c^{2})"};
+    ConfigurableAxis axisLambdaMass{"axisLambdaMass", {200, 1.01f, 1.21f}, "Inv. Mass (GeV/c^{2})"};
+    ConfigurableAxis axisXiMass{"axisXiMass", {200, 1.22f, 1.42f}, "Inv. Mass (GeV/c^{2})"};
+    ConfigurableAxis axisOmegaMass{"axisOmegaMass", {200, 1.57f, 1.77f}, "Inv. Mass (GeV/c^{2})"};
+    ConfigurableAxis axisMult{"axisMult", {VARIABLE_WIDTH, 0.0f, 0.01f, 1.0f, 10.0f, 20.0f, 30.0f, 40.0f, 50.0f, 70.0f, 100.0f}, "Centrality percentile bins"};
+  } axesConfigurations;
 
   // QA
   Configurable<bool> doTrueSelectionInMass{"doTrueSelectionInMass", false, "Fill mass histograms only with true primary Particles for MC"};
   // Do declarative selections for DCAs, if possible
-  Filter preFilterTracks = nabs(aod::track::dcaXY) < dcaXYconstant + dcaXYpTdep * nabs(aod::track::signed1Pt);
-  Filter preFilterV0 = nabs(aod::v0data::dcapostopv) > dcaPostopv&&
-                                                         nabs(aod::v0data::dcanegtopv) > dcaNegtopv&& aod::v0data::dcaV0daughters < dcaV0dau;
+  Filter preFilterTracks = nabs(aod::track::dcaXY) < trackSelections.dcaXYconstant + trackSelections.dcaXYpTdep * nabs(aod::track::signed1Pt);
+  Filter preFilterV0 = nabs(aod::v0data::dcapostopv) > v0Selection.dcaPostopv&&
+                                                         nabs(aod::v0data::dcanegtopv) > v0Selection.dcaNegtopv&& aod::v0data::dcaV0daughters < v0Selection.dcaV0dau;
   Filter preFilterCascade =
-    nabs(aod::cascdata::dcapostopv) > dcaPostopv&& nabs(aod::cascdata::dcanegtopv) > dcaNegtopv&& nabs(aod::cascdata::dcabachtopv) > cascadeSettingDcabachtopv&& aod::cascdata::dcaV0daughters < dcaV0dau&& aod::cascdata::dcacascdaughters < cascadeSettingDcacascdau;
+    nabs(aod::cascdata::dcapostopv) > v0Selection.dcaPostopv&& nabs(aod::cascdata::dcanegtopv) > v0Selection.dcaNegtopv&& nabs(aod::cascdata::dcabachtopv) > cascSelection.dcaBachtopv&& aod::cascdata::dcaV0daughters < cascSelection.cascdcaV0dau&& aod::cascdata::dcacascdaughters < cascSelection.dcaCascdau;
 
   // using V0LinkedTagged = soa::Join<aod::V0sLinked, aod::V0Tags>;
   // using CascadesLinkedTagged = soa::Join<aod::CascadesLinked, aod::CascTags>;
@@ -202,7 +224,20 @@ struct HStrangeCorrelationFilter {
   Produces<aod::AssocCascades> assocCascades;
   Produces<aod::AssocHadrons> assocHadrons;
   Produces<aod::AssocPID> assocPID;
+  struct : ConfigurableGroup {
+    // invariant mass parametrizations
+    Configurable<std::vector<float>> massParsK0Mean{"massParsK0Mean", {0.495967, 0.000095, 0.001120, 0.800000}, "pars in [0]+[1]*x+[2]*std::exp(-[3]*x)"};
+    Configurable<std::vector<float>> massParsK0Width{"massParsK0Width", {0.002324, 0.000600, 0.005076, 1.644687}, "pars in [0]+[1]*x+[2]*std::exp(-[3]*x)"};
 
+    Configurable<std::vector<float>> massParsLambdaMean{"massParsLambdaMean", {1.115554, 0.000002, -0.000311, 1.303969}, "pars in [0]+[1]*x+[2]*std::exp(-[3]*x)"};
+    Configurable<std::vector<float>> massParsLambdaWidth{"massParsLambdaWidth", {0.001066, 0.000168, 0.001893, 1.407199}, "pars in [0]+[1]*x+[2]*std::exp(-[3]*x)"};
+
+    Configurable<std::vector<float>> massParsCascadeMean{"massParsCascadeMean", {1.322150, -0.000087, -0.000761, 0.316391}, "pars in [0]+[1]*x+[2]*std::exp(-[3]*x)"};
+    Configurable<std::vector<float>> massParsCascadeWidth{"massParsCascadeWidth", {0.001269, 0.000249, 0.002790, 1.128544}, "pars in [0]+[1]*x+[2]*std::exp(-[3]*x)"};
+
+    Configurable<std::vector<float>> massParsOmegaMean{"massParsOmegaMean", {1.671908, -0.000000, 0.001027, 2.263832}, "pars in [0]+[1]*x+[2]*std::exp(-[3]*x)"};
+    Configurable<std::vector<float>> massParsOmegaWidth{"massParsOmegaWidth", {0.001223, 0.000300, 0.040718, 2.826750}, "pars in [0]+[1]*x+[2]*std::exp(-[3]*x)"};
+  } parameters;
   TF1* fK0Mean = new TF1("fK0Mean", "[0]+[1]*x+[2]*std::exp(-[3]*x)");
   TF1* fK0Width = new TF1("fK0Width", "[0]+[1]*x+[2]*std::exp(-[3]*x)");
   TF1* fLambdaMean = new TF1("fLambdaMean", "[0]+[1]*x+[2]*std::exp(-[3]*x)");
@@ -211,35 +246,62 @@ struct HStrangeCorrelationFilter {
   TF1* fXiWidth = new TF1("fXiWidth", "[0]+[1]*x+[2]*std::exp(-[3]*x)");
   TF1* fOmegaMean = new TF1("fomegaMean", "[0]+[1]*x+[2]*std::exp(-[3]*x)");
   TF1* fOmegaWidth = new TF1("fomegaWidth", "[0]+[1]*x+[2]*std::exp(-[3]*x)");
-
+  TH1F* hK0ShortMean;
+  TH1F* hK0ShortWidth;
+  TH1F* hLambdaMean;
+  TH1F* hLambdaWidth;
+  TH1F* hXiMean;
+  TH1F* hXiWidth;
+  TH1F* hOmegaMean;
+  TH1F* hOmegaWidth;
   Zorro zorro;
   OutputObj<ZorroSummary> zorroSummary{"zorroSummary"};
   int mRunNumber;
+
+  struct TriggCandidate {
+    float pt;
+    int collisionId;
+    int trackId;
+    bool isPhysicalPrimary;
+    float origPt;
+  };
+  TriggCandidate thisTrigg;
+
+  std::vector<TriggCandidate> triggerCandidates;
 
   void init(InitContext const&)
   {
     zorroSummary.setObject(zorro.getZorroSummary());
     mRunNumber = -1;
-
-    fK0Mean->SetParameters(massParsK0Mean->at(0), massParsK0Mean->at(1), massParsK0Mean->at(2), massParsK0Mean->at(3));
-    fK0Width->SetParameters(massParsK0Width->at(0), massParsK0Width->at(1), massParsK0Width->at(2), massParsK0Width->at(3));
-    fLambdaMean->SetParameters(massParsLambdaMean->at(0), massParsLambdaMean->at(1), massParsLambdaMean->at(2), massParsLambdaMean->at(3));
-    fLambdaWidth->SetParameters(massParsLambdaWidth->at(0), massParsLambdaWidth->at(1), massParsLambdaWidth->at(2), massParsLambdaWidth->at(3));
-    fXiMean->SetParameters(massParsCascadeMean->at(0), massParsCascadeMean->at(1), massParsCascadeMean->at(2), massParsCascadeMean->at(3));
-    fXiWidth->SetParameters(massParsCascadeWidth->at(0), massParsCascadeWidth->at(1), massParsCascadeWidth->at(2), massParsCascadeWidth->at(3));
-    fOmegaMean->SetParameters(massParsOmegaMean->at(0), massParsOmegaMean->at(1), massParsOmegaMean->at(2), massParsOmegaMean->at(3));
-    fOmegaWidth->SetParameters(massParsOmegaWidth->at(0), massParsOmegaWidth->at(1), massParsOmegaWidth->at(2), massParsOmegaWidth->at(3));
-
+    if (useParameterization) {
+      fK0Mean->SetParameters(parameters.massParsK0Mean->at(0), parameters.massParsK0Mean->at(1), parameters.massParsK0Mean->at(2), parameters.massParsK0Mean->at(3));
+      fK0Width->SetParameters(parameters.massParsK0Width->at(0), parameters.massParsK0Width->at(1), parameters.massParsK0Width->at(2), parameters.massParsK0Width->at(3));
+      fLambdaMean->SetParameters(parameters.massParsLambdaMean->at(0), parameters.massParsLambdaMean->at(1), parameters.massParsLambdaMean->at(2), parameters.massParsLambdaMean->at(3));
+      fLambdaWidth->SetParameters(parameters.massParsLambdaWidth->at(0), parameters.massParsLambdaWidth->at(1), parameters.massParsLambdaWidth->at(2), parameters.massParsLambdaWidth->at(3));
+      fXiMean->SetParameters(parameters.massParsCascadeMean->at(0), parameters.massParsCascadeMean->at(1), parameters.massParsCascadeMean->at(2), parameters.massParsCascadeMean->at(3));
+      fXiWidth->SetParameters(parameters.massParsCascadeWidth->at(0), parameters.massParsCascadeWidth->at(1), parameters.massParsCascadeWidth->at(2), parameters.massParsCascadeWidth->at(3));
+      fOmegaMean->SetParameters(parameters.massParsOmegaMean->at(0), parameters.massParsOmegaMean->at(1), parameters.massParsOmegaMean->at(2), parameters.massParsOmegaMean->at(3));
+      fOmegaWidth->SetParameters(parameters.massParsOmegaWidth->at(0), parameters.massParsOmegaWidth->at(1), parameters.massParsOmegaWidth->at(2), parameters.massParsOmegaWidth->at(3));
+    } else {
+      hK0ShortMean = 0x0;
+      hK0ShortWidth = 0x0;
+      hLambdaMean = 0x0;
+      hLambdaWidth = 0x0;
+      hXiMean = 0x0;
+      hXiWidth = 0x0;
+      hOmegaMean = 0x0;
+      hOmegaWidth = 0x0;
+    }
     if (doprocessV0s || doprocessV0sMC) {
-      histos.add("h3dMassK0Short", "h3dMassK0Short", kTH3F, {axisPtQA, axisK0ShortMass, axisMult});
-      histos.add("h3dMassLambda", "h3dMassLambda", kTH3F, {axisPtQA, axisLambdaMass, axisMult});
-      histos.add("h3dMassAntiLambda", "h3dMassAntiLambda", kTH3F, {axisPtQA, axisLambdaMass, axisMult});
+      histos.add("h3dMassK0Short", "h3dMassK0Short", kTH3F, {axesConfigurations.axisPtQA, axesConfigurations.axisK0ShortMass, axesConfigurations.axisMult});
+      histos.add("h3dMassLambda", "h3dMassLambda", kTH3F, {axesConfigurations.axisPtQA, axesConfigurations.axisLambdaMass, axesConfigurations.axisMult});
+      histos.add("h3dMassAntiLambda", "h3dMassAntiLambda", kTH3F, {axesConfigurations.axisPtQA, axesConfigurations.axisLambdaMass, axesConfigurations.axisMult});
     }
     if (doprocessCascades || doprocessCascadesMC) {
-      histos.add("h3dMassXiMinus", "h3dMassXiMinus", kTH3F, {axisPtQA, axisXiMass, axisMult});
-      histos.add("h3dMassXiPlus", "h3dMassXiPlus", kTH3F, {axisPtQA, axisXiMass, axisMult});
-      histos.add("h3dMassOmegaMinus", "h3dMassOmegaMinus", kTH3F, {axisPtQA, axisOmegaMass, axisMult});
-      histos.add("h3dMassOmegaPlus", "h3dMassOmegaPlus", kTH3F, {axisPtQA, axisOmegaMass, axisMult});
+      histos.add("h3dMassXiMinus", "h3dMassXiMinus", kTH3F, {axesConfigurations.axisPtQA, axesConfigurations.axisXiMass, axesConfigurations.axisMult});
+      histos.add("h3dMassXiPlus", "h3dMassXiPlus", kTH3F, {axesConfigurations.axisPtQA, axesConfigurations.axisXiMass, axesConfigurations.axisMult});
+      histos.add("h3dMassOmegaMinus", "h3dMassOmegaMinus", kTH3F, {axesConfigurations.axisPtQA, axesConfigurations.axisOmegaMass, axesConfigurations.axisMult});
+      histos.add("h3dMassOmegaPlus", "h3dMassOmegaPlus", kTH3F, {axesConfigurations.axisPtQA, axesConfigurations.axisOmegaMass, axesConfigurations.axisMult});
     }
   }
 
@@ -255,15 +317,76 @@ struct HStrangeCorrelationFilter {
     mRunNumber = bc.runNumber();
   }
 
+  void initParametersFromCCDB(aod::BCsWithTimestamps::iterator const& bc)
+  {
+    if (mRunNumber == bc.runNumber()) {
+      return;
+    }
+    mRunNumber = bc.runNumber();
+    LOG(info) << "Loading mean and sigma from CCDB for run " << mRunNumber << " now...";
+    auto timeStamp = bc.timestamp();
+
+    TList* listParameters = ccdb->getForTimeStamp<TList>(parameterCCDBPath, timeStamp);
+
+    if (!listParameters) {
+      LOG(fatal) << "Problem getting TList object with parameters!";
+    }
+    if (doprocessV0s || doprocessV0sMC) {
+      hK0ShortMean = static_cast<TH1F*>(listParameters->FindObject("hK0ShortMean"));
+      hK0ShortWidth = static_cast<TH1F*>(listParameters->FindObject("hK0ShortWidth"));
+      hLambdaMean = static_cast<TH1F*>(listParameters->FindObject("hLambdaMean"));
+      hLambdaWidth = static_cast<TH1F*>(listParameters->FindObject("hLambdaWidth"));
+    }
+    if (doprocessCascades || doprocessCascadesMC) {
+      hXiMean = static_cast<TH1F*>(listParameters->FindObject("hXiMean"));
+      hXiWidth = static_cast<TH1F*>(listParameters->FindObject("hXiWidth"));
+      hOmegaMean = static_cast<TH1F*>(listParameters->FindObject("hOmegaMean"));
+      hOmegaWidth = static_cast<TH1F*>(listParameters->FindObject("hOmegaWidth"));
+    }
+    LOG(info) << "parameters now loaded for " << mRunNumber;
+  }
+
+  // this function allows for all event selections to be done in a modular way
+  template <typename TCollision>
+  bool isCollisionSelected(TCollision const& collision)
+  {
+    // ________________________________________________
+    // Perform basic event selection
+    if (!collision.sel8()) {
+      return false;
+    }
+    if (std::abs(collision.posZ()) > eventSelections.zVertexCut) {
+      return false;
+    }
+    if (collision.centFT0M() > eventSelections.maxCentPercent || collision.centFT0M() < eventSelections.minCentPercent) {
+      return false;
+    }
+    if (!collision.isInelGt0() && eventSelections.selectINELgtZERO) {
+      return false;
+    }
+    if (!collision.selection_bit(aod::evsel::kIsGoodITSLayersAll) && eventSelections.requireAllGoodITSLayers) {
+      return false;
+    }
+    if (zorroMask.value != "") {
+      auto bc = collision.template bc_as<aod::BCsWithTimestamps>();
+      initCCDB(bc);
+      bool zorroSelected = zorro.isSelected(collision.template bc_as<aod::BCsWithTimestamps>().globalBC()); /// Just let Zorro do the accounting
+      if (!zorroSelected) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   // more event selections in Pb-Pb
   template <typename TCollision>
   bool isCollisionSelectedPbPb(TCollision collision)
   {
-    if (!collision.selection_bit(aod::evsel::kIsTriggerTVX)) /* FT0 vertex (acceptable FT0C-FT0A time difference) collisions */
+    if (!collision.selection_bit(aod::evsel::kIsTriggerTVX) && eventSelections.requireGoodTriggerTVX) /* FT0 vertex (acceptable FT0C-FT0A time difference) collisions */
       return false;
-    if (!collision.selection_bit(o2::aod::evsel::kIsGoodITSLayersAll)) // cut time intervals with dead ITS staves
+    if (!collision.selection_bit(o2::aod::evsel::kIsGoodITSLayersAll) && eventSelections.requireAllGoodITSLayers) // cut time intervals with dead ITS staves
       return false;
-    if (!collision.selection_bit(o2::aod::evsel::kIsGoodZvtxFT0vsPV)) // removes collisions with large differences between z of PV by tracks and z of PV from FT0 A-C time difference
+    if (!collision.selection_bit(o2::aod::evsel::kIsGoodZvtxFT0vsPV) && eventSelections.requireGoodZvtxFT0vsPV) // removes collisions with large differences between z of PV by tracks and z of PV from FT0 A-C time difference
       return false;
     auto occupancy = collision.trackOccupancyInTimeRange();
     if (occupancy < cfgCutOccupancyLow || occupancy > cfgCutOccupancyHigh) /* Below min occupancy and Above max occupancy*/
@@ -281,23 +404,23 @@ struct HStrangeCorrelationFilter {
   template <class TTrack>
   bool isValidTrigger(TTrack track)
   {
-    if (track.eta() > triggerEtaMax || track.eta() < triggerEtaMin) {
+    if (track.eta() > generalSelections.triggerEtaMax || track.eta() < generalSelections.triggerEtaMin) {
       return false;
     }
     // if (track.sign()= 1 ) {continue;}
-    if (track.pt() > triggerPtCutMax || track.pt() < triggerPtCutMin) {
+    if (track.pt() > generalSelections.triggerPtCutMax || track.pt() < generalSelections.triggerPtCutMin) {
       return false;
     }
-    if (track.tpcNClsCrossedRows() < minTPCNCrossedRows) {
+    if (track.tpcNClsCrossedRows() < trackSelections.minTPCNCrossedRows) {
       return false; // crossed rows
     }
-    if (!track.hasITS() && triggerRequireITS) {
+    if (!track.hasITS() && trackSelections.triggerRequireITS) {
       return false; // skip, doesn't have ITS signal (skips lots of TPC-only!)
     }
-    if (track.tpcNClsShared() > triggerMaxTPCSharedClusters) {
+    if (track.tpcNClsShared() > trackSelections.triggerMaxTPCSharedClusters) {
       return false; // skip, has shared clusters
     }
-    if (!(BIT_CHECK(track.itsClusterMap(), 0)) && triggerRequireL0) {
+    if (!(BIT_CHECK(track.itsClusterMap(), 0)) && trackSelections.triggerRequireL0) {
       return false; // skip, doesn't have cluster in ITS L0
     }
     return true;
@@ -305,43 +428,43 @@ struct HStrangeCorrelationFilter {
   template <class TTrack>
   bool isValidAssocTrack(TTrack assoc)
   {
-    if (assoc.eta() > assocEtaMax || assoc.eta() < assocEtaMin) {
+    if (assoc.eta() > generalSelections.assocEtaMax || assoc.eta() < generalSelections.assocEtaMin) {
       return false;
     }
-    if (assoc.pt() > assocPtCutMax || assoc.pt() < assocPtCutMin) {
+    if (assoc.pt() > generalSelections.assocPtCutMax || assoc.pt() < generalSelections.assocPtCutMin) {
       return false;
     }
-    if (assoc.tpcNClsCrossedRows() < minTPCNCrossedRows) {
+    if (assoc.tpcNClsCrossedRows() < trackSelections.minTPCNCrossedRows) {
       return false; // crossed rows
     }
-    if (!assoc.hasITS() && assocRequireITS) {
+    if (!assoc.hasITS() && trackSelections.assocRequireITS) {
       return false; // skip, doesn't have ITS signal (skips lots of TPC-only!)
     }
 
     // do this only if information is available
     float nSigmaTPCTOF[8] = {-10, -10, -10, -10, -10, -10, -10, -10};
-    if constexpr (requires { assoc.tofSignal(); }) {
+    if constexpr (requires { assoc.tofSignal(); } && !requires { assoc.mcParticle(); }) {
       if (assoc.tofSignal() > 0) {
-        if (std::sqrt(assoc.tofNSigmaPi() * assoc.tofNSigmaPi() + assoc.tpcNSigmaPi() * assoc.tpcNSigmaPi()) > assocPionNSigmaTPCFOF)
+        if (std::sqrt(assoc.tofNSigmaPi() * assoc.tofNSigmaPi() + assoc.tpcNSigmaPi() * assoc.tpcNSigmaPi()) > trackSelections.assocPionNSigmaTPCFOF)
           return false;
-        if (assoc.tofNSigmaPr() < rejectSigma)
+        if (assoc.tofNSigmaPr() < trackSelections.rejectSigma)
           return false;
-        if (assoc.tpcNSigmaPr() < rejectSigma)
+        if (assoc.tpcNSigmaPr() < trackSelections.rejectSigma)
           return false;
-        if (assoc.tofNSigmaKa() < rejectSigma)
+        if (assoc.tofNSigmaKa() < trackSelections.rejectSigma)
           return false;
-        if (assoc.tpcNSigmaKa() < rejectSigma)
+        if (assoc.tpcNSigmaKa() < trackSelections.rejectSigma)
           return false;
         nSigmaTPCTOF[4] = assoc.tofNSigmaPi();
         nSigmaTPCTOF[5] = assoc.tofNSigmaKa();
         nSigmaTPCTOF[6] = assoc.tofNSigmaPr();
         nSigmaTPCTOF[7] = assoc.tofNSigmaEl();
       } else {
-        if (assoc.tpcNSigmaPi() > assocPionNSigmaTPCFOF)
+        if (assoc.tpcNSigmaPi() > trackSelections.assocPionNSigmaTPCFOF)
           return false;
-        if (assoc.tpcNSigmaPr() < rejectSigma)
+        if (assoc.tpcNSigmaPr() < trackSelections.rejectSigma)
           return false;
-        if (assoc.tpcNSigmaKa() < rejectSigma)
+        if (assoc.tpcNSigmaKa() < trackSelections.rejectSigma)
           return false;
       }
       nSigmaTPCTOF[0] = assoc.tpcNSigmaPi();
@@ -352,11 +475,13 @@ struct HStrangeCorrelationFilter {
 
     bool physicalPrimary = false;
     float origPt = -1;
+    float code = -9999;
     if constexpr (requires { assoc.mcParticle(); }) {
       if (assoc.has_mcParticle()) {
         auto mcParticle = assoc.mcParticle();
         physicalPrimary = mcParticle.isPhysicalPrimary();
         origPt = mcParticle.pt();
+        code = mcParticle.pdgCode();
       }
     }
 
@@ -364,7 +489,8 @@ struct HStrangeCorrelationFilter {
       assoc.collisionId(),
       physicalPrimary,
       assoc.globalIndex(),
-      origPt);
+      origPt,
+      code);
     assocPID(
       nSigmaTPCTOF[0],
       nSigmaTPCTOF[1],
@@ -379,133 +505,139 @@ struct HStrangeCorrelationFilter {
 
   // cascadeselection in PbPb
   template <typename TCascade>
-  bool CascadeSelectedPbPb(TCascade casc, float pvx, float pvy, float pvz)
+  bool cascadeSelectedPbPb(TCascade casc, float pvx, float pvy, float pvz)
   {
     // bachBaryonCosPA
-    if (casc.bachBaryonCosPA() < MorePbPbsystCuts.bachBaryonCosPA)
+    if (casc.bachBaryonCosPA() < cascSelection.bachBaryonCosPA)
       return false;
     // bachBaryonDCAxyToPV
-    if (std::abs(casc.bachBaryonDCAxyToPV()) > MorePbPbsystCuts.bachBaryonDCAxyToPV)
+    if (std::abs(casc.bachBaryonDCAxyToPV()) > cascSelection.bachBaryonDCAxyToPV)
       return false;
     // casccosPA
-    if (casc.casccosPA(pvx, pvy, pvz) < MorePbPbsystCuts.cascCospa)
+    if (casc.casccosPA(pvx, pvy, pvz) < cascSelection.cascCospa)
       return false;
     // dcacascdaughters
-    float ptDepCut = MorePbPbsystCuts.dcaCacsDauPar0;
-    if (casc.pt() > 1 && casc.pt() < 4)
-      ptDepCut = MorePbPbsystCuts.dcaCacsDauPar1;
-    else if (casc.pt() > 4)
-      ptDepCut = MorePbPbsystCuts.dcaCacsDauPar2;
+    float ptDepCut = cascSelection.dcaCacsDauPar0;
+    if (casc.pt() > cascSelection.lowPtForCascDaugPtDep && casc.pt() < cascSelection.highPtForCascDaugPtDep)
+      ptDepCut = cascSelection.dcaCacsDauPar1;
+    else if (casc.pt() > cascSelection.highPtForCascDaugPtDep)
+      ptDepCut = cascSelection.dcaCacsDauPar2;
     if (casc.dcacascdaughters() > ptDepCut)
       return false;
     // dcaV0daughters
-    if (casc.dcaV0daughters() > dcaV0dau)
+    if (casc.dcaV0daughters() > cascSelection.cascdcaV0dau)
       return false;
     // dcav0topv
-    if (std::abs(casc.dcav0topv(pvx, pvy, pvz)) < MorePbPbsystCuts.cascdcaV0ToPV)
+    if (std::abs(casc.dcav0topv(pvx, pvy, pvz)) < cascSelection.cascMindcav0topv)
       return false;
     // cascradius
-    if (casc.cascradius() < MorePbPbsystCuts.cascRadius)
+    if (casc.cascradius() < cascSelection.cascRadius)
       return false;
     // v0radius
-    if (casc.v0radius() < MorePbPbsystCuts.cascv0RadiusMin)
+    if (casc.v0radius() < cascSelection.cascv0RadiusMin)
       return false;
     // v0cosPA
-    if (casc.v0cosPA(casc.x(), casc.y(), casc.z()) < MorePbPbsystCuts.cascv0cospa)
+    if (casc.v0cosPA(casc.x(), casc.y(), casc.z()) < cascSelection.cascv0cospa)
       return false;
     // lambdaMassWin
-    if (std::abs(casc.mLambda() - o2::constants::physics::MassLambda0) > MorePbPbsystCuts.lambdaMassWin)
+    if (std::abs(casc.mLambda() - o2::constants::physics::MassLambda0) > cascSelection.lambdaMassWin)
       return false;
     return true;
   }
 
   // for real data processing
-  void processTriggers(soa::Join<aod::Collisions, aod::EvSels>::iterator const& collision, soa::Filtered<FullTracks> const& tracks, aod::BCsWithTimestamps const&)
+  void processTriggers(soa::Join<aod::Collisions, aod::EvSels, aod::CentFT0Ms, aod::CentFT0Cs, aod::PVMults>::iterator const& collision, soa::Filtered<FullTracks> const& tracks, aod::BCsWithTimestamps const&)
   {
-    // Perform basic event selection
-    if (!collision.sel8()) {
+    triggerCandidates.clear();
+    if (((doPPAnalysis && !isCollisionSelected(collision))) || (!doPPAnalysis && !isCollisionSelectedPbPb(collision))) {
       return;
-    }
-    // No need to correlate stuff that's in far collisions
-    if (std::abs(collision.posZ()) > 10.0) {
-      return;
-    }
-    if (zorroMask.value != "") {
-      auto bc = collision.bc_as<aod::BCsWithTimestamps>();
-      initCCDB(bc);
-      bool zorroSelected = zorro.isSelected(collision.bc_as<aod::BCsWithTimestamps>().globalBC()); /// Just let Zorro do the accounting
-      if (!zorroSelected) {
-        return;
-      }
     }
 
     /// _________________________________________________
     /// Step 1: Populate table with trigger tracks
+    double leadingPt = -1.;
+    int leadingId = -1;
     for (auto const& track : tracks) {
       if (!isValidTrigger(track))
         continue;
+      thisTrigg.pt = track.pt();
+      thisTrigg.trackId = track.globalIndex();
+      thisTrigg.collisionId = track.collisionId();
+      thisTrigg.isPhysicalPrimary = false; // if you decide to check real data for primaries, you'll have a hard time
+      thisTrigg.origPt = 0;
+      triggerCandidates.push_back(thisTrigg);
+      if (track.pt() > leadingPt) {
+        leadingPt = track.pt();
+        leadingId = track.globalIndex();
+      }
+    }
+    for (auto const& TriggCandidate : triggerCandidates) {
+      bool isLeading = (leadingId == TriggCandidate.trackId);
       triggerTrack(
-        track.collisionId(),
-        false, // if you decide to check real data for primaries, you'll have a hard time
-        track.globalIndex(),
-        0);
+        TriggCandidate.collisionId,
+        TriggCandidate.isPhysicalPrimary,
+        TriggCandidate.trackId,
+        TriggCandidate.origPt,
+        isLeading);
       triggerTrackExtra(1);
     }
   }
 
   // for MC processing
-  void processTriggersMC(soa::Join<aod::Collisions, aod::EvSels>::iterator const& collision, soa::Filtered<FullTracksMC> const& tracks, aod::McParticles const&, aod::BCsWithTimestamps const&)
+  void processTriggersMC(soa::Join<aod::Collisions, aod::EvSels, aod::CentFT0Ms, aod::CentFT0Cs, aod::PVMults>::iterator const& collision, soa::Filtered<FullTracksMC> const& tracks, aod::McParticles const&, aod::BCsWithTimestamps const&)
   {
-    // Perform basic event selection
-    if (!collision.sel8()) {
+    triggerCandidates.clear();
+    if (((doPPAnalysis && !isCollisionSelected(collision))) || (!doPPAnalysis && !isCollisionSelectedPbPb(collision))) {
       return;
-    }
-    // No need to correlate stuff that's in far collisions
-    if (std::abs(collision.posZ()) > 10.0) {
-      return;
-    }
-    if (zorroMask.value != "") {
-      auto bc = collision.bc_as<aod::BCsWithTimestamps>();
-      initCCDB(bc);
-      bool zorroSelected = zorro.isSelected(collision.bc_as<aod::BCsWithTimestamps>().globalBC()); /// Just let Zorro do the accounting
-      if (!zorroSelected) {
-        return;
-      }
     }
 
     /// _________________________________________________
     /// Step 1: Populate table with trigger tracks
+    double leadingPt = -1.;
+    int leadingId = -1;
     for (auto const& track : tracks) {
       if (!isValidTrigger(track))
         continue;
-      bool physicalPrimary = false;
-      float origPt = -1;
+      thisTrigg.pt = track.pt();
+      thisTrigg.trackId = track.globalIndex();
+      thisTrigg.collisionId = track.collisionId();
       if (track.has_mcParticle()) {
         auto mcParticle = track.mcParticle();
-        physicalPrimary = mcParticle.isPhysicalPrimary();
-        origPt = mcParticle.pt();
+        thisTrigg.isPhysicalPrimary = mcParticle.isPhysicalPrimary();
+        thisTrigg.origPt = mcParticle.pt();
       }
+      triggerCandidates.push_back(thisTrigg);
+      if (track.pt() > leadingPt) {
+        leadingPt = track.pt();
+        leadingId = track.globalIndex();
+      }
+    }
+
+    for (auto const& TriggCandidate : triggerCandidates) {
+      bool isLeading = (leadingId == TriggCandidate.trackId);
       triggerTrack(
-        track.collisionId(),
-        physicalPrimary,
-        track.globalIndex(),
-        origPt);
+        TriggCandidate.collisionId,
+        TriggCandidate.isPhysicalPrimary,
+        TriggCandidate.trackId,
+        TriggCandidate.origPt,
+        isLeading);
       triggerTrackExtra(1);
     }
   }
 
   void processAssocPions(soa::Join<aod::Collisions, aod::EvSels>::iterator const& collision, soa::Filtered<IDTracks> const& tracks, aod::BCsWithTimestamps const&)
   {
+    // Load parameters for sideband subtraction
+    auto bc = collision.bc_as<aod::BCsWithTimestamps>();
     // Perform basic event selection
     if (!collision.sel8()) {
       return;
     }
     // No need to correlate stuff that's in far collisions
-    if (std::abs(collision.posZ()) > 10.0) {
+    if (std::abs(collision.posZ()) > eventSelections.zVertexCut) {
       return;
     }
     if (zorroMask.value != "") {
-      auto bc = collision.bc_as<aod::BCsWithTimestamps>();
       initCCDB(bc);
       bool zorroSelected = zorro.isSelected(collision.bc_as<aod::BCsWithTimestamps>().globalBC()); /// Just let Zorro do the accounting
       if (!zorroSelected) {
@@ -521,18 +653,19 @@ struct HStrangeCorrelationFilter {
     }
   }
 
-  void processAssocPionsMC(soa::Join<aod::Collisions, aod::EvSels>::iterator const& collision, soa::Filtered<IDTracksMC> const& tracks, aod::BCsWithTimestamps const&)
+  void processAssocPionsMC(soa::Join<aod::Collisions, aod::EvSels>::iterator const& collision, soa::Filtered<IDTracksMC> const& tracks, aod::McParticles const&, aod::BCsWithTimestamps const&)
   {
+    // Load parameters for sideband subtraction
+    auto bc = collision.bc_as<aod::BCsWithTimestamps>();
     // Perform basic event selection
     if (!collision.sel8()) {
       return;
     }
     // No need to correlate stuff that's in far collisions
-    if (std::abs(collision.posZ()) > 10.0) {
+    if (std::abs(collision.posZ()) > eventSelections.zVertexCut) {
       return;
     }
     if (zorroMask.value != "") {
-      auto bc = collision.bc_as<aod::BCsWithTimestamps>();
       initCCDB(bc);
       bool zorroSelected = zorro.isSelected(collision.bc_as<aod::BCsWithTimestamps>().globalBC()); /// Just let Zorro do the accounting
       if (!zorroSelected) {
@@ -550,16 +683,17 @@ struct HStrangeCorrelationFilter {
 
   void processAssocHadrons(soa::Join<aod::Collisions, aod::EvSels>::iterator const& collision, soa::Filtered<FullTracks> const& tracks, aod::BCsWithTimestamps const&)
   {
+    // Load parameters for sideband subtraction
+    auto bc = collision.bc_as<aod::BCsWithTimestamps>();
     // Perform basic event selection
     if (!collision.sel8()) {
       return;
     }
     // No need to correlate stuff that's in far collisions
-    if (std::abs(collision.posZ()) > 10.0) {
+    if (std::abs(collision.posZ()) > eventSelections.zVertexCut) {
       return;
     }
     if (zorroMask.value != "") {
-      auto bc = collision.bc_as<aod::BCsWithTimestamps>();
       initCCDB(bc);
       bool zorroSelected = zorro.isSelected(collision.bc_as<aod::BCsWithTimestamps>().globalBC()); /// Just let Zorro do the accounting
       if (!zorroSelected) {
@@ -576,16 +710,17 @@ struct HStrangeCorrelationFilter {
   }
   void processAssocHadronsMC(soa::Join<aod::Collisions, aod::EvSels>::iterator const& collision, soa::Filtered<FullTracksMC> const& tracks, aod::McParticles const&, aod::BCsWithTimestamps const&)
   {
+    // Load parameters for sideband subtraction
+    auto bc = collision.bc_as<aod::BCsWithTimestamps>();
     // Perform basic event selection
     if (!collision.sel8()) {
       return;
     }
     // No need to correlate stuff that's in far collisions
-    if (std::abs(collision.posZ()) > 10.0) {
+    if (std::abs(collision.posZ()) > eventSelections.zVertexCut) {
       return;
     }
     if (zorroMask.value != "") {
-      auto bc = collision.bc_as<aod::BCsWithTimestamps>();
       initCCDB(bc);
       bool zorroSelected = zorro.isSelected(collision.bc_as<aod::BCsWithTimestamps>().globalBC()); /// Just let Zorro do the accounting
       if (!zorroSelected) {
@@ -601,35 +736,20 @@ struct HStrangeCorrelationFilter {
     }
   }
 
-  void processV0s(soa::Join<aod::Collisions, aod::EvSels, aod::CentFT0Ms, aod::CentFT0Cs>::iterator const& collision, DauTracks const&, soa::Filtered<V0DatasWithoutTrackX> const& V0s, aod::BCsWithTimestamps const&)
+  void processV0s(soa::Join<aod::Collisions, aod::EvSels, aod::CentFT0Ms, aod::CentFT0Cs, aod::PVMults>::iterator const& collision, DauTracks const&, soa::Filtered<V0DatasWithoutTrackX> const& V0s, aod::BCsWithTimestamps const&)
   {
+    auto bc = collision.bc_as<aod::BCsWithTimestamps>();
     double cent = doPPAnalysis ? collision.centFT0M() : collision.centFT0C();
-    // Perform basic event selection
-    if (!collision.sel8()) {
+    if (((doPPAnalysis && !isCollisionSelected(collision))) || (!doPPAnalysis && !isCollisionSelectedPbPb(collision))) {
       return;
     }
-    // No need to correlate stuff that's in far collisions
-    if (std::abs(collision.posZ()) > 10.0) {
-      return;
-    }
-    if (zorroMask.value != "") {
-      auto bc = collision.bc_as<aod::BCsWithTimestamps>();
-      initCCDB(bc);
-      bool zorroSelected = zorro.isSelected(collision.bc_as<aod::BCsWithTimestamps>().globalBC()); /// Just let Zorro do the accounting
-      if (!zorroSelected) {
-        return;
-      }
-    }
-    if (!doPPAnalysis && !isCollisionSelectedPbPb(collision))
-      return;
-
     /// _________________________________________________
     /// Populate table with associated V0s
     for (auto const& v0 : V0s) {
-      if (v0.v0radius() < v0RadiusMin || v0.v0radius() > v0RadiusMax || v0.eta() > assocEtaMax || v0.eta() < assocEtaMin || v0.v0cosPA() < v0Cospa) {
+      if (v0.v0radius() < v0Selection.v0RadiusMin || v0.v0radius() > v0Selection.v0RadiusMax || v0.eta() > generalSelections.assocEtaMax || v0.eta() < generalSelections.assocEtaMin || v0.v0cosPA() < v0Selection.v0Cospa) {
         continue;
       }
-      if (v0.pt() > assocPtCutMax || v0.pt() < assocPtCutMin) {
+      if (v0.pt() > generalSelections.assocPtCutMax || v0.pt() < generalSelections.assocPtCutMin) {
         continue;
       }
       // check dE/dx compatibility
@@ -640,86 +760,86 @@ struct HStrangeCorrelationFilter {
       auto posdau = v0.posTrack_as<DauTracks>();
       auto negdau = v0.negTrack_as<DauTracks>();
 
-      if (negdau.tpcNClsCrossedRows() < minTPCNCrossedRows)
+      if (negdau.tpcNClsCrossedRows() < trackSelections.minTPCNCrossedRows)
         continue;
-      if (posdau.tpcNClsCrossedRows() < minTPCNCrossedRows)
+      if (posdau.tpcNClsCrossedRows() < trackSelections.minTPCNCrossedRows)
         continue;
 
+      bool isGoodK0Short = (v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassK0Short < v0Selection.lifetimecutK0S &&
+                            std::abs(v0.dcapostopv()) > v0Selection.dcaMesonToPV && std::abs(v0.dcanegtopv()) > v0Selection.dcaMesonToPV &&
+                            v0.qtarm() * v0Selection.armPodCut > std::abs(v0.alpha()));
+      bool isGoodLambda = (v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassLambda0 < v0Selection.lifetimecutLambda &&
+                           std::abs(v0.dcapostopv()) > v0Selection.dcaBaryonToPV && std::abs(v0.dcanegtopv()) > v0Selection.dcaMesonToPV);
+      bool isGoodAntiLambda = (v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassLambda0Bar < v0Selection.lifetimecutLambda &&
+                               std::abs(v0.dcapostopv()) > v0Selection.dcaMesonToPV && std::abs(v0.dcanegtopv()) > v0Selection.dcaBaryonToPV);
       if (std::abs(posdau.tpcNSigmaPi()) < strangedEdxNSigmaLoose && std::abs(negdau.tpcNSigmaPi()) < strangedEdxNSigmaLoose) {
-        if (doPPAnalysis || (v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassK0Short < lifetimecutK0S &&
-                             std::abs(v0.dcapostopv()) > dcapostopvK0S && std::abs(v0.dcanegtopv()) > dcanegtopvK0S &&
-                             v0.qtarm() * armPodCut > std::abs(v0.alpha()))) {
+        if (doPPAnalysis || isGoodK0Short) {
           BIT_SET(compatibleK0Short, 0);
         }
       }
       if (std::abs(posdau.tpcNSigmaPi()) < strangedEdxNSigma && std::abs(negdau.tpcNSigmaPi()) < strangedEdxNSigma) {
-        if (doPPAnalysis || (v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassK0Short < lifetimecutK0S &&
-                             std::abs(v0.dcapostopv()) > dcapostopvK0S && std::abs(v0.dcanegtopv()) > dcanegtopvK0S &&
-                             v0.qtarm() * armPodCut > std::abs(v0.alpha()))) {
+        if (doPPAnalysis || isGoodK0Short) {
           BIT_SET(compatibleK0Short, 1);
         }
       }
       if (std::abs(posdau.tpcNSigmaPi()) < strangedEdxNSigmaTight && std::abs(negdau.tpcNSigmaPi()) < strangedEdxNSigmaTight) {
-        if (doPPAnalysis || (v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassK0Short < lifetimecutK0S &&
-                             std::abs(v0.dcapostopv()) > dcapostopvK0S && std::abs(v0.dcanegtopv()) > dcanegtopvK0S &&
-                             v0.qtarm() * armPodCut > std::abs(v0.alpha()))) {
+        if (doPPAnalysis || isGoodK0Short) {
           BIT_SET(compatibleK0Short, 2);
         }
       }
-      if (std::abs(posdau.tpcNSigmaPr()) < strangedEdxNSigmaLoose && std::abs(negdau.tpcNSigmaPi()) < strangedEdxNSigmaLoose) {
-        if (v0.v0cosPA() > lambdaCospa) {
-          if (doPPAnalysis || (v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassK0Short < lifetimecutLambda &&
-                               std::abs(v0.dcapostopv()) > dcapostopvLambda && std::abs(v0.dcanegtopv()) > dcanegtopvLambda)) {
+      if (v0.v0cosPA() > v0Selection.lambdaCospa) {
+        if (std::abs(posdau.tpcNSigmaPr()) < strangedEdxNSigmaLoose && std::abs(negdau.tpcNSigmaPi()) < strangedEdxNSigmaLoose) {
+          if (doPPAnalysis || isGoodLambda) {
             BIT_SET(compatibleLambda, 0);
           }
         }
-      }
-      if (std::abs(posdau.tpcNSigmaPr()) < strangedEdxNSigma && std::abs(negdau.tpcNSigmaPi()) < strangedEdxNSigma) {
-        if (v0.v0cosPA() > lambdaCospa) {
-          if (doPPAnalysis || (v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassK0Short < lifetimecutLambda &&
-                               std::abs(v0.dcapostopv()) > dcapostopvLambda && std::abs(v0.dcanegtopv()) > dcanegtopvLambda)) {
+        if (std::abs(posdau.tpcNSigmaPr()) < strangedEdxNSigma && std::abs(negdau.tpcNSigmaPi()) < strangedEdxNSigma) {
+          if (doPPAnalysis || isGoodLambda) {
             BIT_SET(compatibleLambda, 1);
           }
         }
-      }
-      if (std::abs(posdau.tpcNSigmaPr()) < strangedEdxNSigmaTight && std::abs(negdau.tpcNSigmaPi()) < strangedEdxNSigmaTight) {
-        if (v0.v0cosPA() > lambdaCospa) {
-          if (doPPAnalysis || (v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassK0Short < lifetimecutLambda &&
-                               std::abs(v0.dcapostopv()) > dcapostopvLambda && std::abs(v0.dcanegtopv()) > dcanegtopvLambda)) {
+        if (std::abs(posdau.tpcNSigmaPr()) < strangedEdxNSigmaTight && std::abs(negdau.tpcNSigmaPi()) < strangedEdxNSigmaTight) {
+          if (doPPAnalysis || isGoodLambda) {
             BIT_SET(compatibleLambda, 2);
           }
         }
-      }
-      if (std::abs(posdau.tpcNSigmaPi()) < strangedEdxNSigmaLoose && std::abs(negdau.tpcNSigmaPr()) < strangedEdxNSigmaLoose) {
-        if (v0.v0cosPA() > lambdaCospa) {
-          if (doPPAnalysis || (v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassK0Short < lifetimecutLambda &&
-                               std::abs(v0.dcapostopv()) > dcapostopvAntiLambda && std::abs(v0.dcanegtopv()) > dcanegtopvAntiLambda)) {
+        if (std::abs(posdau.tpcNSigmaPi()) < strangedEdxNSigmaLoose && std::abs(negdau.tpcNSigmaPr()) < strangedEdxNSigmaLoose) {
+          if (doPPAnalysis || isGoodAntiLambda) {
             BIT_SET(compatibleAntiLambda, 0);
           }
         }
-      }
-      if (std::abs(posdau.tpcNSigmaPi()) < strangedEdxNSigma && std::abs(negdau.tpcNSigmaPr()) < strangedEdxNSigma) {
-        if (v0.v0cosPA() > lambdaCospa) {
-          if (doPPAnalysis || (v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassK0Short < lifetimecutLambda &&
-                               std::abs(v0.dcapostopv()) > dcapostopvAntiLambda && std::abs(v0.dcanegtopv()) > dcanegtopvAntiLambda)) {
+        if (std::abs(posdau.tpcNSigmaPi()) < strangedEdxNSigma && std::abs(negdau.tpcNSigmaPr()) < strangedEdxNSigma) {
+          if (doPPAnalysis || isGoodAntiLambda) {
             BIT_SET(compatibleAntiLambda, 1);
           }
         }
-      }
-      if (std::abs(posdau.tpcNSigmaPi()) < strangedEdxNSigmaTight && std::abs(negdau.tpcNSigmaPr()) < strangedEdxNSigmaTight) {
-        if (v0.v0cosPA() > lambdaCospa) {
-          if (doPPAnalysis || (v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassK0Short < lifetimecutLambda &&
-                               std::abs(v0.dcapostopv()) > dcapostopvAntiLambda && std::abs(v0.dcanegtopv()) > dcanegtopvAntiLambda)) {
+        if (std::abs(posdau.tpcNSigmaPi()) < strangedEdxNSigmaTight && std::abs(negdau.tpcNSigmaPr()) < strangedEdxNSigmaTight) {
+          if (doPPAnalysis || isGoodAntiLambda) {
             BIT_SET(compatibleAntiLambda, 2);
           }
         }
       }
-
-      // simplified handling: calculate NSigma in mass here
-      float massNSigmaK0Short = (v0.mK0Short() - fK0Mean->Eval(v0.pt())) / (fK0Width->Eval(v0.pt()) + 1e-6);
-      float massNSigmaLambda = (v0.mLambda() - fLambdaMean->Eval(v0.pt())) / (fLambdaWidth->Eval(v0.pt()) + 1e-6);
-      float massNSigmaAntiLambda = (v0.mAntiLambda() - fLambdaMean->Eval(v0.pt())) / (fLambdaWidth->Eval(v0.pt()) + 1e-6);
-
+      float massNSigmaK0Short = -20.0f;
+      float massNSigmaLambda = -20.0f;
+      float massNSigmaAntiLambda = -20.0f;
+      if (useParameterization) {
+        massNSigmaK0Short = (v0.mK0Short() - fK0Mean->Eval(v0.pt())) / (fK0Width->Eval(v0.pt()) + 1e-6);
+        massNSigmaLambda = (v0.mLambda() - fLambdaMean->Eval(v0.pt())) / (fLambdaWidth->Eval(v0.pt()) + 1e-6);
+        massNSigmaAntiLambda = (v0.mAntiLambda() - fLambdaMean->Eval(v0.pt())) / (fLambdaWidth->Eval(v0.pt()) + 1e-6);
+      } else {
+        // Load parameters for sideband subtraction
+        initParametersFromCCDB(bc);
+        // simplified handling: calculate NSigma in mass here
+        if (v0.pt() < minPtForParam || v0.pt() > maxPtForParam) {
+          massNSigmaK0Short = (v0.mK0Short() - hK0ShortMean->GetBinContent(hK0ShortMean->FindBin(v0.pt()))) / (hK0ShortWidth->GetBinContent(hK0ShortWidth->FindBin(v0.pt())) + 1e-6);
+          massNSigmaLambda = (v0.mLambda() - hLambdaMean->GetBinContent(hLambdaMean->FindBin(v0.pt()))) / (hLambdaWidth->GetBinContent(hLambdaMean->FindBin(v0.pt())) + 1e-6);
+          massNSigmaAntiLambda = (v0.mAntiLambda() - hLambdaMean->GetBinContent(hLambdaMean->FindBin(v0.pt()))) / (hLambdaWidth->GetBinContent(hLambdaMean->FindBin(v0.pt())) + 1e-6);
+        } else {
+          massNSigmaK0Short = (v0.mK0Short() - hK0ShortMean->Interpolate(v0.pt())) / (hK0ShortWidth->Interpolate(v0.pt()) + 1e-6);
+          massNSigmaLambda = (v0.mLambda() - hLambdaMean->Interpolate(v0.pt())) / (hLambdaWidth->Interpolate(v0.pt()) + 1e-6);
+          massNSigmaAntiLambda = (v0.mAntiLambda() - hLambdaMean->Interpolate(v0.pt())) / (hLambdaWidth->Interpolate(v0.pt()) + 1e-6);
+        }
+      }
       if (compatibleK0Short)
         histos.fill(HIST("h3dMassK0Short"), v0.pt(), v0.mK0Short(), cent);
       if (compatibleLambda)
@@ -741,34 +861,21 @@ struct HStrangeCorrelationFilter {
     }
   }
 
-  void processV0sMC(soa::Join<aod::Collisions, aod::EvSels, aod::CentFT0Ms, aod::CentFT0Cs>::iterator const& collision, DauTracksMC const&, soa::Filtered<V0DatasWithoutTrackXMC> const& V0s, aod::McParticles const&, aod::BCsWithTimestamps const&)
+  void processV0sMC(soa::Join<aod::Collisions, aod::EvSels, aod::CentFT0Ms, aod::CentFT0Cs, aod::PVMults>::iterator const& collision, DauTracksMC const&, soa::Filtered<V0DatasWithoutTrackXMC> const& V0s, aod::McParticles const&, aod::BCsWithTimestamps const&)
   {
     double cent = doPPAnalysis ? collision.centFT0M() : collision.centFT0C();
-    // Perform basic event selection
-    if (!collision.sel8()) {
+    auto bc = collision.bc_as<aod::BCsWithTimestamps>();
+    if (((doPPAnalysis && !isCollisionSelected(collision))) || (!doPPAnalysis && !isCollisionSelectedPbPb(collision))) {
       return;
     }
-    // No need to correlate stuff that's in far collisions
-    if (std::abs(collision.posZ()) > 10.0) {
-      return;
-    }
-    if (zorroMask.value != "") {
-      auto bc = collision.bc_as<aod::BCsWithTimestamps>();
-      initCCDB(bc);
-      bool zorroSelected = zorro.isSelected(collision.bc_as<aod::BCsWithTimestamps>().globalBC()); /// Just let Zorro do the accounting
-      if (!zorroSelected) {
-        return;
-      }
-    }
-    if (!doPPAnalysis && !isCollisionSelectedPbPb(collision))
-      return;
     /// _________________________________________________
     /// Populate table with associated V0s
+
     for (auto const& v0 : V0s) {
-      if (v0.v0radius() < v0RadiusMin || v0.v0radius() > v0RadiusMax || v0.eta() > assocEtaMax || v0.eta() < assocEtaMin || v0.v0cosPA() < v0Cospa) {
+      if (v0.v0radius() < v0Selection.v0RadiusMin || v0.v0radius() > v0Selection.v0RadiusMax || v0.eta() > generalSelections.assocEtaMax || v0.eta() < generalSelections.assocEtaMin || v0.v0cosPA() < v0Selection.v0Cospa) {
         continue;
       }
-      if (v0.pt() > assocPtCutMax || v0.pt() < assocPtCutMin) {
+      if (v0.pt() > generalSelections.assocPtCutMax || v0.pt() < generalSelections.assocPtCutMin) {
         continue;
       }
       // check dE/dx compatibility
@@ -779,95 +886,98 @@ struct HStrangeCorrelationFilter {
       auto posdau = v0.posTrack_as<DauTracksMC>();
       auto negdau = v0.negTrack_as<DauTracksMC>();
 
-      if (negdau.tpcNClsCrossedRows() < minTPCNCrossedRows)
+      if (negdau.tpcNClsCrossedRows() < trackSelections.minTPCNCrossedRows)
         continue;
-      if (posdau.tpcNClsCrossedRows() < minTPCNCrossedRows)
+      if (posdau.tpcNClsCrossedRows() < trackSelections.minTPCNCrossedRows)
         continue;
 
+      bool isGoodK0Short = v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassK0Short < v0Selection.lifetimecutK0S &&
+                           std::abs(v0.dcapostopv()) > v0Selection.dcaMesonToPV && std::abs(v0.dcanegtopv()) > v0Selection.dcaMesonToPV &&
+                           v0.qtarm() * v0Selection.armPodCut > std::abs(v0.alpha());
+      bool isGoodLambda = v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassLambda0 < v0Selection.lifetimecutLambda &&
+                          std::abs(v0.dcapostopv()) > v0Selection.dcaBaryonToPV && std::abs(v0.dcanegtopv()) > v0Selection.dcaMesonToPV;
+      bool isGoodAntiLambda = v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassLambda0Bar < v0Selection.lifetimecutLambda &&
+                              std::abs(v0.dcapostopv()) > v0Selection.dcaMesonToPV && std::abs(v0.dcanegtopv()) > v0Selection.dcaBaryonToPV;
       if (std::abs(posdau.tpcNSigmaPi()) < strangedEdxNSigmaLoose && std::abs(negdau.tpcNSigmaPi()) < strangedEdxNSigmaLoose) {
-        if (doPPAnalysis || (v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassK0Short < lifetimecutK0S &&
-                             std::abs(v0.dcapostopv()) > dcapostopvK0S && std::abs(v0.dcanegtopv()) > dcanegtopvK0S &&
-                             v0.qtarm() * armPodCut > std::abs(v0.alpha()))) {
+        if (doPPAnalysis || isGoodK0Short) {
           BIT_SET(compatibleK0Short, 0);
         }
       }
       if (std::abs(posdau.tpcNSigmaPi()) < strangedEdxNSigma && std::abs(negdau.tpcNSigmaPi()) < strangedEdxNSigma) {
-        if (doPPAnalysis || (v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassK0Short < lifetimecutK0S &&
-                             std::abs(v0.dcapostopv()) > dcapostopvK0S && std::abs(v0.dcanegtopv()) > dcanegtopvK0S &&
-                             v0.qtarm() * armPodCut > std::abs(v0.alpha()))) {
+        if (doPPAnalysis || isGoodK0Short) {
           BIT_SET(compatibleK0Short, 1);
         }
       }
       if (std::abs(posdau.tpcNSigmaPi()) < strangedEdxNSigmaTight && std::abs(negdau.tpcNSigmaPi()) < strangedEdxNSigmaTight) {
-        if (doPPAnalysis || (v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassK0Short < lifetimecutK0S &&
-                             std::abs(v0.dcapostopv()) > dcapostopvK0S && std::abs(v0.dcanegtopv()) > dcanegtopvK0S &&
-                             v0.qtarm() * armPodCut > std::abs(v0.alpha()))) {
+        if (doPPAnalysis || isGoodK0Short) {
           BIT_SET(compatibleK0Short, 2);
         }
       }
-      if (std::abs(posdau.tpcNSigmaPr()) < strangedEdxNSigmaLoose && std::abs(negdau.tpcNSigmaPi()) < strangedEdxNSigmaLoose) {
-        if (v0.v0cosPA() > lambdaCospa) {
-          if (doPPAnalysis || (v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassK0Short < lifetimecutLambda &&
-                               std::abs(v0.dcapostopv()) > dcapostopvLambda && std::abs(v0.dcanegtopv()) > dcanegtopvLambda)) {
+      if (v0.v0cosPA() > v0Selection.lambdaCospa) {
+        if (std::abs(posdau.tpcNSigmaPr()) < strangedEdxNSigmaLoose && std::abs(negdau.tpcNSigmaPi()) < strangedEdxNSigmaLoose) {
+          if (doPPAnalysis || isGoodLambda) {
             BIT_SET(compatibleLambda, 0);
           }
         }
-      }
-      if (std::abs(posdau.tpcNSigmaPr()) < strangedEdxNSigma && std::abs(negdau.tpcNSigmaPi()) < strangedEdxNSigma) {
-        if (v0.v0cosPA() > lambdaCospa) {
-          if (doPPAnalysis || (v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassK0Short < lifetimecutLambda &&
-                               std::abs(v0.dcapostopv()) > dcapostopvLambda && std::abs(v0.dcanegtopv()) > dcanegtopvLambda)) {
+        if (std::abs(posdau.tpcNSigmaPr()) < strangedEdxNSigma && std::abs(negdau.tpcNSigmaPi()) < strangedEdxNSigma) {
+          if (doPPAnalysis || isGoodLambda) {
             BIT_SET(compatibleLambda, 1);
           }
         }
-      }
-      if (std::abs(posdau.tpcNSigmaPr()) < strangedEdxNSigmaTight && std::abs(negdau.tpcNSigmaPi()) < strangedEdxNSigmaTight) {
-        if (v0.v0cosPA() > lambdaCospa) {
-          if (doPPAnalysis || (v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassK0Short < lifetimecutLambda &&
-                               std::abs(v0.dcapostopv()) > dcapostopvLambda && std::abs(v0.dcanegtopv()) > dcanegtopvLambda)) {
+
+        if (std::abs(posdau.tpcNSigmaPr()) < strangedEdxNSigmaTight && std::abs(negdau.tpcNSigmaPi()) < strangedEdxNSigmaTight) {
+          if (doPPAnalysis || isGoodLambda) {
             BIT_SET(compatibleLambda, 2);
           }
         }
-      }
-      if (std::abs(posdau.tpcNSigmaPi()) < strangedEdxNSigmaLoose && std::abs(negdau.tpcNSigmaPr()) < strangedEdxNSigmaLoose) {
-        if (v0.v0cosPA() > lambdaCospa) {
-          if (doPPAnalysis || (v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassK0Short < lifetimecutLambda &&
-                               std::abs(v0.dcapostopv()) > dcapostopvAntiLambda && std::abs(v0.dcanegtopv()) > dcanegtopvAntiLambda)) {
+        if (std::abs(posdau.tpcNSigmaPi()) < strangedEdxNSigmaLoose && std::abs(negdau.tpcNSigmaPr()) < strangedEdxNSigmaLoose) {
+          if (doPPAnalysis || isGoodAntiLambda) {
             BIT_SET(compatibleAntiLambda, 0);
           }
         }
-      }
-      if (std::abs(posdau.tpcNSigmaPi()) < strangedEdxNSigma && std::abs(negdau.tpcNSigmaPr()) < strangedEdxNSigma) {
-        if (v0.v0cosPA() > lambdaCospa) {
-          if (doPPAnalysis || (v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassK0Short < lifetimecutLambda &&
-                               std::abs(v0.dcapostopv()) > dcapostopvAntiLambda && std::abs(v0.dcanegtopv()) > dcanegtopvAntiLambda)) {
+        if (std::abs(posdau.tpcNSigmaPi()) < strangedEdxNSigma && std::abs(negdau.tpcNSigmaPr()) < strangedEdxNSigma) {
+          if (doPPAnalysis || isGoodAntiLambda) {
             BIT_SET(compatibleAntiLambda, 1);
           }
         }
-      }
-      if (std::abs(posdau.tpcNSigmaPi()) < strangedEdxNSigmaTight && std::abs(negdau.tpcNSigmaPr()) < strangedEdxNSigmaTight) {
-        if (v0.v0cosPA() > lambdaCospa) {
-          if (doPPAnalysis || (v0.distovertotmom(collision.posX(), collision.posY(), collision.posZ()) * o2::constants::physics::MassK0Short < lifetimecutLambda &&
-                               std::abs(v0.dcapostopv()) > dcapostopvAntiLambda && std::abs(v0.dcanegtopv()) > dcanegtopvAntiLambda)) {
+        if (std::abs(posdau.tpcNSigmaPi()) < strangedEdxNSigmaTight && std::abs(negdau.tpcNSigmaPr()) < strangedEdxNSigmaTight) {
+          if (doPPAnalysis || isGoodAntiLambda) {
             BIT_SET(compatibleAntiLambda, 2);
           }
         }
       }
 
-      // simplified handling: calculate NSigma in mass here
-      float massNSigmaK0Short = (v0.mK0Short() - fK0Mean->Eval(v0.pt())) / (fK0Width->Eval(v0.pt()) + 1e-6);
-      float massNSigmaLambda = (v0.mLambda() - fLambdaMean->Eval(v0.pt())) / (fLambdaWidth->Eval(v0.pt()) + 1e-6);
-      float massNSigmaAntiLambda = (v0.mAntiLambda() - fLambdaMean->Eval(v0.pt())) / (fLambdaWidth->Eval(v0.pt()) + 1e-6);
+      float massNSigmaK0Short = -20.0f;
+      float massNSigmaLambda = -20.0f;
+      float massNSigmaAntiLambda = -20.0f;
+      if (useParameterization) {
+        massNSigmaK0Short = (v0.mK0Short() - fK0Mean->Eval(v0.pt())) / (fK0Width->Eval(v0.pt()) + 1e-6);
+        massNSigmaLambda = (v0.mLambda() - fLambdaMean->Eval(v0.pt())) / (fLambdaWidth->Eval(v0.pt()) + 1e-6);
+        massNSigmaAntiLambda = (v0.mAntiLambda() - fLambdaMean->Eval(v0.pt())) / (fLambdaWidth->Eval(v0.pt()) + 1e-6);
+      } else {
+        // Load parameters for sideband subtraction
+        initParametersFromCCDB(bc);
+        // simplified handling: calculate NSigma in mass here
+        if (v0.pt() < minPtForParam || v0.pt() > maxPtForParam) {
+          massNSigmaK0Short = (v0.mK0Short() - hK0ShortMean->GetBinContent(hK0ShortMean->FindBin(v0.pt()))) / (hK0ShortWidth->GetBinContent(hK0ShortWidth->FindBin(v0.pt())) + 1e-6);
+          massNSigmaLambda = (v0.mLambda() - hLambdaMean->GetBinContent(hLambdaMean->FindBin(v0.pt()))) / (hLambdaWidth->GetBinContent(hLambdaMean->FindBin(v0.pt())) + 1e-6);
+          massNSigmaAntiLambda = (v0.mAntiLambda() - hLambdaMean->GetBinContent(hLambdaMean->FindBin(v0.pt()))) / (hLambdaWidth->GetBinContent(hLambdaMean->FindBin(v0.pt())) + 1e-6);
+        } else {
+          massNSigmaK0Short = (v0.mK0Short() - hK0ShortMean->Interpolate(v0.pt())) / (hK0ShortWidth->Interpolate(v0.pt()) + 1e-6);
+          massNSigmaLambda = (v0.mLambda() - hLambdaMean->Interpolate(v0.pt())) / (hLambdaWidth->Interpolate(v0.pt()) + 1e-6);
+          massNSigmaAntiLambda = (v0.mAntiLambda() - hLambdaMean->Interpolate(v0.pt())) / (hLambdaWidth->Interpolate(v0.pt()) + 1e-6);
+        }
+      }
       bool v0PhysicalPrimary = false;
       bool trueK0Short = false;
       bool trueLambda = false;
       bool trueAntiLambda = false;
       v0PhysicalPrimary = v0.isPhysicalPrimary();
-      if (v0.pdgCode() == 310)
+      if (v0.pdgCode() == PDG_t::kK0Short)
         trueK0Short = true;
-      if (v0.pdgCode() == 3122)
+      if (v0.pdgCode() == PDG_t::kLambda0)
         trueLambda = true;
-      if (v0.pdgCode() == -3122)
+      if (v0.pdgCode() == PDG_t::kLambda0Bar)
         trueAntiLambda = true;
       if (compatibleK0Short && (!doTrueSelectionInMass || (trueK0Short && v0PhysicalPrimary)))
         histos.fill(HIST("h3dMassK0Short"), v0.pt(), v0.mK0Short(), cent);
@@ -890,49 +1000,46 @@ struct HStrangeCorrelationFilter {
     }
   }
 
-  void processCascades(soa::Join<aod::Collisions, aod::EvSels, aod::CentFT0Ms, aod::CentFT0Cs>::iterator const& collision, DauTracks const&, soa::Filtered<V0DatasWithoutTrackX> const& /*V0s*/, soa::Filtered<aod::CascDatas> const& Cascades, aod::BCsWithTimestamps const&)
+  void processCascades(soa::Join<aod::Collisions, aod::EvSels, aod::CentFT0Ms, aod::CentFT0Cs, aod::PVMults>::iterator const& collision, DauTracks const&, soa::Filtered<V0DatasWithoutTrackX> const& /*V0s*/, soa::Filtered<aod::CascDatas> const& Cascades, aod::BCsWithTimestamps const&)
   {
     double cent = doPPAnalysis ? collision.centFT0M() : collision.centFT0C();
-    // Perform basic event selection
-    if (!collision.sel8()) {
+    auto bc = collision.bc_as<aod::BCsWithTimestamps>();
+    if (((doPPAnalysis && !isCollisionSelected(collision))) || (!doPPAnalysis && !isCollisionSelectedPbPb(collision))) {
       return;
     }
-    // No need to correlate stuff that's in far collisions
-    if (std::abs(collision.posZ()) > 10.0) {
-      return;
-    }
-    if (zorroMask.value != "") {
-      auto bc = collision.bc_as<aod::BCsWithTimestamps>();
-      initCCDB(bc);
-      bool zorroSelected = zorro.isSelected(collision.bc_as<aod::BCsWithTimestamps>().globalBC()); /// Just let Zorro do the accounting
-      if (!zorroSelected) {
-        return;
-      }
-    }
-    if (!doPPAnalysis && !isCollisionSelectedPbPb(collision))
-      return;
     /// _________________________________________________
     /// Step 3: Populate table with associated Cascades
     for (auto const& casc : Cascades) {
-      if (casc.eta() > assocEtaMax || casc.eta() < assocEtaMin) {
+      if (casc.eta() > generalSelections.assocEtaMax || casc.eta() < generalSelections.assocEtaMin) {
         continue;
       }
-      if (casc.pt() > assocPtCutMax || casc.pt() < assocPtCutMin) {
+      if (casc.pt() > generalSelections.assocPtCutMax || casc.pt() < generalSelections.assocPtCutMin) {
         continue;
       }
+      if (doPPAnalysis && (casc.v0cosPA(collision.posX(), collision.posY(), collision.posZ()) < cascSelection.cascv0cospa ||
+                           casc.casccosPA(collision.posX(), collision.posY(), collision.posZ()) < cascSelection.cascCospa ||
+                           casc.cascradius() < cascSelection.cascRadius ||
+                           std::abs(casc.dcav0topv(collision.posX(), collision.posY(), collision.posZ())) < cascSelection.cascMindcav0topv ||
+                           std::abs(casc.mLambda() - o2::constants::physics::MassLambda0) > cascSelection.cascV0masswindow))
+        continue;
       auto bachTrackCast = casc.bachelor_as<DauTracks>();
       auto posTrackCast = casc.posTrack_as<DauTracks>();
       auto negTrackCast = casc.negTrack_as<DauTracks>();
 
       // minimum TPC crossed rows
-      if (bachTrackCast.tpcNClsCrossedRows() < minTPCNCrossedRows)
+      if (bachTrackCast.tpcNClsCrossedRows() < trackSelections.minTPCNCrossedRows)
         continue;
-      if (posTrackCast.tpcNClsCrossedRows() < minTPCNCrossedRows)
+      if (posTrackCast.tpcNClsCrossedRows() < trackSelections.minTPCNCrossedRows)
         continue;
-      if (negTrackCast.tpcNClsCrossedRows() < minTPCNCrossedRows)
+      if (negTrackCast.tpcNClsCrossedRows() < trackSelections.minTPCNCrossedRows)
         continue;
-      if (!doPPAnalysis && !CascadeSelectedPbPb(casc, collision.posX(), collision.posY(), collision.posZ()))
+      if (!doPPAnalysis && !cascadeSelectedPbPb(casc, collision.posX(), collision.posY(), collision.posZ()))
         continue;
+
+      bool isGoodNegCascadePbPb = std::abs(casc.dcabachtopv()) > cascSelection.dcaBachToPV && std::abs(casc.dcapostopv()) > cascSelection.cascDcaBaryonToPV &&
+                                  std::abs(casc.dcanegtopv()) > cascSelection.cascDcaMesonToPV;
+      bool isGoodPosCascadePbPb = std::abs(casc.dcabachtopv()) > cascSelection.dcaBachToPV && std::abs(casc.dcapostopv()) > cascSelection.cascDcaMesonToPV &&
+                                  std::abs(casc.dcanegtopv()) > cascSelection.cascDcaBaryonToPV;
       // check dE/dx compatibility
       int compatibleXiMinus = 0;
       int compatibleXiPlus = 0;
@@ -940,113 +1047,105 @@ struct HStrangeCorrelationFilter {
       int compatibleOmegaPlus = 0;
       float cascpos = std::hypot(casc.x() - collision.posX(), casc.y() - collision.posY(), casc.z() - collision.posZ());
       float cascptotmom = std::hypot(casc.px(), casc.py(), casc.pz());
-      float ctauXi = o2::constants::physics::MassXiMinus * cascpos / ((cascptotmom + 1e-13) * ctauxiPDG);
-      float ctauOmega = o2::constants::physics::MassOmegaMinus * cascpos / ((cascptotmom + 1e-13) * ctauomegaPDG);
+      float ctauXi = o2::constants::physics::MassXiMinus * cascpos / ((cascptotmom + 1e-13) * ctauxi);
+      float ctauOmega = o2::constants::physics::MassOmegaMinus * cascpos / ((cascptotmom + 1e-13) * ctauomega);
 
+      bool isGoodXiPbPb = std::abs(casc.mOmega() - o2::constants::physics::MassOmegaMinus) > cascSelection.rejcomp &&
+                          ctauXi < cascSelection.proplifetime && std::abs(casc.yXi()) < cascSelection.rapCut;
+      bool isGoodOmegaPbPb = std::abs(casc.mXi() - o2::constants::physics::MassXiMinus) > cascSelection.rejcomp &&
+                             ctauOmega < cascSelection.proplifetime && std::abs(casc.yOmega()) < cascSelection.rapCut;
       if (std::abs(posTrackCast.tpcNSigmaPr()) < strangedEdxNSigmaLoose && std::abs(negTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaLoose && std::abs(bachTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaLoose && casc.sign() < 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaBaryonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaMesonToPV && std::abs(casc.mOmega() - o2::constants::physics::MassOmegaMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauXi < MorePbPbsystCuts.proplifetime && std::abs(casc.yXi()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodNegCascadePbPb && isGoodXiPbPb)) {
           BIT_SET(compatibleXiMinus, 0);
         }
       }
       if (std::abs(posTrackCast.tpcNSigmaPr()) < strangedEdxNSigma && std::abs(negTrackCast.tpcNSigmaPi()) < strangedEdxNSigma && std::abs(bachTrackCast.tpcNSigmaPi()) < strangedEdxNSigma && casc.sign() < 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaBaryonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaMesonToPV && std::abs(casc.mOmega() - o2::constants::physics::MassOmegaMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauXi < MorePbPbsystCuts.proplifetime && std::abs(casc.yXi()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodNegCascadePbPb && isGoodXiPbPb)) {
           BIT_SET(compatibleXiMinus, 1);
         }
       }
       if (std::abs(posTrackCast.tpcNSigmaPr()) < strangedEdxNSigmaTight && std::abs(negTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaTight && std::abs(bachTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaTight && casc.sign() < 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaBaryonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaMesonToPV && std::abs(casc.mOmega() - o2::constants::physics::MassOmegaMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauXi < MorePbPbsystCuts.proplifetime && std::abs(casc.yXi()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodNegCascadePbPb && isGoodXiPbPb)) {
           BIT_SET(compatibleXiMinus, 2);
         }
       }
 
       if (std::abs(posTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaLoose && std::abs(negTrackCast.tpcNSigmaPr()) < strangedEdxNSigmaLoose && std::abs(bachTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaLoose && casc.sign() > 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaBaryonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaMesonToPV && std::abs(casc.mOmega() - o2::constants::physics::MassOmegaMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauXi < MorePbPbsystCuts.proplifetime && std::abs(casc.yXi()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodPosCascadePbPb && isGoodXiPbPb)) {
           BIT_SET(compatibleXiPlus, 0);
         }
       }
       if (std::abs(posTrackCast.tpcNSigmaPi()) < strangedEdxNSigma && std::abs(negTrackCast.tpcNSigmaPr()) < strangedEdxNSigma && std::abs(bachTrackCast.tpcNSigmaPi()) < strangedEdxNSigma && casc.sign() > 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaBaryonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaMesonToPV && std::abs(casc.mOmega() - o2::constants::physics::MassOmegaMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauXi < MorePbPbsystCuts.proplifetime && std::abs(casc.yXi()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodPosCascadePbPb && isGoodXiPbPb)) {
           BIT_SET(compatibleXiPlus, 1);
         }
       }
       if (std::abs(posTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaTight && std::abs(negTrackCast.tpcNSigmaPr()) < strangedEdxNSigmaTight && std::abs(bachTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaTight && casc.sign() > 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaBaryonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaMesonToPV && std::abs(casc.mOmega() - o2::constants::physics::MassOmegaMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauXi < MorePbPbsystCuts.proplifetime && std::abs(casc.yXi()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodPosCascadePbPb && isGoodXiPbPb)) {
           BIT_SET(compatibleXiPlus, 2);
         }
       }
 
       if (std::abs(posTrackCast.tpcNSigmaPr()) < strangedEdxNSigmaLoose && std::abs(negTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaLoose && std::abs(bachTrackCast.tpcNSigmaKa()) < strangedEdxNSigmaLoose && casc.sign() < 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaBaryonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaMesonToPV && std::abs(casc.mXi() - o2::constants::physics::MassXiMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauOmega < MorePbPbsystCuts.proplifetime && std::abs(casc.yOmega()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodNegCascadePbPb && isGoodOmegaPbPb)) {
           BIT_SET(compatibleOmegaMinus, 0);
         }
       }
       if (std::abs(posTrackCast.tpcNSigmaPr()) < strangedEdxNSigma && std::abs(negTrackCast.tpcNSigmaPi()) < strangedEdxNSigma && std::abs(bachTrackCast.tpcNSigmaKa()) < strangedEdxNSigma && casc.sign() < 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaBaryonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaMesonToPV && std::abs(casc.mXi() - o2::constants::physics::MassXiMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauOmega < MorePbPbsystCuts.proplifetime && std::abs(casc.yOmega()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodNegCascadePbPb && isGoodOmegaPbPb)) {
           BIT_SET(compatibleOmegaMinus, 1);
         }
       }
       if (std::abs(posTrackCast.tpcNSigmaPr()) < strangedEdxNSigmaTight && std::abs(negTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaTight && std::abs(bachTrackCast.tpcNSigmaKa()) < strangedEdxNSigmaTight && casc.sign() < 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaBaryonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaMesonToPV && std::abs(casc.mXi() - o2::constants::physics::MassXiMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauOmega < MorePbPbsystCuts.proplifetime && std::abs(casc.yOmega()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodNegCascadePbPb && isGoodOmegaPbPb)) {
           BIT_SET(compatibleOmegaMinus, 2);
         }
       }
 
       if (std::abs(posTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaLoose && std::abs(negTrackCast.tpcNSigmaPr()) < strangedEdxNSigmaLoose && std::abs(bachTrackCast.tpcNSigmaKa()) < strangedEdxNSigmaLoose && casc.sign() > 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaMesonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaBaryonToPV && std::abs(casc.mXi() - o2::constants::physics::MassXiMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauOmega < MorePbPbsystCuts.proplifetime && std::abs(casc.yOmega()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodPosCascadePbPb && isGoodOmegaPbPb)) {
           BIT_SET(compatibleOmegaPlus, 0);
         }
       }
       if (std::abs(posTrackCast.tpcNSigmaPi()) < strangedEdxNSigma && std::abs(negTrackCast.tpcNSigmaPr()) < strangedEdxNSigma && std::abs(bachTrackCast.tpcNSigmaKa()) < strangedEdxNSigma && casc.sign() > 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaMesonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaBaryonToPV && std::abs(casc.mXi() - o2::constants::physics::MassXiMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauOmega < MorePbPbsystCuts.proplifetime && std::abs(casc.yOmega()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodPosCascadePbPb && isGoodOmegaPbPb)) {
           BIT_SET(compatibleOmegaPlus, 1);
         }
       }
       if (std::abs(posTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaTight && std::abs(negTrackCast.tpcNSigmaPr()) < strangedEdxNSigmaTight && std::abs(bachTrackCast.tpcNSigmaKa()) < strangedEdxNSigmaTight && casc.sign() > 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaMesonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaBaryonToPV && std::abs(casc.mXi() - o2::constants::physics::MassXiMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauOmega < MorePbPbsystCuts.proplifetime && std::abs(casc.yOmega()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodPosCascadePbPb && isGoodOmegaPbPb)) {
           BIT_SET(compatibleOmegaPlus, 2);
         }
       }
-
-      float massNSigmaXi = (casc.mXi() - fXiMean->Eval(casc.pt())) / (fXiWidth->Eval(casc.pt()) + 1e-6);
-      float massNSigmaOmega = (casc.mOmega() - fOmegaMean->Eval(casc.pt())) / (fOmegaWidth->Eval(casc.pt()) + 1e-6);
-
+      float massNSigmaXi = -20.0f;
+      float massNSigmaOmega = -20.0f;
+      if (useParameterization) {
+        massNSigmaXi = (casc.mXi() - fXiMean->Eval(casc.pt())) / (fXiWidth->Eval(casc.pt()) + 1e-6);
+        massNSigmaOmega = (casc.mOmega() - fOmegaMean->Eval(casc.pt())) / (fOmegaWidth->Eval(casc.pt()) + 1e-6);
+      } else {
+        // Load parameters for sideband subtraction
+        initParametersFromCCDB(bc);
+        if (casc.pt() < minPtForParam || casc.pt() > maxPtForParam) {
+          massNSigmaXi = (casc.mXi() - hXiMean->GetBinContent(hXiMean->FindBin(casc.pt()))) / (hXiWidth->GetBinContent(hXiWidth->FindBin(casc.pt())) + 1e-6);
+          massNSigmaOmega = (casc.mOmega() - hOmegaMean->GetBinContent(hOmegaMean->FindBin(casc.pt()))) / (hOmegaWidth->GetBinContent(hOmegaWidth->FindBin(casc.pt())) + 1e-6);
+        } else {
+          massNSigmaXi = (casc.mXi() - hXiMean->Interpolate(casc.pt())) / (hXiWidth->Interpolate(casc.pt()) + 1e-6);
+          massNSigmaOmega = (casc.mOmega() - hOmegaMean->Interpolate(casc.pt())) / (hOmegaWidth->Interpolate(casc.pt()) + 1e-6);
+        }
+      }
       if (compatibleXiMinus)
         histos.fill(HIST("h3dMassXiMinus"), casc.pt(), casc.mXi(), cent);
       if (compatibleXiPlus)
         histos.fill(HIST("h3dMassXiPlus"), casc.pt(), casc.mXi(), cent);
-      if (compatibleOmegaMinus)
+      if (compatibleOmegaMinus && std::abs(massNSigmaXi) > nSigmaNearXiMassCenter)
         histos.fill(HIST("h3dMassOmegaMinus"), casc.pt(), casc.mOmega(), cent);
-      if (compatibleOmegaPlus)
+      if (compatibleOmegaPlus && std::abs(massNSigmaXi) > nSigmaNearXiMassCenter)
         histos.fill(HIST("h3dMassOmegaPlus"), casc.pt(), casc.mOmega(), cent);
 
       if (!fillTableOnlyWithCompatible ||
           ( // start major condition check
             ((compatibleXiMinus > 0 || compatibleXiPlus > 0) && std::abs(massNSigmaXi) < maxMassNSigma) ||
-            ((compatibleOmegaMinus > 0 || compatibleOmegaPlus > 0) && std::abs(massNSigmaOmega) < maxMassNSigma)) // end major condition check
+            ((compatibleOmegaMinus > 0 || compatibleOmegaPlus > 0) && std::abs(massNSigmaOmega) < maxMassNSigma && std::abs(massNSigmaXi) > nSigmaNearXiMassCenter)) // end major condition check
       ) {
         assocCascades(casc.collisionId(), casc.globalIndex(),
                       compatibleXiMinus, compatibleXiPlus, compatibleOmegaMinus, compatibleOmegaPlus,
@@ -1056,50 +1155,47 @@ struct HStrangeCorrelationFilter {
     }
   }
 
-  void processCascadesMC(soa::Join<aod::Collisions, aod::EvSels, aod::CentFT0Ms, aod::CentFT0Cs>::iterator const& collision, DauTracks const&, soa::Filtered<V0DatasWithoutTrackXMC> const& /*V0s*/, soa::Filtered<CascDatasMC> const& Cascades, aod::McParticles const&, aod::BCsWithTimestamps const&)
+  void processCascadesMC(soa::Join<aod::Collisions, aod::EvSels, aod::CentFT0Ms, aod::CentFT0Cs, aod::PVMults>::iterator const& collision, DauTracks const&, soa::Filtered<V0DatasWithoutTrackXMC> const& /*V0s*/, soa::Filtered<CascDatasMC> const& Cascades, aod::McParticles const&, aod::BCsWithTimestamps const&)
   {
     double cent = doPPAnalysis ? collision.centFT0M() : collision.centFT0C();
+    auto bc = collision.bc_as<aod::BCsWithTimestamps>();
     // Perform basic event selection
-    if (!collision.sel8()) {
+    if (((doPPAnalysis && !isCollisionSelected(collision))) || (!doPPAnalysis && !isCollisionSelectedPbPb(collision))) {
       return;
     }
-    // No need to correlate stuff that's in far collisions
-    if (std::abs(collision.posZ()) > 10.0) {
-      return;
-    }
-    if (zorroMask.value != "") {
-      auto bc = collision.bc_as<aod::BCsWithTimestamps>();
-      initCCDB(bc);
-      bool zorroSelected = zorro.isSelected(collision.bc_as<aod::BCsWithTimestamps>().globalBC()); /// Just let Zorro do the accounting
-      if (!zorroSelected) {
-        return;
-      }
-    }
-    if (!doPPAnalysis && !isCollisionSelectedPbPb(collision))
-      return;
     /// _________________________________________________
     /// Step 3: Populate table with associated Cascades
     for (auto const& casc : Cascades) {
-      if (casc.eta() > assocEtaMax || casc.eta() < assocEtaMin) {
+      if (casc.eta() > generalSelections.assocEtaMax || casc.eta() < generalSelections.assocEtaMin) {
         continue;
       }
-      if (casc.pt() > assocPtCutMax || casc.pt() < assocPtCutMin) {
+      if (casc.pt() > generalSelections.assocPtCutMax || casc.pt() < generalSelections.assocPtCutMin) {
         continue;
       }
+      if (doPPAnalysis && (casc.v0cosPA(collision.posX(), collision.posY(), collision.posZ()) < cascSelection.cascv0cospa ||
+                           casc.casccosPA(collision.posX(), collision.posY(), collision.posZ()) < cascSelection.cascCospa ||
+                           casc.cascradius() < cascSelection.cascRadius ||
+                           std::abs(casc.dcav0topv(collision.posX(), collision.posY(), collision.posZ())) < cascSelection.cascMindcav0topv ||
+                           std::abs(casc.mLambda() - o2::constants::physics::MassLambda0) > cascSelection.cascV0masswindow))
+        continue;
+
       auto bachTrackCast = casc.bachelor_as<DauTracks>();
       auto posTrackCast = casc.posTrack_as<DauTracks>();
       auto negTrackCast = casc.negTrack_as<DauTracks>();
 
       // minimum TPC crossed rows
-      if (bachTrackCast.tpcNClsCrossedRows() < minTPCNCrossedRows)
+      if (bachTrackCast.tpcNClsCrossedRows() < trackSelections.minTPCNCrossedRows)
         continue;
-      if (posTrackCast.tpcNClsCrossedRows() < minTPCNCrossedRows)
+      if (posTrackCast.tpcNClsCrossedRows() < trackSelections.minTPCNCrossedRows)
         continue;
-      if (negTrackCast.tpcNClsCrossedRows() < minTPCNCrossedRows)
+      if (negTrackCast.tpcNClsCrossedRows() < trackSelections.minTPCNCrossedRows)
         continue;
-      if (!doPPAnalysis && !CascadeSelectedPbPb(casc, collision.posX(), collision.posY(), collision.posZ()))
+      if (!doPPAnalysis && !cascadeSelectedPbPb(casc, collision.posX(), collision.posY(), collision.posZ()))
         continue;
-
+      bool isGoodNegCascadePbPb = (std::abs(casc.dcabachtopv()) > cascSelection.dcaBachToPV && std::abs(casc.dcapostopv()) > cascSelection.cascDcaBaryonToPV &&
+                                   std::abs(casc.dcanegtopv()) > cascSelection.cascDcaMesonToPV);
+      bool isGoodPosCascadePbPb = (std::abs(casc.dcabachtopv()) > cascSelection.dcaBachToPV && std::abs(casc.dcapostopv()) > cascSelection.cascDcaMesonToPV &&
+                                   std::abs(casc.dcanegtopv()) > cascSelection.cascDcaBaryonToPV);
       // check dE/dx compatibility
       int compatibleXiMinus = 0;
       int compatibleXiPlus = 0;
@@ -1107,126 +1203,120 @@ struct HStrangeCorrelationFilter {
       int compatibleOmegaPlus = 0;
       float cascpos = std::hypot(casc.x() - collision.posX(), casc.y() - collision.posY(), casc.z() - collision.posZ());
       float cascptotmom = std::hypot(casc.px(), casc.py(), casc.pz());
-      float ctauXi = o2::constants::physics::MassXiMinus * cascpos / ((cascptotmom + 1e-13) * ctauxiPDG);
-      float ctauOmega = o2::constants::physics::MassOmegaMinus * cascpos / ((cascptotmom + 1e-13) * ctauomegaPDG);
+      float ctauXi = o2::constants::physics::MassXiMinus * cascpos / ((cascptotmom + 1e-13) * ctauxi);
+      float ctauOmega = o2::constants::physics::MassOmegaMinus * cascpos / ((cascptotmom + 1e-13) * ctauomega);
 
+      bool iGoodXiPbPb = std::abs(casc.mOmega() - o2::constants::physics::MassOmegaMinus) > cascSelection.rejcomp &&
+                         ctauXi < cascSelection.proplifetime && std::abs(casc.yXi()) < cascSelection.rapCut;
+      bool isGoodOmegaPbPb = std::abs(casc.mXi() - o2::constants::physics::MassXiMinus) > cascSelection.rejcomp &&
+                             ctauOmega < cascSelection.proplifetime && std::abs(casc.yOmega()) < cascSelection.rapCut;
       if (std::abs(posTrackCast.tpcNSigmaPr()) < strangedEdxNSigmaLoose && std::abs(negTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaLoose && std::abs(bachTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaLoose && casc.sign() < 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaBaryonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaMesonToPV && std::abs(casc.mOmega() - o2::constants::physics::MassOmegaMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauXi < MorePbPbsystCuts.proplifetime && std::abs(casc.yXi()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodNegCascadePbPb && iGoodXiPbPb)) {
           BIT_SET(compatibleXiMinus, 0);
         }
       }
       if (std::abs(posTrackCast.tpcNSigmaPr()) < strangedEdxNSigma && std::abs(negTrackCast.tpcNSigmaPi()) < strangedEdxNSigma && std::abs(bachTrackCast.tpcNSigmaPi()) < strangedEdxNSigma && casc.sign() < 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaBaryonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaMesonToPV && std::abs(casc.mOmega() - o2::constants::physics::MassOmegaMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauXi < MorePbPbsystCuts.proplifetime && std::abs(casc.yXi()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodNegCascadePbPb && iGoodXiPbPb)) {
           BIT_SET(compatibleXiMinus, 1);
         }
       }
       if (std::abs(posTrackCast.tpcNSigmaPr()) < strangedEdxNSigmaTight && std::abs(negTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaTight && std::abs(bachTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaTight && casc.sign() < 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaBaryonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaMesonToPV && std::abs(casc.mOmega() - o2::constants::physics::MassOmegaMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauXi < MorePbPbsystCuts.proplifetime && std::abs(casc.yXi()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodNegCascadePbPb && iGoodXiPbPb)) {
           BIT_SET(compatibleXiMinus, 2);
         }
       }
 
       if (std::abs(posTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaLoose && std::abs(negTrackCast.tpcNSigmaPr()) < strangedEdxNSigmaLoose && std::abs(bachTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaLoose && casc.sign() > 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaBaryonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaMesonToPV && std::abs(casc.mOmega() - o2::constants::physics::MassOmegaMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauXi < MorePbPbsystCuts.proplifetime && std::abs(casc.yXi()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodPosCascadePbPb && iGoodXiPbPb)) {
           BIT_SET(compatibleXiPlus, 0);
         }
       }
       if (std::abs(posTrackCast.tpcNSigmaPi()) < strangedEdxNSigma && std::abs(negTrackCast.tpcNSigmaPr()) < strangedEdxNSigma && std::abs(bachTrackCast.tpcNSigmaPi()) < strangedEdxNSigma && casc.sign() > 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaBaryonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaMesonToPV && std::abs(casc.mOmega() - o2::constants::physics::MassOmegaMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauXi < MorePbPbsystCuts.proplifetime && std::abs(casc.yXi()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodPosCascadePbPb && iGoodXiPbPb)) {
           BIT_SET(compatibleXiPlus, 1);
         }
       }
       if (std::abs(posTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaTight && std::abs(negTrackCast.tpcNSigmaPr()) < strangedEdxNSigmaTight && std::abs(bachTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaTight && casc.sign() > 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaBaryonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaMesonToPV && std::abs(casc.mOmega() - o2::constants::physics::MassOmegaMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauXi < MorePbPbsystCuts.proplifetime && std::abs(casc.yXi()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodPosCascadePbPb && iGoodXiPbPb)) {
           BIT_SET(compatibleXiPlus, 2);
         }
       }
 
       if (std::abs(posTrackCast.tpcNSigmaPr()) < strangedEdxNSigmaLoose && std::abs(negTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaLoose && std::abs(bachTrackCast.tpcNSigmaKa()) < strangedEdxNSigmaLoose && casc.sign() < 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaBaryonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaMesonToPV && std::abs(casc.mXi() - o2::constants::physics::MassXiMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauOmega < MorePbPbsystCuts.proplifetime && std::abs(casc.yOmega()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodNegCascadePbPb && isGoodOmegaPbPb)) {
           BIT_SET(compatibleOmegaMinus, 0);
         }
       }
       if (std::abs(posTrackCast.tpcNSigmaPr()) < strangedEdxNSigma && std::abs(negTrackCast.tpcNSigmaPi()) < strangedEdxNSigma && std::abs(bachTrackCast.tpcNSigmaKa()) < strangedEdxNSigma && casc.sign() < 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaBaryonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaMesonToPV && std::abs(casc.mXi() - o2::constants::physics::MassXiMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauOmega < MorePbPbsystCuts.proplifetime && std::abs(casc.yOmega()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodNegCascadePbPb && isGoodOmegaPbPb)) {
           BIT_SET(compatibleOmegaMinus, 1);
         }
       }
       if (std::abs(posTrackCast.tpcNSigmaPr()) < strangedEdxNSigmaTight && std::abs(negTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaTight && std::abs(bachTrackCast.tpcNSigmaKa()) < strangedEdxNSigmaTight && casc.sign() < 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaBaryonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaMesonToPV && std::abs(casc.mXi() - o2::constants::physics::MassXiMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauOmega < MorePbPbsystCuts.proplifetime && std::abs(casc.yOmega()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodNegCascadePbPb && isGoodOmegaPbPb)) {
           BIT_SET(compatibleOmegaMinus, 2);
         }
       }
 
       if (std::abs(posTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaLoose && std::abs(negTrackCast.tpcNSigmaPr()) < strangedEdxNSigmaLoose && std::abs(bachTrackCast.tpcNSigmaKa()) < strangedEdxNSigmaLoose && casc.sign() > 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaMesonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaBaryonToPV && std::abs(casc.mXi() - o2::constants::physics::MassXiMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauOmega < MorePbPbsystCuts.proplifetime && std::abs(casc.yOmega()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodPosCascadePbPb && isGoodOmegaPbPb)) {
           BIT_SET(compatibleOmegaPlus, 0);
         }
       }
       if (std::abs(posTrackCast.tpcNSigmaPi()) < strangedEdxNSigma && std::abs(negTrackCast.tpcNSigmaPr()) < strangedEdxNSigma && std::abs(bachTrackCast.tpcNSigmaKa()) < strangedEdxNSigma && casc.sign() > 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaMesonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaBaryonToPV && std::abs(casc.mXi() - o2::constants::physics::MassXiMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauOmega < MorePbPbsystCuts.proplifetime && std::abs(casc.yOmega()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodPosCascadePbPb && isGoodOmegaPbPb)) {
           BIT_SET(compatibleOmegaPlus, 1);
         }
       }
       if (std::abs(posTrackCast.tpcNSigmaPi()) < strangedEdxNSigmaTight && std::abs(negTrackCast.tpcNSigmaPr()) < strangedEdxNSigmaTight && std::abs(bachTrackCast.tpcNSigmaKa()) < strangedEdxNSigmaTight && casc.sign() > 0) {
-        if (doPPAnalysis || (std::abs(casc.dcabachtopv()) > MorePbPbsystCuts.dcaBachToPV && std::abs(casc.dcapostopv()) > MorePbPbsystCuts.dcaMesonToPV &&
-                             std::abs(casc.dcanegtopv()) > MorePbPbsystCuts.dcaBaryonToPV && std::abs(casc.mXi() - o2::constants::physics::MassXiMinus) > MorePbPbsystCuts.rejcomp &&
-                             ctauOmega < MorePbPbsystCuts.proplifetime && std::abs(casc.yOmega()) < MorePbPbsystCuts.rapCut)) {
+        if (doPPAnalysis || (isGoodPosCascadePbPb && isGoodOmegaPbPb)) {
           BIT_SET(compatibleOmegaPlus, 2);
         }
       }
+      float massNSigmaXi = 20.0f;
+      float massNSigmaOmega = 20.0f;
+      if (useParameterization) {
+        massNSigmaXi = (casc.mXi() - fXiMean->Eval(casc.pt())) / (fXiWidth->Eval(casc.pt()) + 1e-6);
+        massNSigmaOmega = (casc.mOmega() - fOmegaMean->Eval(casc.pt())) / (fOmegaWidth->Eval(casc.pt()) + 1e-6);
+      } else {
+        // Load parameters for sideband subtraction
+        initParametersFromCCDB(bc);
+        if (casc.pt() < minPtForParam || casc.pt() > maxPtForParam) {
+          massNSigmaXi = (casc.mXi() - hXiMean->GetBinContent(hXiMean->FindBin(casc.pt()))) / (hXiWidth->GetBinContent(hXiWidth->FindBin(casc.pt())) + 1e-6);
+          massNSigmaOmega = (casc.mOmega() - hOmegaMean->GetBinContent(hOmegaMean->FindBin(casc.pt()))) / (hOmegaWidth->GetBinContent(hOmegaWidth->FindBin(casc.pt())) + 1e-6);
+        } else {
+          massNSigmaXi = (casc.mXi() - hXiMean->Interpolate(casc.pt())) / (hXiWidth->Interpolate(casc.pt()) + 1e-6);
+          massNSigmaOmega = (casc.mOmega() - hOmegaMean->Interpolate(casc.pt())) / (hOmegaWidth->Interpolate(casc.pt()) + 1e-6);
+        }
+      }
 
-      float massNSigmaXi = (casc.mXi() - fXiMean->Eval(casc.pt())) / (fXiWidth->Eval(casc.pt()) + 1e-6);
-      float massNSigmaOmega = (casc.mOmega() - fOmegaMean->Eval(casc.pt())) / (fOmegaWidth->Eval(casc.pt()) + 1e-6);
       bool cascPhysicalPrimary = false;
       bool trueXiMinus = false;
       bool trueXiPlus = false;
       bool trueOmegaMinus = false;
       bool trueOmegaPlus = false;
       cascPhysicalPrimary = casc.isPhysicalPrimary();
-      if (casc.pdgCode() == 3312)
+      if (casc.pdgCode() == PDG_t::kXiMinus)
         trueXiMinus = true;
-      if (casc.pdgCode() == -3312)
+      if (casc.pdgCode() == PDG_t::kXiPlusBar)
         trueXiPlus = true;
-      if (casc.pdgCode() == 3334)
+      if (casc.pdgCode() == PDG_t::kOmegaMinus)
         trueOmegaMinus = true;
-      if (casc.pdgCode() == -3334)
+      if (casc.pdgCode() == PDG_t::kOmegaPlusBar)
         trueOmegaPlus = true;
       if (compatibleXiMinus && (!doTrueSelectionInMass || (trueXiMinus && cascPhysicalPrimary)))
         histos.fill(HIST("h3dMassXiMinus"), casc.pt(), casc.mXi(), cent);
       if (compatibleXiPlus && (!doTrueSelectionInMass || (trueXiPlus && cascPhysicalPrimary)))
         histos.fill(HIST("h3dMassXiPlus"), casc.pt(), casc.mXi(), cent);
-      if (compatibleOmegaMinus && (!doTrueSelectionInMass || (trueOmegaMinus && cascPhysicalPrimary)))
+      if (compatibleOmegaMinus && (!doTrueSelectionInMass || (trueOmegaMinus && cascPhysicalPrimary)) && std::abs(massNSigmaXi) > nSigmaNearXiMassCenter)
         histos.fill(HIST("h3dMassOmegaMinus"), casc.pt(), casc.mOmega(), cent);
-      if (compatibleOmegaPlus && (!doTrueSelectionInMass || (trueOmegaPlus && cascPhysicalPrimary)))
+      if (compatibleOmegaPlus && (!doTrueSelectionInMass || (trueOmegaPlus && cascPhysicalPrimary)) && std::abs(massNSigmaXi) > nSigmaNearXiMassCenter)
         histos.fill(HIST("h3dMassOmegaPlus"), casc.pt(), casc.mOmega(), cent);
 
       if (!fillTableOnlyWithCompatible ||
           ( // start major condition check
             ((compatibleXiMinus > 0 || compatibleXiPlus > 0) && std::abs(massNSigmaXi) < maxMassNSigma) ||
-            ((compatibleOmegaMinus > 0 || compatibleOmegaPlus > 0) && std::abs(massNSigmaOmega) < maxMassNSigma)) // end major condition check
+            ((compatibleOmegaMinus > 0 || compatibleOmegaPlus > 0) && std::abs(massNSigmaOmega) < maxMassNSigma && std::abs(massNSigmaXi) > nSigmaNearXiMassCenter)) // end major condition check
       ) {
         assocCascades(casc.collisionId(), casc.globalIndex(),
                       compatibleXiMinus, compatibleXiPlus, compatibleOmegaMinus, compatibleOmegaPlus,

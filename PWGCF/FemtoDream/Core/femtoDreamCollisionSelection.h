@@ -16,14 +16,22 @@
 #ifndef PWGCF_FEMTODREAM_CORE_FEMTODREAMCOLLISIONSELECTION_H_
 #define PWGCF_FEMTODREAM_CORE_FEMTODREAMCOLLISIONSELECTION_H_
 
-#include <string>
-#include <iostream>
+#include "Common/CCDB/EventSelectionParams.h"
 #include "Common/CCDB/TriggerAliases.h"
-#include "Common/DataModel/EventSelection.h"
-#include "Framework/HistogramRegistry.h"
-#include "Framework/Logger.h"
 
-using namespace o2::framework;
+#include <Framework/HistogramRegistry.h>
+#include <Framework/HistogramSpec.h>
+#include <Framework/Logger.h>
+
+#include <TH1.h>
+#include <TMath.h>
+#include <TMathBase.h>
+
+#include <cmath>
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace o2::analysis::femtoDream
 {
@@ -56,19 +64,19 @@ class FemtoDreamCollisionSelection
 
   /// Initializes histograms for the task
   /// \param registry Histogram registry to be passed
-  void init(HistogramRegistry* registry)
+  void init(o2::framework::HistogramRegistry* registry)
   {
     if (!mCutsSet) {
       LOGF(error, "Event selection not set - quitting!");
     }
     mHistogramRegistry = registry;
-    mHistogramRegistry->add("Event/Zvtx", "; vtx_{z} (cm); Entries", kTH1F, {{300, -12.5, 12.5}});
-    mHistogramRegistry->add("Event/MultPercentile", "; Multiplicity Percentile; Entries", kTH1F, {{100, 0, 100}});
-    mHistogramRegistry->add("Event/MultPercentileVSMultNTracksPV", "; Multiplicity Percentile; MultNTracks", kTH2F, {{100, 0, 100}, {200, 0, 200}});
-    mHistogramRegistry->add("Event/MultNTracksPV", "; MultNTracksPV; Entries", kTH1F, {{200, 0, 200}});
-    mHistogramRegistry->add("Event/MultNTracklets", "; MultNTrackslets; Entries", kTH1F, {{300, 0, 300}});
-    mHistogramRegistry->add("Event/MultTPC", "; MultTPC; Entries", kTH1F, {{600, 0, 600}});
-    mHistogramRegistry->add("Event/Sphericity", "; Sphericity; Entries", kTH1F, {{100, 0, 1}});
+    mHistogramRegistry->add("Event/Zvtx", "; vtx_{z} (cm); Entries", o2::framework::HistType::kTH1F, {{300, -12.5, 12.5}});
+    mHistogramRegistry->add("Event/MultPercentile", "; Multiplicity Percentile; Entries", o2::framework::HistType::kTH1F, {{100, 0, 100}});
+    mHistogramRegistry->add("Event/MultPercentileVSMultNTracksPV", "; Multiplicity Percentile; MultNTracks", o2::framework::HistType::kTH2F, {{100, 0, 100}, {200, 0, 200}});
+    mHistogramRegistry->add("Event/MultNTracksPV", "; MultNTracksPV; Entries", o2::framework::HistType::kTH1F, {{200, 0, 200}});
+    mHistogramRegistry->add("Event/MultNTracklets", "; MultNTrackslets; Entries", o2::framework::HistType::kTH1F, {{300, 0, 300}});
+    mHistogramRegistry->add("Event/MultTPC", "; MultTPC; Entries", o2::framework::HistType::kTH1F, {{600, 0, 600}});
+    mHistogramRegistry->add("Event/Sphericity", "; Sphericity; Entries", o2::framework::HistType::kTH1F, {{100, 0, 1}});
   }
 
   /// Print some debug information
@@ -156,6 +164,36 @@ class FemtoDreamCollisionSelection
     return true;
   }
 
+  /// Pile-up selection of PbPb collisions
+  /// \tparam T type of the collision
+  /// \param col Collision
+  /// \return whether or not the collisions fulfills the specified selections
+  template <typename C>
+  bool isPileUpCollisionPbPb(C const& col,
+                             bool noSameBunchPileup, bool isGoodITSLayersAll)
+  {
+    if ((noSameBunchPileup && !col.selection_bit(aod::evsel::kNoSameBunchPileup)) || (isGoodITSLayersAll && !col.selection_bit(aod::evsel::kIsGoodITSLayersAll))) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /// occupancy selection
+  /// \tparam T type of the collision
+  /// \param col Collision
+  /// \return whether or not the collisions fulfills the specified selections
+  template <typename C>
+  bool occupancySelection(C const& col,
+                          int tpcOccupancyMin, int tpcOccupancyMax)
+  {
+    const auto occupancy = col.trackOccupancyInTimeRange();
+    if ((occupancy < tpcOccupancyMin || occupancy > tpcOccupancyMax)) {
+      return false;
+    }
+    return true;
+  }
+
   /// Some basic QA of the event
   /// \tparam T type of the collision
   /// \param col Collision
@@ -173,6 +211,52 @@ class FemtoDreamCollisionSelection
         mHistogramRegistry->fill(HIST("Event/MultNTracklets"), col.multTracklets());
       }
     }
+  }
+
+  /// Initializes histograms for qn bin
+  /// \param registry Histogram registry to be passed
+  void initEPQA(o2::framework::HistogramRegistry* registry)
+  {
+    mHistogramQn = registry;
+    mHistogramQn->add("Event/centFT0CBeforeQn", "; cent", o2::framework::HistType::kTH1F, {{10, 0, 100}});
+    mHistogramQn->add("Event/centFT0CAfterQn", "; cent", o2::framework::HistType::kTH1F, {{10, 0, 100}});
+    mHistogramQn->add("Event/centVsqn", "; cent; qn", o2::framework::HistType::kTH2F, {{10, 0, 100}, {1000, 0, 1000}});
+    mHistogramQn->add("Event/centVsqnVsSpher", "; cent; qn; Sphericity", o2::framework::HistType::kTH3F, {{10, 0, 100}, {100, 0, 1000}, {100, 0, 1}});
+    mHistogramQn->add("Event/qnBin", "; qnBin; entries", o2::framework::HistType::kTH1F, {{20, 0, 20}});
+    mHistogramQn->add("Event/psiEP", "; #Psi_{EP} (deg); entries", o2::framework::HistType::kTH1F, {{100, 0, 180}});
+    mHistogramQn->add("Event/epReso_FT0CTPC", "; cent; qnBin; reso_ft0c_tpc", o2::framework::HistType::kTH2F, {{10, 0, 100}, {10, 0, 10}});
+    mHistogramQn->add("Event/epReso_FT0ATPC", "; cent; qnBin; reso_ft0a_tpc", o2::framework::HistType::kTH2F, {{10, 0, 100}, {10, 0, 10}});
+    mHistogramQn->add("Event/epReso_FT0CFT0A", "; cent; qnBin; reso_ft0c_ft0a", o2::framework::HistType::kTH2F, {{10, 0, 100}, {10, 0, 10}});
+    mHistogramQn->add("Event/epReso_count", "; cent; qnBin; count", o2::framework::HistType::kTH2F, {{10, 0, 100}, {10, 0, 10}});
+
+    return;
+  }
+
+  /// Initializes histograms for the flow calculation
+  /// \param registry Histogram registry to be passed
+  void initFlow(o2::framework::HistogramRegistry* registry, bool doQnSeparation, int mumQnBins = 10, int centBins = 10)
+  {
+    if (!mCutsSet) {
+      LOGF(error, "Event selection not set - quitting!");
+    }
+
+    mHistogramQn = registry;
+    mHistogramQn->add("Event/hN2allQn", ";centrality; #sum Re(Q_{2,A} Q_{2,B}^{*})", o2::framework::HistType::kTH1F, {{centBins, 0, 100}});
+    mHistogramQn->add("Event/hD2allQn", ";centrality; #sum (W_{A} W_{B})", o2::framework::HistType::kTH1F, {{centBins, 0, 100}});
+    mHistogramQn->get<TH1>(HIST("Event/hN2allQn"))->Sumw2();
+    mHistogramQn->get<TH1>(HIST("Event/hD2allQn"))->Sumw2();
+
+    if (doQnSeparation) {
+      for (int iqn(0); iqn < mumQnBins; ++iqn) {
+        hN2.push_back(mHistogramQn->add(("Qn/hN2_" + std::to_string(iqn)).c_str(), ";centrality; #sum Re(Q_{2,A} Q_{2,B}^{*})", o2::framework::HistType::kTH1F, {{centBins, 0, 100}}));
+        hD2.push_back(mHistogramQn->add(("Qn/hD2_" + std::to_string(iqn)).c_str(), ";centrality; #sum (W_{A} W_{B})", o2::framework::HistType::kTH1F, {{centBins, 0, 100}}));
+      }
+      for (int iqn(0); iqn < mumQnBins; ++iqn) {
+        std::get<std::shared_ptr<TH1>>(hN2[iqn])->Sumw2();
+        std::get<std::shared_ptr<TH1>>(hD2[iqn])->Sumw2();
+      }
+    }
+    return;
   }
 
   /// \todo to be implemented!
@@ -246,17 +330,223 @@ class FemtoDreamCollisionSelection
     return spt;
   }
 
+  /// Compute the qn-vector(FT0C) of an event
+  /// \tparam T type of the collision
+  /// \param col Collision
+  /// \return value of the qn-vector of FT0C of the event
+  template <typename T>
+  float computeqnVec(T const& col, int qvecMod = 0)
+  {
+    double qn = -999.f;
+    if (qvecMod == 0) {
+      qn = std::sqrt(col.qvecFT0CReVec()[0] * col.qvecFT0CReVec()[0] + col.qvecFT0CImVec()[0] * col.qvecFT0CImVec()[0]) * std::sqrt(col.sumAmplFT0C());
+    } else if (qvecMod == 1) {
+      qn = std::sqrt(col.qvecFT0AReVec()[0] * col.qvecFT0AReVec()[0] + col.qvecFT0AImVec()[0] * col.qvecFT0AImVec()[0]) * std::sqrt(col.sumAmplFT0A());
+    } else {
+      LOGP(error, "no selected detector of Qvec for ESE ");
+      return qn;
+    }
+    return qn;
+  }
+
+  /// Compute the event plane of an event
+  /// \tparam T type of the collision
+  /// \param col Collision
+  /// \param nmode EP in which harmonic(default 2nd harmonic)
+  /// \return angle of the event plane (rad) of FT0C of the event
+  template <typename T>
+  float computeEP(T const& col, int nmode, int qvecMod)
+  {
+    double EP = -999.f;
+    if (qvecMod == 0) {
+      EP = ((1. / nmode) * (TMath::ATan2(col.qvecFT0CImVec()[0], col.qvecFT0CReVec()[0])));
+    } else if (qvecMod == 1) {
+      EP = ((1. / nmode) * (TMath::ATan2(col.qvecFT0AImVec()[0], col.qvecFT0AReVec()[0])));
+    } else if (qvecMod == 2) {
+      EP = ((1. / nmode) * (TMath::ATan2(col.qvecTPCallImVec()[0], col.qvecTPCallReVec()[0])));
+    } else {
+      LOGP(error, "no selected detector of Qvec for EP");
+      return EP;
+    }
+
+    if (EP < 0) {
+      EP += TMath::Pi();
+    } // atan2 return in rad -pi/2-pi/2, then make it 0-pi
+    return EP;
+  }
+
+  /// Compute the event plane resolution of 3 sub-events
+  /// \tparam T type of the collision
+  /// \param col Collision
+  /// \param nmode EP in which harmonic(default 2nd harmonic)
+  template <typename T>
+  void fillEPReso(T const& col, int nmode, float centrality)
+  {
+    const float psi_ft0c = ((1. / nmode) * (TMath::ATan2(col.qvecFT0CImVec()[0], col.qvecFT0CReVec()[0])));
+    const float psi_ft0a = ((1. / nmode) * (TMath::ATan2(col.qvecFT0AImVec()[0], col.qvecFT0AReVec()[0])));
+    const float psi_tpc = ((1. / nmode) * (TMath::ATan2(col.qvecTPCallImVec()[0], col.qvecTPCallReVec()[0])));
+
+    mHistogramQn->fill(HIST("Event/epReso_FT0CTPC"), centrality, mQnBin + 0.f, std::cos((psi_ft0c - psi_tpc) * nmode));
+    mHistogramQn->fill(HIST("Event/epReso_FT0ATPC"), centrality, mQnBin + 0.f, std::cos((psi_ft0a - psi_tpc) * nmode));
+    mHistogramQn->fill(HIST("Event/epReso_FT0CFT0A"), centrality, mQnBin + 0.f, std::cos((psi_ft0c - psi_ft0a) * nmode));
+    mHistogramQn->fill(HIST("Event/epReso_count"), centrality, mQnBin + 0.f);
+  }
+
+  /// \return the 1-d qn-vector separator to 2-d
+  std::vector<std::vector<float>> getQnBinSeparator2D(std::vector<float> flat, const int numQnBins = 10)
+  {
+    size_t nBins = numQnBins + 1;
+
+    if (flat.empty() || flat.size() % nBins != 0) {
+      LOGP(error, "ConfQnBinSeparator size = {} is not divisible by {}",
+           flat.size(), nBins);
+      return {{-999, -999}};
+    }
+
+    size_t nCent = flat.size() / nBins;
+    std::vector<std::vector<float>> res(nCent, std::vector<float>(nBins));
+
+    for (size_t i = 0; i < nCent; ++i) {
+      for (size_t j = 0; j < nBins; ++j) {
+        res[i][j] = flat[i * nBins + j];
+      }
+    }
+    return res;
+  }
+
+  /// Get the bin number of qn-vector(FT0C) of an event
+  /// \param centBinWidth centrality bin width, example: per 1%, per 10% ...
+  /// \return bin number of qn-vector of the event
+  // add a param : bool doFillHisto ?
+  int myqnBin(float centrality, float centMax, bool doFillCent, std::vector<float> qnBinSeparator, float qn, const int numQnBins, float centBinWidth = 1.f)
+  {
+    auto twoDSeparator = getQnBinSeparator2D(qnBinSeparator, numQnBins);
+    if (twoDSeparator.empty() || twoDSeparator[0][0] == -999.) {
+      LOGP(warning, "ConfQnBinSeparator not set, using default fallback!");
+      return -999; // safe fallback
+    }
+
+    // if (doFillHisto)
+    //   mHistogramQn->fill(HIST("Event/centFT0CBefore"), centrality);
+    // add a param : bool doFillHisto ?
+    int qnBin = -999;
+    int mycentBin = static_cast<int>(centrality / centBinWidth);
+    if (mycentBin >= static_cast<int>(centMax / centBinWidth))
+      return qnBin;
+
+    if (mycentBin > static_cast<int>(twoDSeparator.size()) - 1)
+      return qnBin;
+
+    if (doFillCent)
+      mHistogramQn->fill(HIST("Event/centFT0CAfterQn"), centrality);
+
+    for (int iqn(0); iqn < static_cast<int>(twoDSeparator[mycentBin].size()) - 1; ++iqn) {
+      if (qn > twoDSeparator[mycentBin][iqn] && qn <= twoDSeparator[mycentBin][iqn + 1]) {
+        qnBin = iqn;
+        break;
+      } else {
+        continue;
+      }
+    }
+
+    mQnBin = qnBin;
+    return qnBin;
+  }
+
+  /// \fill event-wise informations
+  template <typename T>
+  void fillEPQA(T& col, float centrality, float fSpher, float qn, float psiEP, int nmode = 2)
+  {
+    mHistogramQn->fill(HIST("Event/centFT0CBeforeQn"), centrality);
+    mHistogramQn->fill(HIST("Event/centVsqn"), centrality, qn);
+    mHistogramQn->fill(HIST("Event/centVsqnVsSpher"), centrality, qn, fSpher);
+    mHistogramQn->fill(HIST("Event/qnBin"), mQnBin + 0.f);
+    mHistogramQn->fill(HIST("Event/psiEP"), psiEP);
+    fillEPReso(col, nmode, centrality);
+  }
+
+  /// \todo to be implemented!
+  /// Do cumulants for flow calculation
+  /// \tparam T type of the collision
+  /// \param doQnSeparation to fill flow in divied qn bins
+  /// \param qnBin should be <int> in 0-9
+  /// \param fEtaGap eta gap for flow cumulant
+  template <typename T1, typename T2, typename TC>
+  void doCumulants(T1 const& col, T2 const& tracks, TC& trackCuts, float centrality, bool doQnSeparation = false, int numQnBins = 10, float fEtaGap = 0.5f, float ptMin = 0.2f, float ptMax = 5.0f, float harmonic = 2.0f)
+  {
+    int numOfTracks = col.numContrib();
+    if (numOfTracks < 3)
+      return;
+
+    double Q2A_re = 0., Q2A_im = 0., WA = 0.;
+    double Q2B_re = 0., Q2B_im = 0., WB = 0.;
+
+    int nA = 0, nB = 0;
+
+    for (auto const& trk : tracks) {
+      if (!trackCuts.isSelectedMinimal(trk)) {
+        continue;
+      }
+      const double pt = trk.pt();
+      const double eta = trk.eta();
+      if (pt < ptMin || pt > ptMax) {
+        continue;
+      }
+
+      const double w = 1.0; // TODO: NUA/NUE weight
+      const double phi = trk.phi();
+      const double c = w * TMath::Cos(harmonic * phi);
+      const double s = w * TMath::Sin(harmonic * phi);
+
+      if (eta > fEtaGap) {
+        Q2A_re += c;
+        Q2A_im += s;
+        WA += w;
+        nA++;
+      } else if (eta < -1 * fEtaGap) {
+        Q2B_re += c;
+        Q2B_im += s;
+        WB += w;
+        nB++;
+      }
+    }
+
+    // need at least 1 track on each side to form pairs; for stability, require >=2
+    if (nA < 2 || nB < 2) {
+      return;
+    }
+    const double D2_evt = WA * WB;
+    if (D2_evt <= 0.) {
+      return;
+    }
+
+    // N2_evt = Re(Q2A * conj(Q2B)) = Q2A_re*Q2B_re + Q2A_im*Q2B_im
+    const double N2_evt = Q2A_re * Q2B_re + Q2A_im * Q2B_im;
+
+    mHistogramQn->fill(HIST("Event/hN2allQn"), centrality, N2_evt);
+    mHistogramQn->fill(HIST("Event/hD2allQn"), centrality, D2_evt);
+    if (doQnSeparation && mQnBin >= 0 && mQnBin < numQnBins) {
+      std::get<std::shared_ptr<TH1>>(hN2[mQnBin])->Fill(centrality, N2_evt);
+      std::get<std::shared_ptr<TH1>>(hD2[mQnBin])->Fill(centrality, D2_evt);
+    }
+    return;
+  }
+
  private:
-  HistogramRegistry* mHistogramRegistry = nullptr; ///< For QA output
-  bool mCutsSet = false;                           ///< Protection against running without cuts
-  bool mCheckTrigger = false;                      ///< Check for trigger
-  bool mCheckOffline = false;                      ///< Check for offline criteria (might change)
-  bool mAddCheckOffline = false;                   ///< Additional check for offline criteria (added to sel8 soon)
-  bool mCheckIsRun3 = false;                       ///< Check if running on Pilot Beam
-  triggerAliases mTrigger = kINT7;                 ///< Trigger to check for
-  float mZvtxMax = 999.f;                          ///< Maximal deviation from nominal z-vertex (cm)
+  o2::framework::HistogramRegistry* mHistogramRegistry = nullptr; ///< For QA output
+  bool mCutsSet = false;                                          ///< Protection against running without cuts
+  bool mCheckTrigger = false;                                     ///< Check for trigger
+  bool mCheckOffline = false;                                     ///< Check for offline criteria (might change)
+  bool mAddCheckOffline = false;                                  ///< Additional check for offline criteria (added to sel8 soon)
+  bool mCheckIsRun3 = false;                                      ///< Check if running on Pilot Beam
+  triggerAliases mTrigger = kINT7;                                ///< Trigger to check for
+  float mZvtxMax = 999.f;                                         ///< Maximal deviation from nominal z-vertex (cm)
   float mMinSphericity = 0.f;
   float mSphericityPtmin = 0.f;
+  int mQnBin = -999;
+  o2::framework::HistogramRegistry* mHistogramQn = nullptr; ///< For flow cumulant output
+  std::vector<o2::framework::HistPtr> hN2;                  ///< Histograms of c22 per Qn bin
+  std::vector<o2::framework::HistPtr> hD2;                  ///< Histograms of c22 per Qn bin
 };
 } // namespace o2::analysis::femtoDream
 

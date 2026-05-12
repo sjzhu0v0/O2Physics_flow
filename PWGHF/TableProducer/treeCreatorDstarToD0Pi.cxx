@@ -17,6 +17,7 @@
 /// \author Fabrizio Grosa <fabrizio.grosa@cern.ch>, CERN
 
 #include "PWGHF/Core/DecayChannels.h"
+#include "PWGHF/DataModel/AliasTables.h"
 #include "PWGHF/DataModel/CandidateReconstructionTables.h"
 #include "PWGHF/DataModel/CandidateSelectionTables.h"
 
@@ -152,8 +153,8 @@ DECLARE_SOA_TABLE(HfCandDstLites, "AOD", "HFCANDDSTLITE",
                   full::Phi,
                   full::Y,
                   full::CandidateSelFlag,
-                  hf_cand_dstar::FlagMcMatchRec,
-                  hf_cand_dstar::OriginMcRec,
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::OriginMcRec,
                   full::PtBhadMother)
 
 DECLARE_SOA_TABLE(HfCandDstFulls, "AOD", "HFCANDDSTFULL",
@@ -225,8 +226,8 @@ DECLARE_SOA_TABLE(HfCandDstFulls, "AOD", "HFCANDDSTFULL",
                   full::Y,
                   full::E,
                   full::CandidateSelFlag,
-                  hf_cand_dstar::FlagMcMatchRec,
-                  hf_cand_dstar::OriginMcRec,
+                  hf_cand_mc_flag::FlagMcMatchRec,
+                  hf_cand_mc_flag::OriginMcRec,
                   full::PtBhadMother);
 
 DECLARE_SOA_TABLE(HfCandDstFullEvs, "AOD", "HFCANDDSTFULLEV",
@@ -244,8 +245,8 @@ DECLARE_SOA_TABLE(HfCandDstFullPs, "AOD", "HFCANDDSTFULLP",
                   full::Eta,
                   full::Phi,
                   full::Y,
-                  hf_cand_dstar::FlagMcMatchGen,
-                  hf_cand_dstar::OriginMcGen,
+                  hf_cand_mc_flag::FlagMcMatchGen,
+                  hf_cand_mc_flag::OriginMcGen,
                   full::PtBhadMother);
 
 } // namespace o2::aod
@@ -271,10 +272,10 @@ struct HfTreeCreatorDstarToD0Pi {
   using CandDstarMcGen = soa::Filtered<soa::Join<aod::McParticles, aod::HfCandDstarMcGen>>;
 
   Filter filterSelectCandidates = aod::hf_sel_candidate_dstar::isSelDstarToD0Pi == selectionFlagDstarToD0Pi;
-  Filter filterMcGenMatching = nabs(aod::hf_cand_dstar::flagMcMatchGen) == static_cast<int8_t>(hf_decay::hf_cand_dstar::DecayChannelMain::DstarToPiKPi);
+  Filter filterMcGenMatching = nabs(aod::hf_cand_mc_flag::flagMcMatchGen) == static_cast<int8_t>(hf_decay::hf_cand_dstar::DecayChannelMain::DstarToPiKPi);
 
-  Partition<CandDstarWSelFlagMcRec> reconstructedCandSig = nabs(aod::hf_cand_dstar::flagMcMatchRec) == static_cast<int8_t>(hf_decay::hf_cand_dstar::DecayChannelMain::DstarToPiKPi);
-  Partition<CandDstarWSelFlagMcRec> reconstructedCandBkg = nabs(aod::hf_cand_dstar::flagMcMatchRec) != static_cast<int8_t>(hf_decay::hf_cand_dstar::DecayChannelMain::DstarToPiKPi);
+  Partition<CandDstarWSelFlagMcRec> reconstructedCandSig = nabs(aod::hf_cand_mc_flag::flagMcMatchRec) == static_cast<int8_t>(hf_decay::hf_cand_dstar::DecayChannelMain::DstarToPiKPi);
+  Partition<CandDstarWSelFlagMcRec> reconstructedCandBkg = nabs(aod::hf_cand_mc_flag::flagMcMatchRec) != static_cast<int8_t>(hf_decay::hf_cand_dstar::DecayChannelMain::DstarToPiKPi);
 
   void init(InitContext const&)
   {
@@ -293,12 +294,12 @@ struct HfTreeCreatorDstarToD0Pi {
       runNumber);
   }
 
-  template <bool doMc = false, typename T>
+  template <bool DoMc = false, typename T>
   void fillCandidateTable(const T& candidate, float ptBhadMotherPart = -1)
   {
     int8_t flagMc{0};
     int8_t originMc{0};
-    if constexpr (doMc) {
+    if constexpr (DoMc) {
       flagMc = candidate.flagMcMatchRec();
       originMc = candidate.originMcRec();
     }
@@ -495,7 +496,7 @@ struct HfTreeCreatorDstarToD0Pi {
     }
     for (const auto& candidate : candidates) {
       if (downSampleBkgFactor < 1.) {
-        float pseudoRndm = candidate.ptProng0() * 1000. - static_cast<int64_t>(candidate.ptProng0() * 1000);
+        float const pseudoRndm = candidate.ptProng0() * 1000. - static_cast<int64_t>(candidate.ptProng0() * 1000);
         if (candidate.pt() < ptMaxForDownSample && pseudoRndm >= downSampleBkgFactor) {
           continue;
         }
@@ -536,7 +537,7 @@ struct HfTreeCreatorDstarToD0Pi {
       }
       for (const auto& candidate : reconstructedCandBkg) {
         if (downSampleBkgFactor < 1.) {
-          float pseudoRndm = candidate.ptProng0() * 1000. - static_cast<int64_t>(candidate.ptProng0() * 1000);
+          float const pseudoRndm = candidate.ptProng0() * 1000. - static_cast<int64_t>(candidate.ptProng0() * 1000);
           if (candidate.pt() < ptMaxForDownSample && pseudoRndm >= downSampleBkgFactor) {
             continue;
           }
