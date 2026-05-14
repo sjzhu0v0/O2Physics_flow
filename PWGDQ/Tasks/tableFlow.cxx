@@ -34,7 +34,6 @@
 #include "Framework/AnalysisDataModel.h"
 #include "Framework/AnalysisTask.h"
 #include "Framework/runDataProcessing.h"
-#include "ITSMFTBase/DPLAlpideParam.h"
 
 #include "TGeoGlobalMagField.h"
 #include <TH1F.h>
