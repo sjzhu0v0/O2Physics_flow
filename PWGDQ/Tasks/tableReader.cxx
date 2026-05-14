@@ -170,6 +170,21 @@ constexpr static int pairTypeEMu = VarManager::kElectronMuon;
 // Global function used to define needed histogram classes
 void DefineHistograms(HistogramManager* histMan, TString histClasses, Configurable<std::string> configVar); // defines histograms for all tasks
 
+void AppendCutNamesFromJSON(TString& cutNames, std::string const& cutsJSON)
+{
+  TString addCutsStr = cutsJSON;
+  if (addCutsStr == "") {
+    return;
+  }
+  std::vector<AnalysisCut*> addCuts = dqcuts::GetCutsFromJSON(addCutsStr.Data());
+  for (auto& cut : addCuts) {
+    if (!cutNames.IsNull()) {
+      cutNames += ",";
+    }
+    cutNames += cut->GetName();
+  }
+}
+
 struct AnalysisEventSelection {
   Produces<aod::EventCuts> eventSel;
   Produces<aod::MixingHashes> hash;
@@ -178,6 +193,7 @@ struct AnalysisEventSelection {
   // TODO: Provide the mixing variables and binning directly via configurables (e.g. vectors of float)
   Configurable<std::string> fConfigMixingVariables{"cfgMixingVars", "", "Mixing configs separated by a comma, default no mixing"};
   Configurable<std::string> fConfigEventCuts{"cfgEventCuts", "eventStandard", "Event selection"};
+  Configurable<std::string> fConfigEventCutsJSON{"cfgEventCutsJSON", "", "Additional event cuts specified in JSON format"};
   Configurable<bool> fConfigQA{"cfgQA", false, "If true, fill QA histograms"};
   Configurable<bool> fConfigRunZorro{"cfgRunZorro", false, "Enable event selection with zorro [WARNING: under debug, do not enable!]"};
   Configurable<int> fConfigITSROFrameStartBorderMargin{"ITSROFrameStartBorderMargin", -1, "Number of bcs at the start of ITS RO Frame border. Take from CCDB if -1"};
@@ -201,7 +217,16 @@ struct AnalysisEventSelection {
 
     fEventCut = new AnalysisCompositeCut(true);
     TString eventCutStr = fConfigEventCuts.value;
-    fEventCut->AddCut(dqcuts::GetAnalysisCut(eventCutStr.Data()));
+    if (eventCutStr != "") {
+      fEventCut->AddCut(dqcuts::GetAnalysisCut(eventCutStr.Data()));
+    }
+    TString eventCutJSONStr = fConfigEventCutsJSON.value;
+    if (eventCutJSONStr != "") {
+      std::vector<AnalysisCut*> jsonCuts = dqcuts::GetCutsFromJSON(eventCutJSONStr.Data());
+      for (auto& cut : jsonCuts) {
+        fEventCut->AddCut(cut);
+      }
+    }
     VarManager::SetUseVars(AnalysisCut::fgUsedVars); // provide the list of required variables so that VarManager knows what to fill
 
     VarManager::SetDefaultVarNames();
@@ -342,6 +367,7 @@ struct AnalysisTrackSelection {
   // The user must ensure using them properly in the tasks downstream
   // NOTE: For now, the candidate electron cuts must be provided first, then followed by any other needed selections
   Configurable<std::string> fConfigCuts{"cfgTrackCuts", "jpsiO2MCdebugCuts2", "Comma separated list of barrel track cuts"};
+  Configurable<std::string> fConfigCutsJSON{"cfgBarrelTrackCutsJSON", "", "Additional list of barrel track cuts in JSON format"};
   Configurable<bool> fConfigQA{"cfgQA", false, "If true, fill QA histograms"};
   Configurable<std::string> fConfigAddTrackHistogram{"cfgAddTrackHistogram", "", "Comma separated list of histograms"};
   Configurable<int> fConfigPrefilterCutId{"cfgPrefilterCutId", 32, "Id of the Prefilter track cut (starting at 0)"}; // In order to create another column prefilter (should be temporary before improving cut selection in configurables, then displaced to AnalysisPrefilterSelection)
@@ -371,6 +397,13 @@ struct AnalysisTrackSelection {
       std::unique_ptr<TObjArray> objArray(cutNamesStr.Tokenize(","));
       for (int icut = 0; icut < objArray->GetEntries(); ++icut) {
         fTrackCuts.push_back(*dqcuts::GetCompositeCut(objArray->At(icut)->GetName()));
+      }
+    }
+    TString addTrackCutsStr = fConfigCutsJSON.value;
+    if (addTrackCutsStr != "") {
+      std::vector<AnalysisCut*> addTrackCuts = dqcuts::GetCutsFromJSON(addTrackCutsStr.Data());
+      for (auto& cut : addTrackCuts) {
+        fTrackCuts.push_back(*reinterpret_cast<AnalysisCompositeCut*>(cut));
       }
     }
 
@@ -479,6 +512,7 @@ struct AnalysisMuonSelection {
   Produces<aod::MuonTrackCuts> muonSel;
   OutputObj<THashList> fOutputList{"output"};
   Configurable<std::string> fConfigCuts{"cfgMuonCuts", "muonQualityCuts", "Comma separated list of muon cuts"};
+  Configurable<std::string> fConfigCutsJSON{"cfgMuonCutsJSON", "", "Additional list of muon cuts in JSON format"};
   Configurable<bool> fConfigQA{"cfgQA", false, "If true, fill QA histograms"};
   Configurable<std::string> fConfigAddMuonHistogram{"cfgAddMuonHistogram", "", "Comma separated list of histograms"};
 
@@ -498,6 +532,13 @@ struct AnalysisMuonSelection {
       std::unique_ptr<TObjArray> objArray(cutNamesStr.Tokenize(","));
       for (int icut = 0; icut < objArray->GetEntries(); ++icut) {
         fMuonCuts.push_back(*dqcuts::GetCompositeCut(objArray->At(icut)->GetName()));
+      }
+    }
+    TString addCutsStr = fConfigCutsJSON.value;
+    if (addCutsStr != "") {
+      std::vector<AnalysisCut*> addCuts = dqcuts::GetCutsFromJSON(addCutsStr.Data());
+      for (auto& cut : addCuts) {
+        fMuonCuts.push_back(*reinterpret_cast<AnalysisCompositeCut*>(cut));
       }
     }
     VarManager::SetUseVars(AnalysisCut::fgUsedVars); // provide the list of required variables so that VarManager knows what to fill
@@ -699,7 +740,9 @@ struct AnalysisEventMixing {
   //  bit position in the cuts bitmap
   // TODO: Create a configurable to specify exactly on which of the bits one should run the event mixing
   Configurable<std::string> fConfigTrackCuts{"cfgTrackCuts", "", "Comma separated list of barrel track cuts"};
+  Configurable<std::string> fConfigTrackCutsJSON{"cfgBarrelTrackCutsJSON", "", "Additional list of barrel track cuts in JSON format"};
   Configurable<std::string> fConfigMuonCuts{"cfgMuonCuts", "", "Comma separated list of muon cuts"};
+  Configurable<std::string> fConfigMuonCutsJSON{"cfgMuonCutsJSON", "", "Additional list of muon cuts in JSON format"};
   Configurable<int> fConfigMixingDepth{"cfgMixingDepth", 100, "Number of Events stored for event mixing"};
   Configurable<std::string> fConfigAddEventMixingHistogram{"cfgAddEventMixingHistogram", "", "Comma separated list of histograms"};
   Configurable<std::string> ccdburl{"ccdburl", "http://alice-ccdb.cern.ch", "url of the ccdb repository"};
@@ -756,6 +799,7 @@ struct AnalysisEventMixing {
     TString histNames = "";
     if (context.mOptions.get<bool>("processBarrelSkimmed") || context.mOptions.get<bool>("processBarrelVnSkimmed")) {
       TString cutNames = fConfigTrackCuts.value;
+      AppendCutNamesFromJSON(cutNames, fConfigTrackCutsJSON.value);
       if (!cutNames.IsNull()) {
         std::unique_ptr<TObjArray> objArray(cutNames.Tokenize(","));
         for (int icut = 0; icut < objArray->GetEntries(); ++icut) {
@@ -771,6 +815,7 @@ struct AnalysisEventMixing {
     }
     if (context.mOptions.get<bool>("processMuonSkimmed") || context.mOptions.get<bool>("processMuonVnSkimmed") || context.mOptions.get<bool>("processMuonVnCentrSkimmed") || context.mOptions.get<bool>("processMuonVnExtraSkimmed")) {
       TString cutNames = fConfigMuonCuts.value;
+      AppendCutNamesFromJSON(cutNames, fConfigMuonCutsJSON.value);
       if (!cutNames.IsNull()) {
         std::unique_ptr<TObjArray> objArray(cutNames.Tokenize(","));
         for (int icut = 0; icut < objArray->GetEntries(); ++icut) {
@@ -791,6 +836,8 @@ struct AnalysisEventMixing {
     if (context.mOptions.get<bool>("processBarrelMuonSkimmed")) {
       TString cutNamesBarrel = fConfigTrackCuts.value;
       TString cutNamesMuon = fConfigMuonCuts.value;
+      AppendCutNamesFromJSON(cutNamesBarrel, fConfigTrackCutsJSON.value);
+      AppendCutNamesFromJSON(cutNamesMuon, fConfigMuonCutsJSON.value);
       if (!cutNamesBarrel.IsNull() && !cutNamesMuon.IsNull()) {
         std::unique_ptr<TObjArray> objArrayBarrel(cutNamesBarrel.Tokenize(","));
         std::unique_ptr<TObjArray> objArrayMuon(cutNamesMuon.Tokenize(","));
@@ -1050,8 +1097,11 @@ struct AnalysisSameEventPairing {
 
   OutputObj<THashList> fOutputList{"output"};
   Configurable<std::string> fConfigTrackCuts{"cfgTrackCuts", "jpsiO2MCdebugCuts2", "Comma separated list of barrel track cuts"};
+  Configurable<std::string> fConfigTrackCutsJSON{"cfgBarrelTrackCutsJSON", "", "Additional list of barrel track cuts in JSON format"};
   Configurable<std::string> fConfigMuonCuts{"cfgMuonCuts", "", "Comma separated list of muon cuts"};
+  Configurable<std::string> fConfigMuonCutsJSON{"cfgMuonCutsJSON", "", "Additional list of muon cuts in JSON format"};
   Configurable<std::string> fConfigPairCuts{"cfgPairCuts", "", "Comma separated list of pair cuts"};
+  Configurable<std::string> fConfigPairCutsJSON{"cfgPairCutsJSON", "", "Additional list of pair cuts in JSON format"};
   Configurable<std::string> url{"ccdb-url", "http://alice-ccdb.cern.ch", "url of the ccdb repository"};
   Configurable<std::string> ccdbPath{"ccdb-path", "Users/lm", "base path to the ccdb object"};
   Configurable<std::string> ccdbPathFlow{"ccdb-path-flow", "Users/c/chizh/FlowResolution", "path to the ccdb object for flow resolution factors"};
@@ -1150,6 +1200,13 @@ struct AnalysisSameEventPairing {
       std::unique_ptr<TObjArray> objArray(cutNamesStr.Tokenize(","));
       for (int icut = 0; icut < objArray->GetEntries(); ++icut) {
         fPairCuts.push_back(*dqcuts::GetCompositeCut(objArray->At(icut)->GetName()));
+      }
+    }
+    TString addPairCutsStr = fConfigPairCutsJSON.value;
+    if (addPairCutsStr != "") {
+      std::vector<AnalysisCut*> addPairCuts = dqcuts::GetCutsFromJSON(addPairCutsStr.Data());
+      for (auto& cut : addPairCuts) {
+        fPairCuts.push_back(*reinterpret_cast<AnalysisCompositeCut*>(cut));
       }
     }
 
@@ -1251,6 +1308,7 @@ struct AnalysisSameEventPairing {
 
     if (context.mOptions.get<bool>("processDecayToEESkimmed") || context.mOptions.get<bool>("processDecayToEESkimmedWithMult") || context.mOptions.get<bool>("processDecayToEESkimmedNoTwoProngFitter") || context.mOptions.get<bool>("processDecayToEESkimmedWithCov") || context.mOptions.get<bool>("processDecayToEESkimmedWithCovNoTwoProngFitter") || context.mOptions.get<bool>("processDecayToEEVertexingSkimmed") || context.mOptions.get<bool>("processVnDecayToEESkimmed") || context.mOptions.get<bool>("processDecayToEEPrefilterSkimmed") || context.mOptions.get<bool>("processDecayToEEPrefilterSkimmedNoTwoProngFitter") || context.mOptions.get<bool>("processDecayToEESkimmedWithColl") || context.mOptions.get<bool>("processDecayToEESkimmedWithCollNoTwoProngFitter") || context.mOptions.get<bool>("processDecayToPiPiSkimmed") || context.mOptions.get<bool>("processAllSkimmed") || context.mOptions.get<bool>("processDecayToEESkimmedWithMult")) {
       TString cutNames = fConfigTrackCuts.value;
+      AppendCutNamesFromJSON(cutNames, fConfigTrackCutsJSON.value);
       if (!cutNames.IsNull()) { // if track cuts
         std::unique_ptr<TObjArray> objArray(cutNames.Tokenize(","));
         for (int icut = 0; icut < objArray->GetEntries(); ++icut) { // loop over track cuts
@@ -1264,6 +1322,7 @@ struct AnalysisSameEventPairing {
           fTrackHistNames.push_back(names);
 
           TString cutNamesStr = fConfigPairCuts.value;
+          AppendCutNamesFromJSON(cutNamesStr, fConfigPairCutsJSON.value);
           if (!cutNamesStr.IsNull()) { // if pair cuts
             std::unique_ptr<TObjArray> objArrayPair(cutNamesStr.Tokenize(","));
             for (int iPairCut = 0; iPairCut < objArrayPair->GetEntries(); ++iPairCut) { // loop over pair cuts
@@ -1285,6 +1344,7 @@ struct AnalysisSameEventPairing {
 
     if (context.mOptions.get<bool>("processDecayToMuMuSkimmed") || context.mOptions.get<bool>("processDecayToMuMuSkimmedWithMult") || context.mOptions.get<bool>("processDecayToMuMuVertexingSkimmed") || context.mOptions.get<bool>("processDecayToMuMuSkimmedWithColl") || context.mOptions.get<bool>("processVnDecayToMuMuSkimmed") || context.mOptions.get<bool>("processVnDecayToMuMuSkimmedWithWeights") || context.mOptions.get<bool>("processVnDecayToMuMuSkimmedWithWeightsAndColl") || context.mOptions.get<bool>("processVnCentrDecayToMuMuSkimmed") || context.mOptions.get<bool>("processAllSkimmed")) {
       TString cutNames = fConfigMuonCuts.value;
+      AppendCutNamesFromJSON(cutNames, fConfigMuonCutsJSON.value);
       if (!cutNames.IsNull()) {
         std::unique_ptr<TObjArray> objArray(cutNames.Tokenize(","));
         for (int icut = 0; icut < objArray->GetEntries(); ++icut) { // loop over track cuts
@@ -1302,6 +1362,7 @@ struct AnalysisSameEventPairing {
           fMuonHistNames.push_back(names);
 
           TString cutNamesStr = fConfigPairCuts.value;
+          AppendCutNamesFromJSON(cutNamesStr, fConfigPairCutsJSON.value);
           if (!cutNamesStr.IsNull()) { // if pair cuts
             std::unique_ptr<TObjArray> objArrayPair(cutNamesStr.Tokenize(","));
             for (int iPairCut = 0; iPairCut < objArrayPair->GetEntries(); ++iPairCut) { // loop over pair cuts
@@ -1319,6 +1380,8 @@ struct AnalysisSameEventPairing {
     if (context.mOptions.get<bool>("processElectronMuonSkimmed") || context.mOptions.get<bool>("processAllSkimmed")) {
       TString cutNamesBarrel = fConfigTrackCuts.value;
       TString cutNamesMuon = fConfigMuonCuts.value;
+      AppendCutNamesFromJSON(cutNamesBarrel, fConfigTrackCutsJSON.value);
+      AppendCutNamesFromJSON(cutNamesMuon, fConfigMuonCutsJSON.value);
       if (!cutNamesBarrel.IsNull() && !cutNamesMuon.IsNull()) {
         std::unique_ptr<TObjArray> objArrayBarrel(cutNamesBarrel.Tokenize(","));
         std::unique_ptr<TObjArray> objArrayMuon(cutNamesMuon.Tokenize(","));
@@ -1335,6 +1398,7 @@ struct AnalysisSameEventPairing {
             fTrackMuonHistNames.push_back(names);
 
             TString cutNamesStr = fConfigPairCuts.value;
+            AppendCutNamesFromJSON(cutNamesStr, fConfigPairCutsJSON.value);
             if (!cutNamesStr.IsNull()) { // if pair cuts
               std::unique_ptr<TObjArray> objArrayPair(cutNamesStr.Tokenize(","));
               for (int iPairCut = 0; iPairCut < objArrayPair->GetEntries(); ++iPairCut) { // loop over pair cuts
@@ -1415,13 +1479,16 @@ struct AnalysisSameEventPairing {
     }
 
     TString cutNames = fConfigTrackCuts.value;
+    AppendCutNamesFromJSON(cutNames, fConfigTrackCutsJSON.value);
     std::vector<std::vector<TString>> histNames = fTrackHistNames;
     if constexpr (TPairType == pairTypeMuMu) {
       cutNames = fConfigMuonCuts.value;
+      AppendCutNamesFromJSON(cutNames, fConfigMuonCutsJSON.value);
       histNames = fMuonHistNames;
     }
     if constexpr (TPairType == pairTypeEMu) {
       cutNames = fConfigMuonCuts.value;
+      AppendCutNamesFromJSON(cutNames, fConfigMuonCutsJSON.value);
       histNames = fTrackMuonHistNames;
     }
     std::unique_ptr<TObjArray> objArray(cutNames.Tokenize(","));
