@@ -204,6 +204,8 @@ struct AnalysisEventSelection {
       return;
     }
 
+    VarManager::SetDefaultVarNames();
+
     fEventCut = new AnalysisCompositeCut(true);
     TString eventCutStr = fConfigEventCuts.value;
     if (eventCutStr != "") {
@@ -222,7 +224,6 @@ struct AnalysisEventSelection {
     }
     VarManager::SetUseVars(AnalysisCut::fgUsedVars); // provide the list of required variables so that VarManager knows what to fill
 
-    VarManager::SetDefaultVarNames();
     if (fConfigQA) {
       fHistMan = new HistogramManager("analysisHistos", "", VarManager::kNVars);
       fHistMan->SetUseDefaultVariableNames(kTRUE);
@@ -389,6 +390,8 @@ struct AnalysisTrackSelection {
       return;
     }
 
+    VarManager::SetDefaultVarNames();
+
     fCurrentRun = 0;
 
     TString cutNamesStr = fConfigCuts.value;
@@ -410,7 +413,6 @@ struct AnalysisTrackSelection {
     VarManager::SetUseVars(AnalysisCut::fgUsedVars); // provide the list of required variables so that VarManager knows what to fill
 
     if (fConfigQA) {
-      VarManager::SetDefaultVarNames();
       fHistMan = new HistogramManager("analysisHistos", "aa", VarManager::kNVars);
       fHistMan->SetUseDefaultVariableNames(kTRUE);
       fHistMan->SetDefaultVarNames(VarManager::fgVariableNames, VarManager::fgVariableUnits);
@@ -527,6 +529,8 @@ struct AnalysisMuonSelection {
       return;
     }
 
+    VarManager::SetDefaultVarNames();
+
     TString cutNamesStr = fConfigCuts.value;
     if (!cutNamesStr.IsNull()) {
       std::unique_ptr<TObjArray> objArray(cutNamesStr.Tokenize(","));
@@ -545,7 +549,6 @@ struct AnalysisMuonSelection {
     VarManager::SetUseVars(AnalysisCut::fgUsedVars); // provide the list of required variables so that VarManager knows what to fill
 
     if (fConfigQA) {
-      VarManager::SetDefaultVarNames();
       fHistMan = new HistogramManager("analysisHistos", "aa", VarManager::kNVars);
       fHistMan->SetUseDefaultVariableNames(kTRUE);
       fHistMan->SetDefaultVarNames(VarManager::fgVariableNames, VarManager::fgVariableUnits);
