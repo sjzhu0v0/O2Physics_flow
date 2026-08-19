@@ -471,6 +471,7 @@ class VarManager : public TObject
     kPin_leg1,
     kTPCnSigmaKa_leg1,
     kPt2,
+    kDaughterPtSum,
     kEta2,
     kPhi2,
     kCharge2,
@@ -606,6 +607,7 @@ class VarManager : public TObject
     kMCVy,
     kMCVz,
     kMCPt,
+    kMCDaughterPtSum,
     kMCPhi,
     kMCEta,
     kMCY,
@@ -2749,6 +2751,7 @@ void VarManager::FillPair(T1 const& t1, T2 const& t2, float* values)
   ROOT::Math::PtEtaPhiMVector v12 = v1 + v2;
   values[kMass] = v12.M();
   values[kPt] = v12.Pt();
+  values[kDaughterPtSum] = t1.pt() + t2.pt();
   values[kEta] = v12.Eta();
   // values[kPhi] = v12.Phi();
   values[kPhi] = v12.Phi() > 0 ? v12.Phi() : v12.Phi() + 2. * M_PI;
@@ -3182,6 +3185,7 @@ void VarManager::FillPairME(T1 const& t1, T2 const& t2, float* values)
   ROOT::Math::PtEtaPhiMVector v12 = v1 + v2;
   values[kMass] = v12.M();
   values[kPt] = v12.Pt();
+  values[kDaughterPtSum] = t1.pt() + t2.pt();
   values[kEta] = v12.Eta();
   // values[kPhi] = v12.Phi();
   values[kPhi] = v12.Phi() > 0 ? v12.Phi() : v12.Phi() + 2. * M_PI;
@@ -3425,6 +3429,7 @@ void VarManager::FillPairMC(T1 const& t1, T2 const& t2, float* values)
   ROOT::Math::PtEtaPhiMVector v12 = v1 + v2;
   values[kMCMass] = v12.M();
   values[kMCPt] = v12.Pt();
+  values[kMCDaughterPtSum] = t1.pt() + t2.pt();
   values[kMCEta] = v12.Eta();
   values[kMCPhi] = v12.Phi();
   values[kMCY] = -v12.Rapidity();

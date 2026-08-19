@@ -3179,6 +3179,19 @@ AnalysisCompositeCut* o2::aod::dqcuts::GetCompositeCut(const char* cutName)
     cut->AddCut(GetAnalysisCut("pairNoCut"));
     return cut;
   }
+  if (!nameStr.compare("pairDaughterPtSum2p7LowPairPt")) {
+    AnalysisCompositeCut pairPtSelection("pairDaughterPtSum2p7LowPairPt", "pairDaughterPtSum2p7LowPairPt", kFALSE);
+    AnalysisCut lowPairPt("lowPairPt", "lowPairPt");
+    lowPairPt.AddCut(VarManager::kPt, 0.0, 0.99999994);
+    lowPairPt.AddCut(VarManager::kDaughterPtSum, 2.7000001, 10000000000.0);
+    AnalysisCut highPairPt("highPairPt", "highPairPt");
+    highPairPt.AddCut(VarManager::kPt, 1.0000001, 10000000000.0);
+    pairPtSelection.AddCut(&lowPairPt);
+    pairPtSelection.AddCut(&highPairPt);
+    cut->AddCut(&pairPtSelection);
+    return cut;
+  }
+
 
   if (!nameStr.compare("pairMassLow1")) {
     cut->AddCut(GetAnalysisCut("pairMassLow1"));

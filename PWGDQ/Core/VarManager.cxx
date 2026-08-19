@@ -558,6 +558,8 @@ void VarManager::SetDefaultVarNames()
   fgVariableUnits[kPt1] = "GeV/c";
   fgVariableNames[kPt2] = "p_{T2}";
   fgVariableUnits[kPt2] = "GeV/c";
+  fgVariableNames[kDaughterPtSum] = "p_{T1} + p_{T2}";
+  fgVariableUnits[kDaughterPtSum] = "GeV/c";
   fgVariableNames[kInvPt] = "1/p_{T}";
   fgVariableUnits[kInvPt] = "1/(GeV/c)";
   fgVariableNames[kP] = "p";
@@ -735,6 +737,8 @@ void VarManager::SetDefaultVarNames()
   fgVariableUnits[kMCPz] = "GeV/c";
   fgVariableNames[kMCPt] = "MC p_{T}";
   fgVariableUnits[kMCPt] = "GeV/c";
+  fgVariableNames[kMCDaughterPtSum] = "MC p_{T1} + p_{T2}";
+  fgVariableUnits[kMCDaughterPtSum] = "GeV/c";
   fgVariableNames[kMCPhi] = "#varphi";
   fgVariableUnits[kMCPhi] = "rad";
   fgVariableNames[kMCEta] = "MC #eta";
@@ -1561,6 +1565,7 @@ void VarManager::SetDefaultVarNames()
   fgVarNamesMap["kPin_leg1"] = kPin_leg1;
   fgVarNamesMap["kTPCnSigmaKa_leg1"] = kTPCnSigmaKa_leg1;
   fgVarNamesMap["kPt2"] = kPt2;
+  fgVarNamesMap["kDaughterPtSum"] = kDaughterPtSum;
   fgVarNamesMap["kEta2"] = kEta2;
   fgVarNamesMap["kPhi2"] = kPhi2;
   fgVarNamesMap["kCharge2"] = kCharge2;
@@ -1689,6 +1694,7 @@ void VarManager::SetDefaultVarNames()
   fgVarNamesMap["kMCVy"] = kMCVy;
   fgVarNamesMap["kMCVz"] = kMCVz;
   fgVarNamesMap["kMCPt"] = kMCPt;
+  fgVarNamesMap["kMCDaughterPtSum"] = kMCDaughterPtSum;
   fgVarNamesMap["kMCPhi"] = kMCPhi;
   fgVarNamesMap["kMCEta"] = kMCEta;
   fgVarNamesMap["kMCY"] = kMCY;
