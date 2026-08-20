@@ -981,6 +981,23 @@ void o2::aod::dqhistograms::DefineHistograms(HistogramManager* hm, const char* h
       hm->AddHistogram(histClass, "Mass_MultFDDA", "Mass vs MultFDDA", false, 200, 2.0, 5.0, VarManager::kMass, 1000, 0, 25000.0, VarManager::kMultFDDA);
       hm->AddHistogram(histClass, "Mass_MultFDDC", "Mass vs MultFDDC", false, 200, 2.0, 5.0, VarManager::kMass, 1000, 0, 25000.0, VarManager::kMultFDDC);
     }
+    if (subGroupStr.Contains("newhistgroup1")) {
+      constexpr int kVtxNcontribNbins = 24;
+      constexpr int kMassNbins = 125;
+      constexpr int kPtNbins = 12;
+      double vtxNcontribBinLimits[kVtxNcontribNbins + 1] = {0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0, 85.0, 90.0, 100.0, 120.0, 140.0, 165.0, 200.0, 350.0};
+      double massBinLimits[kMassNbins + 1];
+      double ptBinLimits[kPtNbins + 1];
+      for (int i = 0; i <= kMassNbins; ++i) {
+        massBinLimits[i] = i * 5.0 / kMassNbins;
+      }
+      for (int i = 0; i <= kPtNbins; ++i) {
+        ptBinLimits[i] = i * 6.0 / kPtNbins;
+      }
+      hm->AddHistogram(histClass, "VtxNcontrib_Mass_Pt", "", false,
+                       kVtxNcontribNbins, vtxNcontribBinLimits, VarManager::kVtxNcontrib,
+                       kMassNbins, massBinLimits, VarManager::kMass, kPtNbins, ptBinLimits, VarManager::kPt);
+    }
     if (subGroupStr.Contains("barrel")) {
       hm->AddHistogram(histClass, "Mass", "", false, 500, 0.0, 5.0, VarManager::kMass);
       hm->AddHistogram(histClass, "Mass_HighRange", "", false, 375, 0.0, 15.0, VarManager::kMass);
