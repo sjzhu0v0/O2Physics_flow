@@ -985,19 +985,27 @@ void o2::aod::dqhistograms::DefineHistograms(HistogramManager* hm, const char* h
       constexpr int kVtxNcontribNbins = 24;
       constexpr int kMassNbins = 125;
       constexpr int kPtNbins = 12;
+      constexpr int kDaughterPtSumNbins = 60;
       double vtxNcontribBinLimits[kVtxNcontribNbins + 1] = {0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0, 85.0, 90.0, 100.0, 120.0, 140.0, 165.0, 200.0, 350.0};
       double massBinLimits[kMassNbins + 1];
       double ptBinLimits[kPtNbins + 1];
+      double daughterPtSumBinLimits[kDaughterPtSumNbins + 1];
       for (int i = 0; i <= kMassNbins; ++i) {
         massBinLimits[i] = i * 5.0 / kMassNbins;
       }
       for (int i = 0; i <= kPtNbins; ++i) {
         ptBinLimits[i] = i * 6.0 / kPtNbins;
       }
+      for (int i = 0; i <= kDaughterPtSumNbins; ++i) {
+        daughterPtSumBinLimits[i] = i * 6.0 / kDaughterPtSumNbins;
+      }
       hm->AddHistogram(histClass, "VtxNcontrib_Mass_Pt", "", false,
                        kVtxNcontribNbins, vtxNcontribBinLimits, VarManager::kVtxNcontrib,
                        kMassNbins, massBinLimits, VarManager::kMass, kPtNbins, ptBinLimits, VarManager::kPt);
-      hm->AddHistogram(histClass, "DaughterPtSum", "", false, kPtNbins, ptBinLimits, VarManager::kDaughterPtSum);
+      hm->AddHistogram(histClass, "DaughterPtSum", "", false, kDaughterPtSumNbins, daughterPtSumBinLimits, VarManager::kDaughterPtSum);
+      hm->AddHistogram(histClass, "DaughterPtSum_Pt", "", false,
+                       kDaughterPtSumNbins, daughterPtSumBinLimits, VarManager::kDaughterPtSum,
+                       kPtNbins, ptBinLimits, VarManager::kPt);
     }
     if (subGroupStr.Contains("barrel")) {
       hm->AddHistogram(histClass, "Mass", "", false, 500, 0.0, 5.0, VarManager::kMass);
