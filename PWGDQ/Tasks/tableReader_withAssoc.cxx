@@ -1341,6 +1341,7 @@ struct AnalysisSameEventPairing {
         fPairCuts.push_back(*dqcuts::GetCompositeCut(objArray->At(icut)->GetName()));
       }
     }
+    VarManager::SetUseVars(AnalysisCut::fgUsedVars);
 
     // get the list of cuts for tracks/muons, check that they were played by the barrel/muon selection tasks
     //   and make a mask for active cuts (barrel and muon selection tasks may run more cuts, needed for other analyses)
@@ -1453,6 +1454,12 @@ struct AnalysisSameEventPairing {
                   Form("PairsBarrelSEPP_%s_%s", objArray->At(icut)->GetName(), objArrayPair->At(iPairCut)->GetName()),
                   Form("PairsBarrelSEMM_%s_%s", objArray->At(icut)->GetName(), objArrayPair->At(iPairCut)->GetName())};
                 histNames += Form("%s;%s;%s;", names[0].Data(), names[1].Data(), names[2].Data());
+                if (fEnableBarrelMixingHistos) {
+                  histNames += Form("PairsBarrelMEPM_%s_%s;PairsBarrelMEPP_%s_%s;PairsBarrelMEMM_%s_%s;",
+                                    objArray->At(icut)->GetName(), objArrayPair->At(iPairCut)->GetName(),
+                                    objArray->At(icut)->GetName(), objArrayPair->At(iPairCut)->GetName(),
+                                    objArray->At(icut)->GetName(), objArrayPair->At(iPairCut)->GetName());
+                }
                 fTrackHistNames[fNCutsBarrel + icut * fNPairCuts + iPairCut] = names;
               } // end loop (pair cuts)
             } // end if (pair cuts)
@@ -2207,6 +2214,22 @@ struct AnalysisSameEventPairing {
               }
               if constexpr (TPairType == VarManager::kDecayToEE) {
                 fHistMan->FillHistClass(Form("PairsBarrelMEMM_%s", fTrackCuts[icut].Data()), VarManager::fgValues);
+              }
+            }
+          }
+          if constexpr (TPairType == VarManager::kDecayToEE) {
+            if (fEnableBarrelMixingHistos) {
+              for (auto& pairCut : fPairCuts) {
+                if (!pairCut.IsSelected(VarManager::fgValues)) {
+                  continue;
+                }
+                if (pairSign == 0) {
+                  fHistMan->FillHistClass(Form("PairsBarrelMEPM_%s_%s", fTrackCuts[icut].Data(), pairCut.GetName()), VarManager::fgValues);
+                } else if (pairSign > 0) {
+                  fHistMan->FillHistClass(Form("PairsBarrelMEPP_%s_%s", fTrackCuts[icut].Data(), pairCut.GetName()), VarManager::fgValues);
+                } else {
+                  fHistMan->FillHistClass(Form("PairsBarrelMEMM_%s_%s", fTrackCuts[icut].Data(), pairCut.GetName()), VarManager::fgValues);
+                }
               }
             }
           }
