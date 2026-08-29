@@ -997,6 +997,7 @@ void o2::aod::dqhistograms::DefineHistograms(HistogramManager* hm, const char* h
       hm->AddHistogram(histClass, "VtxNcontrib_Mass_Pt", "", false,
                        kVtxNcontribNbins, vtxNcontribBinLimits, VarManager::kVtxNcontrib,
                        kMassNbins, massBinLimits, VarManager::kMass, kPtNbins, ptBinLimits, VarManager::kPt);
+      hm->AddHistogram(histClass, "DaughterPtSum", "", false, kPtNbins, ptBinLimits, VarManager::kDaughterPtSum);
     }
     if (subGroupStr.Contains("barrel")) {
       hm->AddHistogram(histClass, "Mass", "", false, 500, 0.0, 5.0, VarManager::kMass);
