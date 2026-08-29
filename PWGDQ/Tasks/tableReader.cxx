@@ -743,6 +743,8 @@ struct AnalysisEventMixing {
   Configurable<std::string> fConfigTrackCutsJSON{"cfgBarrelTrackCutsJSON", "", "Additional list of barrel track cuts in JSON format"};
   Configurable<std::string> fConfigMuonCuts{"cfgMuonCuts", "", "Comma separated list of muon cuts"};
   Configurable<std::string> fConfigMuonCutsJSON{"cfgMuonCutsJSON", "", "Additional list of muon cuts in JSON format"};
+  Configurable<std::string> fConfigPairCuts{"cfgPairCuts", "", "Comma separated list of pair cuts"};
+  Configurable<std::string> fConfigPairCutsJSON{"cfgPairCutsJSON", "", "Additional list of pair cuts in JSON format"};
   Configurable<int> fConfigMixingDepth{"cfgMixingDepth", 100, "Number of Events stored for event mixing"};
   Configurable<std::string> fConfigAddEventMixingHistogram{"cfgAddEventMixingHistogram", "", "Comma separated list of histograms"};
   Configurable<std::string> ccdburl{"ccdburl", "http://alice-ccdb.cern.ch", "url of the ccdb repository"};
@@ -775,6 +777,8 @@ struct AnalysisEventMixing {
   std::vector<std::vector<TString>> fTrackHistNames;
   std::vector<std::vector<TString>> fMuonHistNames;
   std::vector<std::vector<TString>> fTrackMuonHistNames;
+  std::vector<AnalysisCompositeCut> fPairCuts;
+  std::vector<TString> fPairCutNames;
 
   NoBinningPolicy<aod::dqanalysisflags::MixingHash> hashBin;
 
@@ -797,6 +801,16 @@ struct AnalysisEventMixing {
 
     // Keep track of all the histogram class names to avoid composing strings in the event mixing pairing
     TString histNames = "";
+    TString pairCutNamesStr = fConfigPairCuts.value;
+    AppendCutNamesFromJSON(pairCutNamesStr, fConfigPairCutsJSON.value);
+    if (!pairCutNamesStr.IsNull()) {
+      std::unique_ptr<TObjArray> objArray(pairCutNamesStr.Tokenize(","));
+      for (int icut = 0; icut < objArray->GetEntries(); ++icut) {
+        fPairCuts.push_back(*dqcuts::GetCompositeCut(objArray->At(icut)->GetName()));
+        fPairCutNames.emplace_back(objArray->At(icut)->GetName());
+      }
+      VarManager::SetUseVars(AnalysisCut::fgUsedVars);
+    }
     if (context.mOptions.get<bool>("processBarrelSkimmed") || context.mOptions.get<bool>("processBarrelVnSkimmed")) {
       TString cutNames = fConfigTrackCuts.value;
       AppendCutNamesFromJSON(cutNames, fConfigTrackCutsJSON.value);
@@ -809,6 +823,13 @@ struct AnalysisEventMixing {
             Form("PairsBarrelMEMM_%s", objArray->At(icut)->GetName())};
           histNames += Form("%s;%s;%s;", names[0].Data(), names[1].Data(), names[2].Data());
           fTrackHistNames.push_back(names);
+          for (auto& pairCutName : fPairCutNames) {
+            names = {Form("PairsBarrelMEPM_%s_%s", objArray->At(icut)->GetName(), pairCutName.Data()),
+                     Form("PairsBarrelMEPP_%s_%s", objArray->At(icut)->GetName(), pairCutName.Data()),
+                     Form("PairsBarrelMEMM_%s_%s", objArray->At(icut)->GetName(), pairCutName.Data())};
+            histNames += Form("%s;%s;%s;", names[0].Data(), names[1].Data(), names[2].Data());
+            fTrackHistNames.push_back(names);
+          }
           fTwoTrackFilterMask |= (static_cast<uint32_t>(1) << icut);
         }
       }
@@ -829,6 +850,17 @@ struct AnalysisEventMixing {
             histNames += Form("%s;%s;%s;", names[0].Data(), names[1].Data(), names[2].Data());
           }
           fMuonHistNames.push_back(names);
+          for (auto& pairCutName : fPairCutNames) {
+            names = {Form("PairsMuonMEPM_%s_%s", objArray->At(icut)->GetName(), pairCutName.Data()),
+                     Form("PairsMuonMEPP_%s_%s", objArray->At(icut)->GetName(), pairCutName.Data()),
+                     Form("PairsMuonMEMM_%s_%s", objArray->At(icut)->GetName(), pairCutName.Data())};
+            if (fConfigAmbiguousHist) {
+              histNames += Form("%s;%s;%s;%s_unambiguous;%s_unambiguous;%s_unambiguous;", names[0].Data(), names[1].Data(), names[2].Data(), names[0].Data(), names[1].Data(), names[2].Data());
+            } else {
+              histNames += Form("%s;%s;%s;", names[0].Data(), names[1].Data(), names[2].Data());
+            }
+            fMuonHistNames.push_back(names);
+          }
           fTwoMuonFilterMask |= (static_cast<uint32_t>(1) << icut);
         }
       }
@@ -849,6 +881,13 @@ struct AnalysisEventMixing {
               Form("PairsEleMuMEMM_%s_%s", objArrayBarrel->At(icut)->GetName(), objArrayMuon->At(icut)->GetName())};
             histNames += Form("%s;%s;%s;", names[0].Data(), names[1].Data(), names[2].Data());
             fTrackMuonHistNames.push_back(names);
+            for (auto& pairCutName : fPairCutNames) {
+              names = {Form("PairsEleMuMEPM_%s_%s_%s", objArrayBarrel->At(icut)->GetName(), objArrayMuon->At(icut)->GetName(), pairCutName.Data()),
+                       Form("PairsEleMuMEPP_%s_%s_%s", objArrayBarrel->At(icut)->GetName(), objArrayMuon->At(icut)->GetName(), pairCutName.Data()),
+                       Form("PairsEleMuMEMM_%s_%s_%s", objArrayBarrel->At(icut)->GetName(), objArrayMuon->At(icut)->GetName(), pairCutName.Data())};
+              histNames += Form("%s;%s;%s;", names[0].Data(), names[1].Data(), names[2].Data());
+              fTrackMuonHistNames.push_back(names);
+            }
             fTwoTrackFilterMask |= (static_cast<uint32_t>(1) << icut);
             fTwoMuonFilterMask |= (static_cast<uint32_t>(1) << icut);
           }
@@ -867,14 +906,14 @@ struct AnalysisEventMixing {
   void runMixedPairing(TTracks1 const& tracks1, TTracks2 const& tracks2)
   {
 
-    unsigned int ncuts = fTrackHistNames.size();
+    unsigned int ncuts = fTrackHistNames.size() / (fPairCuts.size() + 1);
     std::vector<std::vector<TString>> histNames = fTrackHistNames;
     if constexpr (TPairType == pairTypeMuMu) {
-      ncuts = fMuonHistNames.size();
+      ncuts = fMuonHistNames.size() / (fPairCuts.size() + 1);
       histNames = fMuonHistNames;
     }
     if constexpr (TPairType == pairTypeEMu) {
-      ncuts = fTrackMuonHistNames.size();
+      ncuts = fTrackMuonHistNames.size() / (fPairCuts.size() + 1);
       histNames = fTrackMuonHistNames;
     }
 
@@ -891,6 +930,27 @@ struct AnalysisEventMixing {
       } // end for (track2)
     } // end for (track1)
     VarManager::fgValues[VarManager::kMultDimuonsME] = mult_dimuons;
+
+    auto fillHistograms = [&](const std::vector<TString>& names, const auto& track1, const auto& track2) {
+      if (track1.sign() * track2.sign() < 0) {
+        fHistMan->FillHistClass(names[0].Data(), VarManager::fgValues);
+        if (fConfigAmbiguousHist && !(track1.isAmbiguous() || track2.isAmbiguous())) {
+          fHistMan->FillHistClass(Form("%s_unambiguous", names[0].Data()), VarManager::fgValues);
+        }
+      } else {
+        if (track1.sign() > 0) {
+          fHistMan->FillHistClass(names[1].Data(), VarManager::fgValues);
+          if (fConfigAmbiguousHist && !(track1.isAmbiguous() || track2.isAmbiguous())) {
+            fHistMan->FillHistClass(Form("%s_unambiguous", names[1].Data()), VarManager::fgValues);
+          }
+        } else {
+          fHistMan->FillHistClass(names[2].Data(), VarManager::fgValues);
+          if (fConfigAmbiguousHist && !(track1.isAmbiguous() || track2.isAmbiguous())) {
+            fHistMan->FillHistClass(Form("%s_unambiguous", names[2].Data()), VarManager::fgValues);
+          }
+        }
+      }
+    };
 
     twoTrackFilter = 0;
     for (auto& track1 : tracks1) {
@@ -913,28 +973,21 @@ struct AnalysisEventMixing {
         }
         VarManager::FillPairME<TEventFillMap, TPairType>(track1, track2);
 
-        for (unsigned int icut = 0; icut < ncuts; icut++) {
+        unsigned int iHist = 0;
+        for (unsigned int icut = 0; icut < ncuts; ++icut) {
           if (twoTrackFilter & (static_cast<uint32_t>(1) << icut)) {
-            if (track1.sign() * track2.sign() < 0) {
-              fHistMan->FillHistClass(histNames[icut][0].Data(), VarManager::fgValues);
-              if (fConfigAmbiguousHist && !(track1.isAmbiguous() || track2.isAmbiguous())) {
-                fHistMan->FillHistClass(Form("%s_unambiguous", histNames[icut][0].Data()), VarManager::fgValues);
+            fillHistograms(histNames[iHist], track1, track2);
+            ++iHist;
+            for (auto& pairCut : fPairCuts) {
+              if (pairCut.IsSelected(VarManager::fgValues)) {
+                fillHistograms(histNames[iHist], track1, track2);
               }
-            } else {
-              if (track1.sign() > 0) {
-                fHistMan->FillHistClass(histNames[icut][1].Data(), VarManager::fgValues);
-                if (fConfigAmbiguousHist && !(track1.isAmbiguous() || track2.isAmbiguous())) {
-                  fHistMan->FillHistClass(Form("%s_unambiguous", histNames[icut][1].Data()), VarManager::fgValues);
-                }
-              } else {
-                fHistMan->FillHistClass(histNames[icut][2].Data(), VarManager::fgValues);
-                if (fConfigAmbiguousHist && !(track1.isAmbiguous() || track2.isAmbiguous())) {
-                  fHistMan->FillHistClass(Form("%s_unambiguous", histNames[icut][2].Data()), VarManager::fgValues);
-                }
-              }
+              ++iHist;
             }
-          } // end if (filter bits)
-        } // end for (cuts)
+          } else {
+            iHist += 1 + fPairCuts.size();
+          }
+        }
       } // end for (track2)
     } // end for (track1)
   }
